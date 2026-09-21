@@ -13,26 +13,9 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CATEGORY_OPTIONS, SEASON_OPTIONS } from "@/lib/clothing-options";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-
-const CATEGORY_OPTIONS = [
-  { value: "tops", label: "トップス" },
-  { value: "bottoms", label: "ボトムス" },
-  { value: "dress", label: "ワンピース" },
-  { value: "outer", label: "アウター" },
-  { value: "shoes", label: "シューズ" },
-  { value: "bag", label: "バッグ" },
-  { value: "other", label: "その他" },
-] as const;
-
-const SEASON_OPTIONS = [
-  { value: "spring", label: "春" },
-  { value: "summer", label: "夏" },
-  { value: "autumn", label: "秋" },
-  { value: "winter", label: "冬" },
-  { value: "all", label: "オールシーズン" },
-] as const;
 
 const selectClassName = cn(
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
@@ -81,7 +64,7 @@ export function ClothingItemForm({
         });
       if (insertError) throw insertError;
 
-      router.push("/protected");
+      router.push("/protected/items");
     } catch (error: unknown) {
       console.error("clothing item registration failed:", error);
       const message =
