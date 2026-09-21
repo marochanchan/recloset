@@ -26,15 +26,16 @@ async function ClothingItemsList() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {items.map((item) => (
-        <ClothingItemCard
-          key={item.id}
-          title={item.title}
-          brand={item.brand}
-          category={item.category}
-          season={item.season}
-          favorite={item.favorite}
-          status={item.status}
-        />
+        <Link key={item.id} href={`/protected/items/${item.id}`}>
+          <ClothingItemCard
+            title={item.title}
+            brand={item.brand}
+            category={item.category}
+            season={item.season}
+            favorite={item.favorite}
+            status={item.status}
+          />
+        </Link>
       ))}
     </div>
   );
