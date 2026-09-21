@@ -1,3 +1,4 @@
+import { ClothingImageGallery } from "@/components/clothing-image-gallery";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -13,6 +14,7 @@ import { Suspense } from "react";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SIGNED_URL_EXPIRES_IN = 600; // 10分
 
 async function ClothingItemDetail({
   params,
@@ -29,9 +31,10 @@ async function ClothingItemDetail({
   const { data: item, error } = await supabase
     .from("clothing_items")
     .select(
-      "id, title, brand, category, season, purchase_date, purchase_price, favorite, status, wear_count, last_worn_at",
+      "id, title, brand, category, season, purchase_date, purchase_price, favorite, status, wear_count, last_worn_at, clothing_images(image_path, sort_order)",
     )
     .eq("id", id)
+    .order("sort_order", { referencedTable: "clothing_images" })
     .maybeSingle();
 
   if (error) {
@@ -42,43 +45,76 @@ async function ClothingItemDetail({
     notFound();
   }
 
+  const paths = item.clothing_images.map((img) => img.image_path);
+  const signedUrlMap = new Map<string, string>();
+
+  if (paths.length > 0) {
+    const { data: signedUrls, error: signError } = await supabase.storage
+      .from("clothing-images")
+      .createSignedUrls(paths, SIGNED_URL_EXPIRES_IN);
+
+    if (signError) {
+      console.error("clothing image signed url error:", signError);
+    } else {
+      for (const entry of signedUrls) {
+        if (entry.error || !entry.path || !entry.signedUrl) {
+          console.error("clothing image signed url entry error:", entry);
+          continue;
+        }
+        signedUrlMap.set(entry.path, entry.signedUrl);
+      }
+    }
+  }
+
+  const imageUrls = item.clothing_images
+    .map((img) => signedUrlMap.get(img.image_path))
+    .filter((url): url is string => Boolean(url));
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-2xl">{item.title}</CardTitle>
-          {item.favorite && <Badge>お気に入り</Badge>}
-        </div>
-        {item.brand && (
-          <p className="text-sm text-muted-foreground">{item.brand}</p>
-        )}
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary">{getCategoryLabel(item.category)}</Badge>
-          {item.season && (
-            <Badge variant="secondary">{getSeasonLabel(item.season)}</Badge>
+    <div className="flex flex-col gap-4">
+      <ClothingImageGallery images={imageUrls} alt={item.title} />
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="text-2xl">{item.title}</CardTitle>
+            {item.favorite && <Badge>お気に入り</Badge>}
+          </div>
+          {item.brand && (
+            <p className="text-sm text-muted-foreground">{item.brand}</p>
           )}
-          <Badge variant="outline">{item.status}</Badge>
-        </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="secondary">
+              {getCategoryLabel(item.category)}
+            </Badge>
+            {item.season && (
+              <Badge variant="secondary">{getSeasonLabel(item.season)}</Badge>
+            )}
+            <Badge variant="outline">{item.status}</Badge>
+          </div>
 
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <dt className="text-muted-foreground">購入日</dt>
-          <dd>{item.purchase_date ?? "未登録"}</dd>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <dt className="text-muted-foreground">購入日</dt>
+            <dd>{item.purchase_date ?? "未登録"}</dd>
 
-          <dt className="text-muted-foreground">購入価格</dt>
-          <dd>
-            {item.purchase_price !== null ? `¥${item.purchase_price}` : "未登録"}
-          </dd>
+            <dt className="text-muted-foreground">購入価格</dt>
+            <dd>
+              {item.purchase_price !== null
+                ? `¥${item.purchase_price}`
+                : "未登録"}
+            </dd>
 
-          <dt className="text-muted-foreground">着用回数</dt>
-          <dd>{item.wear_count}回</dd>
+            <dt className="text-muted-foreground">着用回数</dt>
+            <dd>{item.wear_count}回</dd>
 
-          <dt className="text-muted-foreground">最終着用日</dt>
-          <dd>{item.last_worn_at ?? "未記録"}</dd>
-        </dl>
-      </CardContent>
-    </Card>
+            <dt className="text-muted-foreground">最終着用日</dt>
+            <dd>{item.last_worn_at ?? "未記録"}</dd>
+          </dl>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
