@@ -4,12 +4,17 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Suspense } from "react";
 
+const SIGNED_URL_EXPIRES_IN = 600; // 10分
+
 async function ClothingItemsList() {
   const supabase = await createClient();
   const { data: items, error } = await supabase
     .from("clothing_items")
-    .select("id, title, brand, category, season, favorite, status")
-    .order("created_at", { ascending: false });
+    .select(
+      "id, title, brand, category, season, favorite, status, clothing_images(image_path, sort_order)",
+    )
+    .order("created_at", { ascending: false })
+    .order("sort_order", { referencedTable: "clothing_images" });
 
   if (error) {
     throw error;
@@ -23,20 +28,52 @@ async function ClothingItemsList() {
     );
   }
 
+  const representativePaths = items
+    .map((item) => item.clothing_images[0]?.image_path)
+    .filter((path): path is string => Boolean(path));
+
+  const signedUrlMap = new Map<string, string>();
+
+  if (representativePaths.length > 0) {
+    const { data: signedUrls, error: signError } = await supabase.storage
+      .from("clothing-images")
+      .createSignedUrls(representativePaths, SIGNED_URL_EXPIRES_IN);
+
+    if (signError) {
+      console.error("clothing image signed url error:", signError);
+    } else {
+      for (const entry of signedUrls) {
+        if (entry.error || !entry.path || !entry.signedUrl) {
+          console.error("clothing image signed url entry error:", entry);
+          continue;
+        }
+        signedUrlMap.set(entry.path, entry.signedUrl);
+      }
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {items.map((item) => (
-        <Link key={item.id} href={`/protected/items/${item.id}`}>
-          <ClothingItemCard
-            title={item.title}
-            brand={item.brand}
-            category={item.category}
-            season={item.season}
-            favorite={item.favorite}
-            status={item.status}
-          />
-        </Link>
-      ))}
+      {items.map((item) => {
+        const representativePath = item.clothing_images[0]?.image_path ?? null;
+        const imageUrl = representativePath
+          ? (signedUrlMap.get(representativePath) ?? null)
+          : null;
+
+        return (
+          <Link key={item.id} href={`/protected/items/${item.id}`}>
+            <ClothingItemCard
+              title={item.title}
+              brand={item.brand}
+              category={item.category}
+              season={item.season}
+              favorite={item.favorite}
+              status={item.status}
+              imageUrl={imageUrl}
+            />
+          </Link>
+        );
+      })}
     </div>
   );
 }

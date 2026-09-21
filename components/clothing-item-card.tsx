@@ -6,6 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCategoryLabel, getSeasonLabel } from "@/lib/clothing-options";
+import Image from "next/image";
 
 type ClothingItemCardProps = {
   title: string;
@@ -14,6 +15,7 @@ type ClothingItemCardProps = {
   season: string | null;
   favorite: boolean;
   status: string;
+  imageUrl: string | null;
 };
 
 export function ClothingItemCard({
@@ -23,9 +25,25 @@ export function ClothingItemCard({
   season,
   favorite,
   status,
+  imageUrl,
 }: ClothingItemCardProps) {
   return (
-    <Card>
+    <Card className="overflow-hidden">
+      <div className="relative aspect-square bg-muted">
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt={title}
+            fill
+            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            className="object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+            画像なし
+          </div>
+        )}
+      </div>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-lg">{title}</CardTitle>
