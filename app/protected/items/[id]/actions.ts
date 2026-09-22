@@ -1,10 +1,15 @@
 "use server";
 
+import { STATUS_OPTIONS } from "@/lib/clothing-options";
 import { createClient } from "@/lib/supabase/server";
 import { hasWornToday } from "@/lib/wear-logs";
 import { revalidatePath } from "next/cache";
 
 type RecordWearTodayResult = {
+  error: string | null;
+};
+
+type UpdateStatusResult = {
   error: string | null;
 };
 
@@ -69,6 +74,53 @@ export async function recordWearToday(
       error:
         "着用記録は保存されましたが、回数の更新に失敗しました。再読み込みしてご確認ください。",
     };
+  }
+
+  revalidatePath(`/protected/items/${itemId}`);
+  return { error: null };
+}
+
+export async function updateClothingItemStatus(
+  itemId: string,
+  status: string,
+): Promise<UpdateStatusResult> {
+  const validStatuses: string[] = STATUS_OPTIONS.map((option) => option.value);
+  if (!validStatuses.includes(status)) {
+    return { error: "不正なステータスです" };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { error: "ログイン情報が確認できませんでした" };
+  }
+
+  // RLSにより、自分が所有する服でなければ取得できない
+  const { data: item, error: itemError } = await supabase
+    .from("clothing_items")
+    .select("id")
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (itemError) {
+    console.error("updateClothingItemStatus: fetch item error", itemError);
+    return { error: "服の情報を取得できませんでした" };
+  }
+  if (!item) {
+    return { error: "対象の服が見つかりません" };
+  }
+
+  const { error: updateError } = await supabase
+    .from("clothing_items")
+    .update({ status })
+    .eq("id", itemId);
+  if (updateError) {
+    console.error("updateClothingItemStatus: update error", updateError);
+    return { error: "ステータスの更新に失敗しました" };
   }
 
   revalidatePath(`/protected/items/${itemId}`);

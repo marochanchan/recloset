@@ -16,10 +16,21 @@ export const SEASON_OPTIONS = [
   { value: "all", label: "オールシーズン" },
 ] as const;
 
+export const STATUS_OPTIONS = [
+  { value: "closet", label: "クローゼット" },
+  { value: "candidate", label: "手放し候補" },
+  { value: "letting_go", label: "手放す" },
+  { value: "sold", label: "売却済み" },
+] as const;
+
 export function getCategoryLabel(value: string): string {
   return CATEGORY_OPTIONS.find((option) => option.value === value)?.label ?? value;
 }
 
 export function getSeasonLabel(value: string): string {
   return SEASON_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
+
+export function getStatusLabel(value: string): string {
+  return STATUS_OPTIONS.find((option) => option.value === value)?.label ?? value;
 }

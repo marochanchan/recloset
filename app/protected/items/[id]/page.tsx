@@ -6,8 +6,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { StatusSelector } from "@/components/status-selector";
 import { WearTodayButton } from "@/components/wear-today-button";
-import { getCategoryLabel, getSeasonLabel } from "@/lib/clothing-options";
+import {
+  getCategoryLabel,
+  getSeasonLabel,
+  getStatusLabel,
+} from "@/lib/clothing-options";
 import { createClient } from "@/lib/supabase/server";
 import { formatJstDate, hasWornToday } from "@/lib/wear-logs";
 import Link from "next/link";
@@ -96,13 +101,15 @@ async function ClothingItemDetail({
             {item.season && (
               <Badge variant="secondary">{getSeasonLabel(item.season)}</Badge>
             )}
-            <Badge variant="outline">{item.status}</Badge>
+            <Badge variant="outline">{getStatusLabel(item.status)}</Badge>
           </div>
 
           <WearTodayButton
             itemId={item.id}
             alreadyLoggedToday={alreadyLoggedToday}
           />
+
+          <StatusSelector itemId={item.id} currentStatus={item.status} />
 
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <dt className="text-muted-foreground">購入日</dt>

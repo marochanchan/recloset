@@ -5,7 +5,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getCategoryLabel, getSeasonLabel } from "@/lib/clothing-options";
+import {
+  getCategoryLabel,
+  getSeasonLabel,
+  getStatusLabel,
+} from "@/lib/clothing-options";
 import Image from "next/image";
 
 type ClothingItemCardProps = {
@@ -56,7 +60,7 @@ export function ClothingItemCard({
         {season && (
           <Badge variant="secondary">{getSeasonLabel(season)}</Badge>
         )}
-        <Badge variant="outline">{status}</Badge>
+        <Badge variant="outline">{getStatusLabel(status)}</Badge>
       </CardContent>
     </Card>
   );
