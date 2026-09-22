@@ -11,7 +11,7 @@ async function ClothingItemsList() {
   const { data: items, error } = await supabase
     .from("clothing_items")
     .select(
-      "id, title, brand, category, season, favorite, status, clothing_images(image_path, sort_order)",
+      "id, title, brand, category, season, favorite, status, last_worn_at, clothing_images(image_path, sort_order)",
     )
     .order("created_at", { ascending: false })
     .order("sort_order", { referencedTable: "clothing_images" });
@@ -69,6 +69,7 @@ async function ClothingItemsList() {
               season={item.season}
               favorite={item.favorite}
               status={item.status}
+              lastWornAt={item.last_worn_at}
               imageUrl={imageUrl}
             />
           </Link>

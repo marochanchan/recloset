@@ -66,3 +66,44 @@ const jstDateFormatter = new Intl.DateTimeFormat("ja-JP", {
 export function formatJstDate(isoString: string): string {
   return jstDateFormatter.format(new Date(isoString));
 }
+
+/**
+ * 2つの時刻について、Asia/Tokyo基準の「暦日」が何日離れているかを返す。
+ * 経過時間（24時間単位）ではなく、日本時間のカレンダー日の差で計算する。
+ * getJstDayRangeUtc() が返すJST真夜中のUTC時刻同士の差は常に24時間の
+ * 整数倍になるため、そのまま日数に変換できる。
+ */
+export function getJstCalendarDaysDiff(from: Date, to: Date): number {
+  const fromStartUtc = getJstDayRangeUtc(from).startUtc.getTime();
+  const toStartUtc = getJstDayRangeUtc(to).startUtc.getTime();
+  return Math.round((toStartUtc - fromStartUtc) / (24 * 60 * 60 * 1000));
+}
+
+/**
+ * last_worn_at（timestamptzのISO文字列、未着用ならnull）から、
+ * Asia/Tokyo基準で「何日着ていないか」を返す。
+ * 未着用（null）の場合はnullを返す。将来のAI診断・フィルター
+ * （例:「90日以上着ていない服」）から再利用できるよう、
+ * 表示用の文言とは分離した数値のみの関数にしている。
+ */
+export function getDaysSinceLastWorn(
+  lastWornAt: string | null,
+  referenceDate: Date = new Date(),
+): number | null {
+  if (!lastWornAt) return null;
+  return getJstCalendarDaysDiff(new Date(lastWornAt), referenceDate);
+}
+
+/**
+ * last_worn_at から、一覧カードなどにそのまま表示できる着用状況の
+ * 短い文言を返す（例:「今日着ました」「3日着ていません」「着用記録なし」）。
+ */
+export function getWearRecencyLabel(
+  lastWornAt: string | null,
+  referenceDate: Date = new Date(),
+): string {
+  const daysSince = getDaysSinceLastWorn(lastWornAt, referenceDate);
+  if (daysSince === null) return "着用記録なし";
+  if (daysSince <= 0) return "今日着ました";
+  return `${daysSince}日着ていません`;
+}

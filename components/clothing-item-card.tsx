@@ -10,6 +10,7 @@ import {
   getSeasonLabel,
   getStatusLabel,
 } from "@/lib/clothing-options";
+import { getWearRecencyLabel } from "@/lib/wear-logs";
 import Image from "next/image";
 
 type ClothingItemCardProps = {
@@ -19,6 +20,7 @@ type ClothingItemCardProps = {
   season: string | null;
   favorite: boolean;
   status: string;
+  lastWornAt: string | null;
   imageUrl: string | null;
 };
 
@@ -29,6 +31,7 @@ export function ClothingItemCard({
   season,
   favorite,
   status,
+  lastWornAt,
   imageUrl,
 }: ClothingItemCardProps) {
   return (
@@ -61,6 +64,7 @@ export function ClothingItemCard({
           <Badge variant="secondary">{getSeasonLabel(season)}</Badge>
         )}
         <Badge variant="outline">{getStatusLabel(status)}</Badge>
+        <Badge variant="secondary">{getWearRecencyLabel(lastWornAt)}</Badge>
       </CardContent>
     </Card>
   );
