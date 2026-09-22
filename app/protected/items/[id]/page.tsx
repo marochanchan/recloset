@@ -6,8 +6,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { WearTodayButton } from "@/components/wear-today-button";
 import { getCategoryLabel, getSeasonLabel } from "@/lib/clothing-options";
 import { createClient } from "@/lib/supabase/server";
+import { formatJstDate, hasWornToday } from "@/lib/wear-logs";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -70,6 +72,8 @@ async function ClothingItemDetail({
     .map((img) => signedUrlMap.get(img.image_path))
     .filter((url): url is string => Boolean(url));
 
+  const alreadyLoggedToday = await hasWornToday(supabase, item.id);
+
   return (
     <div className="flex flex-col gap-4">
       <ClothingImageGallery images={imageUrls} alt={item.title} />
@@ -95,6 +99,11 @@ async function ClothingItemDetail({
             <Badge variant="outline">{item.status}</Badge>
           </div>
 
+          <WearTodayButton
+            itemId={item.id}
+            alreadyLoggedToday={alreadyLoggedToday}
+          />
+
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <dt className="text-muted-foreground">購入日</dt>
             <dd>{item.purchase_date ?? "未登録"}</dd>
@@ -109,8 +118,12 @@ async function ClothingItemDetail({
             <dt className="text-muted-foreground">着用回数</dt>
             <dd>{item.wear_count}回</dd>
 
-            <dt className="text-muted-foreground">最終着用日</dt>
-            <dd>{item.last_worn_at ?? "未記録"}</dd>
+            <dt className="text-muted-foreground">最後に着た日</dt>
+            <dd>
+              {item.last_worn_at
+                ? formatJstDate(item.last_worn_at)
+                : "まだ着用記録がありません"}
+            </dd>
           </dl>
         </CardContent>
       </Card>
