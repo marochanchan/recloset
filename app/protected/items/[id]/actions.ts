@@ -1,8 +1,21 @@
 "use server";
 
+import {
+  type DiagnosisFact,
+  type JevDiagnosisResult,
+  isAmbiguousFeeling,
+  runJevDiagnosis,
+  validateFeelingInput,
+} from "@/lib/ai-diagnosis";
 import { STATUS_OPTIONS } from "@/lib/clothing-options";
+import { type NextAction, buildNextAction } from "@/lib/next-action";
 import { createClient } from "@/lib/supabase/server";
-import { hasWornToday } from "@/lib/wear-logs";
+import {
+  getCurrentSeasonJst,
+  getDaysSinceLastWorn,
+  getDaysSincePurchase,
+  hasWornToday,
+} from "@/lib/wear-logs";
 import { revalidatePath } from "next/cache";
 
 type RecordWearTodayResult = {
@@ -12,6 +25,15 @@ type RecordWearTodayResult = {
 type UpdateStatusResult = {
   error: string | null;
 };
+
+type RunAiDiagnosisResult =
+  | { error: string }
+  | {
+      error: null;
+      decision: JevDiagnosisResult;
+      isAmbiguousFeeling: boolean;
+      nextAction: NextAction;
+    };
 
 export async function recordWearToday(
   itemId: string,
@@ -125,4 +147,76 @@ export async function updateClothingItemStatus(
 
   revalidatePath(`/protected/items/${itemId}`);
   return { error: null };
+}
+
+/**
+ * itemIdとFEELING回答からAI診断（Jev）を実行する。
+ * DBへの保存は行わない（その場限りの診断結果を返すだけ）。
+ * clothing_items.status は診断結果によって自動更新しない。
+ */
+export async function runAiDiagnosis(
+  itemId: string,
+  feelingInput: {
+    currentFeeling: string;
+    wantToWearAgain: string;
+    notWornReasons: string[];
+  },
+): Promise<RunAiDiagnosisResult> {
+  // クライアントのFEELING回答は許可リストで検証してから使う
+  const feeling = validateFeelingInput(feelingInput);
+  if (!feeling) {
+    return { error: "回答の内容が正しくありません" };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { error: "ログイン情報が確認できませんでした" };
+  }
+
+  // RLSにより、自分が所有する服でなければ取得できない。
+  // FACTはここで取得した値のみを使い、クライアントから受け取った値は使わない。
+  // status は過去のユーザー判断であり客観的な利用実績ではないため取得しない。
+  const { data: item, error: itemError } = await supabase
+    .from("clothing_items")
+    .select("wear_count, favorite, category, season, purchase_date, last_worn_at")
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (itemError) {
+    console.error("runAiDiagnosis: fetch item error", itemError);
+    return { error: "服の情報を取得できませんでした" };
+  }
+  if (!item) {
+    return { error: "対象の服が見つかりません" };
+  }
+
+  const fact: DiagnosisFact = {
+    wear_count: item.wear_count,
+    days_since_last_worn: getDaysSinceLastWorn(item.last_worn_at),
+    days_since_purchase: getDaysSincePurchase(item.purchase_date),
+    favorite: item.favorite,
+    category: item.category,
+    season: item.season,
+    current_season: getCurrentSeasonJst(),
+  };
+
+  try {
+    const decision = await runJevDiagnosis(fact, feeling);
+    return {
+      error: null,
+      decision,
+      isAmbiguousFeeling: isAmbiguousFeeling(feeling),
+      nextAction: buildNextAction(decision.choice, fact, feeling),
+    };
+  } catch (error) {
+    console.error("runAiDiagnosis: Jev evaluate error", error);
+    return {
+      error: "AI診断に失敗しました。時間をおいて再度お試しください。",
+    };
+  }
 }

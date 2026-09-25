@@ -1,0 +1,316 @@
+"use client";
+
+import { runAiDiagnosis } from "@/app/protected/items/[id]/actions";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  CURRENT_FEELING_OPTIONS,
+  NOT_WORN_REASON_OPTIONS,
+  WANT_TO_WEAR_AGAIN_OPTIONS,
+  type CurrentFeeling,
+  type JevDiagnosisResult,
+  type NotWornReason,
+  type WantToWearAgain,
+} from "@/lib/ai-diagnosis";
+import type { NextAction } from "@/lib/next-action";
+import { useState, useTransition } from "react";
+
+type AiDiagnosisFlowProps = {
+  itemId: string;
+  title: string;
+  brand: string | null;
+  categoryLabel: string;
+  seasonLabel: string | null;
+  favorite: boolean;
+  wearCount: number;
+  wearRecencyLabel: string;
+  daysSincePurchase: number | null;
+};
+
+type DiagnosisResultState = {
+  decision: JevDiagnosisResult;
+  isAmbiguousFeeling: boolean;
+  nextAction: NextAction;
+};
+
+const MAX_NOT_WORN_REASONS = 2;
+
+function OptionButtons<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly { value: T; label: string }[];
+  value: T | null;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((option) => (
+        <Button
+          key={option.value}
+          type="button"
+          size="sm"
+          variant={value === option.value ? "default" : "outline"}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Q3専用の複数選択ボタン群。
+ * - 通常の理由は最大2つまで
+ * - "do_not_remember" は排他的（選ぶと他をすべて解除、他を選ぶとdo_not_rememberを解除）
+ */
+function NotWornReasonButtons({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly { value: NotWornReason; label: string }[];
+  value: NotWornReason[];
+  onChange: (value: NotWornReason[]) => void;
+}) {
+  const handleToggle = (option: NotWornReason) => {
+    if (value.includes(option)) {
+      onChange(value.filter((selected) => selected !== option));
+      return;
+    }
+
+    if (option === "do_not_remember") {
+      onChange(["do_not_remember"]);
+      return;
+    }
+
+    const withoutDoNotRemember = value.filter(
+      (selected) => selected !== "do_not_remember",
+    );
+    if (withoutDoNotRemember.length >= MAX_NOT_WORN_REASONS) {
+      return; // 既に上限まで選択済み
+    }
+
+    onChange([...withoutDoNotRemember, option]);
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((option) => {
+        const isSelected = value.includes(option.value);
+        const isAtLimit =
+          !isSelected &&
+          option.value !== "do_not_remember" &&
+          value.filter((selected) => selected !== "do_not_remember")
+            .length >= MAX_NOT_WORN_REASONS;
+
+        return (
+          <Button
+            key={option.value}
+            type="button"
+            size="sm"
+            variant={isSelected ? "default" : "outline"}
+            disabled={isAtLimit}
+            onClick={() => handleToggle(option.value)}
+          >
+            {option.label}
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function AiDiagnosisFlow({
+  itemId,
+  title,
+  brand,
+  categoryLabel,
+  seasonLabel,
+  favorite,
+  wearCount,
+  wearRecencyLabel,
+  daysSincePurchase,
+}: AiDiagnosisFlowProps) {
+  const [currentFeeling, setCurrentFeeling] = useState<CurrentFeeling | null>(
+    null,
+  );
+  const [wantToWearAgain, setWantToWearAgain] =
+    useState<WantToWearAgain | null>(null);
+  const [notWornReasons, setNotWornReasons] = useState<NotWornReason[]>([]);
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<DiagnosisResultState | null>(null);
+
+  const canSubmit =
+    currentFeeling !== null &&
+    wantToWearAgain !== null &&
+    notWornReasons.length > 0;
+
+  const handleSubmit = () => {
+    if (!currentFeeling || !wantToWearAgain || notWornReasons.length === 0)
+      return;
+    setError(null);
+    startTransition(async () => {
+      const response = await runAiDiagnosis(itemId, {
+        currentFeeling,
+        wantToWearAgain,
+        notWornReasons,
+      });
+      if (response.error !== null) {
+        setError(response.error);
+        return;
+      }
+      setResult({
+        decision: response.decision,
+        isAmbiguousFeeling: response.isAmbiguousFeeling,
+        nextAction: response.nextAction,
+      });
+    });
+  };
+
+  const currentFeelingLabel = CURRENT_FEELING_OPTIONS.find(
+    (option) => option.value === currentFeeling,
+  )?.label;
+  const wantToWearAgainLabel = WANT_TO_WEAR_AGAIN_OPTIONS.find(
+    (option) => option.value === wantToWearAgain,
+  )?.label;
+  const notWornReasonLabels = notWornReasons
+    .map(
+      (reason) =>
+        NOT_WORN_REASON_OPTIONS.find((option) => option.value === reason)
+          ?.label ?? "",
+    )
+    .filter((label) => label !== "")
+    .join("、");
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="text-xl">{title}</CardTitle>
+            {favorite && <Badge>お気に入り</Badge>}
+          </div>
+          {brand && <p className="text-sm text-muted-foreground">{brand}</p>}
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Badge variant="secondary">{categoryLabel}</Badge>
+          {seasonLabel && <Badge variant="secondary">{seasonLabel}</Badge>}
+        </CardContent>
+      </Card>
+
+      {!result && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">3つの質問</CardTitle>
+            <CardDescription>
+              これは判定ではなく、あなたが考えるためのヒントを見つける質問です。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium">
+                今、この服をどれくらい気に入っていますか？
+              </p>
+              <OptionButtons
+                options={CURRENT_FEELING_OPTIONS}
+                value={currentFeeling}
+                onChange={setCurrentFeeling}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium">
+                もう一度、この服を着たいと思いますか？
+              </p>
+              <OptionButtons
+                options={WANT_TO_WEAR_AGAIN_OPTIONS}
+                value={wantToWearAgain}
+                onChange={setWantToWearAgain}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium">
+                最近着ていない理由に近いものは？（最大2つ）
+              </p>
+              <NotWornReasonButtons
+                options={NOT_WORN_REASON_OPTIONS}
+                value={notWornReasons}
+                onChange={setNotWornReasons}
+              />
+            </div>
+
+            {error && <p className="text-sm text-red-500">{error}</p>}
+
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!canSubmit || isPending}
+            >
+              {isPending ? "診断中..." : "診断する"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {result && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">診断結果</CardTitle>
+            <CardDescription>
+              これは手放す・残すを決める答えではなく、あなたが考えるためのヒントです。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-6">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium">客観的なデータ</p>
+              <ul className="text-sm text-muted-foreground">
+                <li>着用回数：{wearCount}回</li>
+                <li>着用状況：{wearRecencyLabel}</li>
+                <li>
+                  購入からの経過：
+                  {daysSincePurchase !== null
+                    ? `${daysSincePurchase}日`
+                    : "購入日は未登録です"}
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium">あなたの回答</p>
+              <ul className="text-sm text-muted-foreground">
+                <li>今の気持ち：{currentFeelingLabel}</li>
+                <li>また着たいか：{wantToWearAgainLabel}</li>
+                <li>着ていない理由：{notWornReasonLabels}</li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col gap-2 rounded-md border p-4">
+              <p className="text-sm font-medium">次の一歩</p>
+              {result.isAmbiguousFeeling && (
+                <p className="text-sm text-muted-foreground">
+                  まだ迷っている服かもしれません。今すぐ結論を出さなくても大丈夫です。
+                </p>
+              )}
+              <p className="font-medium">{result.nextAction.title}</p>
+              <p className="text-sm text-muted-foreground">
+                {result.nextAction.message}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

@@ -107,3 +107,32 @@ export function getWearRecencyLabel(
   if (daysSince <= 0) return "今日着ました";
   return `${daysSince}日着ていません`;
 }
+
+/**
+ * purchase_date（dateのISO文字列 "YYYY-MM-DD"、未登録ならnull）から、
+ * Asia/Tokyo基準で購入から何日経過したかを返す。AI診断のFACTで使用する。
+ */
+export function getDaysSincePurchase(
+  purchaseDate: string | null,
+  referenceDate: Date = new Date(),
+): number | null {
+  if (!purchaseDate) return null;
+  return getJstCalendarDaysDiff(new Date(purchaseDate), referenceDate);
+}
+
+/**
+ * 実行環境のローカルタイムゾーンに依存せず、Asia/Tokyoの「今」が
+ * 何月かから季節を判定する（3-5月:春, 6-8月:夏, 9-11月:秋, 12-2月:冬）。
+ * AI診断のFACTで、服自体のseasonとは別に「今の季節」として使用する。
+ */
+export function getCurrentSeasonJst(
+  referenceDate: Date = new Date(),
+): "spring" | "summer" | "autumn" | "winter" {
+  const jstShifted = new Date(referenceDate.getTime() + JST_OFFSET_MS);
+  const month = jstShifted.getUTCMonth() + 1; // 1-12
+
+  if (month >= 3 && month <= 5) return "spring";
+  if (month >= 6 && month <= 8) return "summer";
+  if (month >= 9 && month <= 11) return "autumn";
+  return "winter";
+}

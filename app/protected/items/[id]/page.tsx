@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { StatusSelector } from "@/components/status-selector";
+import { Button } from "@/components/ui/button";
 import { WearTodayButton } from "@/components/wear-today-button";
 import {
   getCategoryLabel,
@@ -132,6 +133,17 @@ async function ClothingItemDetail({
                 : "まだ着用記録がありません"}
             </dd>
           </dl>
+
+          <div className="flex flex-col gap-2 border-t pt-4">
+            <p className="text-sm text-muted-foreground">
+              着用データと今の気持ちから、次の一歩を一緒に考えます
+            </p>
+            <Button asChild variant="outline" className="w-full">
+              <Link href={`/protected/items/${item.id}/diagnosis`}>
+                AI診断
+              </Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
