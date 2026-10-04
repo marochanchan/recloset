@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { StatusSelector } from "@/components/status-selector";
 import { Button } from "@/components/ui/button";
+import { DeleteItemButton } from "@/components/delete-item-button";
 import { WearTodayButton } from "@/components/wear-today-button";
 import {
   getCategoryLabel,
@@ -112,6 +113,10 @@ async function ClothingItemDetail({
 
           <StatusSelector itemId={item.id} currentStatus={item.status} />
 
+          <Button asChild variant="outline" className="w-full">
+            <Link href={`/protected/items/${item.id}/edit`}>編集する</Link>
+          </Button>
+
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <dt className="text-muted-foreground">購入日</dt>
             <dd>{item.purchase_date ?? "未登録"}</dd>
@@ -123,14 +128,14 @@ async function ClothingItemDetail({
                 : "未登録"}
             </dd>
 
-            <dt className="text-muted-foreground">着用回数</dt>
+            <dt className="text-muted-foreground">Re:closetでの着用記録</dt>
             <dd>{item.wear_count}回</dd>
 
             <dt className="text-muted-foreground">最後に着た日</dt>
             <dd>
               {item.last_worn_at
                 ? formatJstDate(item.last_worn_at)
-                : "まだ着用記録がありません"}
+                : "まだRe:closetでの着用記録がありません"}
             </dd>
           </dl>
 
@@ -143,6 +148,10 @@ async function ClothingItemDetail({
                 AI診断
               </Link>
             </Button>
+          </div>
+
+          <div className="flex flex-col gap-2 border-t pt-4">
+            <DeleteItemButton itemId={item.id} />
           </div>
         </CardContent>
       </Card>

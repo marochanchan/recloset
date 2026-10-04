@@ -1,5 +1,6 @@
 import {
   NOT_WORN_REASON_OPTIONS,
+  isAmbiguousFeeling,
   type DiagnosisDecisionChoice,
   type DiagnosisFact,
   type DiagnosisFeelingInput,
@@ -28,16 +29,9 @@ export function getRecentWornBucket(
   return "long_unworn";
 }
 
-export type PurchaseRecencyBucket = "recently_purchased" | "normal";
-
-export function getPurchaseRecencyBucket(
-  daysSincePurchase: number | null,
-): PurchaseRecencyBucket {
-  if (daysSincePurchase !== null && daysSincePurchase <= 30) {
-    return "recently_purchased";
-  }
-  return "normal";
-}
+// purchase_date（days_since_purchase）は補助FACTのため、Next Actionの
+// 文言・分岐には使わない（「最近買ったから」「古いから」だけで提案を
+// 変えない）。KEEP/RETRY/REBYEの判断自体への反映はJev側の指示で行う。
 
 // ============================================================
 // structured Next Action
@@ -49,6 +43,7 @@ export function getPurchaseRecencyBucket(
 export type NextActionKind =
   | "keep_as_is" // KEEP
   | "reflect_recent_wear" // RETRY: 直近着用のため「振り返り」に切り替え
+  | "try_once_first" // RETRY: never_recorded + 本人も迷っている（まず一度着てみる）
   | "wait_for_season" // RETRY: out_of_season（今は着るよう促さない）
   | "create_opportunity" // RETRY: long_unworn（機会を積極的に作る）
   | "small_trial" // RETRY: 通常の小さな試み
@@ -60,7 +55,6 @@ export type NextAction = {
   primaryReason: NotWornReason | null;
   secondaryReason: NotWornReason | null;
   recentWornBucket: RecentWornBucket;
-  purchaseRecencyBucket: PurchaseRecencyBucket;
   /** 短い見出し。「ユーザーが次に何をするか」が分かる表現にする（Decisionの言い換えにしない）。 */
   title: string;
   message: string;
@@ -88,29 +82,36 @@ function pickPrimaryAndSecondaryReason(reasons: NotWornReason[]): {
   return { primary: sorted[0], secondary: sorted[1] ?? null };
 }
 
-const KEEP_MESSAGE = "このまま大切に着ていこう。";
+const KEEP_MESSAGE = "このまま大切に着ていきましょう。";
 
 const REBYE_MESSAGE =
-  "手放し候補として、少し時間をかけて考えてみよう。他の似た服と比べてみたり、しばらく候補のまま様子を見てもいい。";
+  "手放し候補として、少し時間をかけて考えてみましょう。他の似た服と比べてみたり、しばらく候補のまま様子を見てみましょう。";
+
+// 本人の回答がまだ迷っている状態（isAmbiguousFeeling）でJevがREBYEを選んだ場合に、
+// REBYE_MESSAGEの前に添えて「手放し候補＝今すぐ手放す決定」ではないことを明確にする。
+// KEEP・RETRYは元のメッセージ自体が「今のまま」「試してみる」という結論を急がせない
+// 内容のため、isAmbiguousFeelingとの意味の衝突が起きにくく、この前置きは追加しない。
+const AMBIGUOUS_REBYE_PREFIX =
+  "まだ迷いがあるようなので、今すぐ手放す必要はありません。";
 
 const REFLECT_RECENT_WEAR_OUT_OF_SEASON_MESSAGE =
-  "最近着たとき、どう感じた？今すぐ決めず、次に着られる季節になったときもう一度選びたいと思うか確かめてみよう。";
+  "最近着たとき、どう感じましたか？今すぐ決めず、次に着られる季節になったときもう一度選びたいと思うか確かめてみましょう。";
 
 const REFLECT_RECENT_WEAR_GENERIC_MESSAGE =
-  "最近着たとき、どう感じた？その感覚を、次に考えるときの材料にしてみよう。";
+  "最近着たとき、どう感じましたか？その感覚を、次に考えるときの材料にしてみましょう。";
 
 // RETRY・理由ごとの基本アクション（FACTガードによる上書きがない場合に使う）
 const RETRY_REASON_MESSAGES: Record<NotWornReason, string> = {
-  out_of_season: "着られる季節になったら、一度だけ着てみよう。",
+  out_of_season: "着られる季節になったら、一度だけ着てみましょう。",
   no_occasion:
-    "着られそうな場面を1つ具体的に考えてみよう。思いつかなければ、手放し候補として少し様子を見よう。",
-  hard_to_style: "手持ちの服で新しい組み合わせを1つ試してみよう。",
+    "着られそうな場面を1つ具体的に考えてみましょう。思いつかなければ、手放し候補として少し様子を見てみましょう。",
+  hard_to_style: "手持ちの服で新しい組み合わせを1つ試してみましょう。",
   fit_or_comfort:
-    "一度袖を通して、サイズ・着心地の何が気になるか確認してみよう。",
+    "一度袖を通して、サイズ・着心地の何が気になるか確認してみましょう。",
   somehow_not_reaching_for_it:
-    "次に服を選ぶとき、意識してこの服を候補に入れてみよう。",
-  do_not_remember: "一度着て、着た後にどう感じたか確かめてみよう。",
-  other: "今の状況に合わせて、小さく試せることを1つ考えてみよう。",
+    "次に服を選ぶとき、意識してこの服を候補に入れてみましょう。",
+  do_not_remember: "一度着て、着た後にどう感じたか確かめてみましょう。",
+  other: "今の状況に合わせて、小さく試せることを1つ考えてみましょう。",
 };
 
 const RETRY_REASON_KIND: Record<NotWornReason, NextActionKind> = {
@@ -129,6 +130,7 @@ const REVIEW_AS_CANDIDATE_TITLE = "手放し候補として整理してみよう
 const REFLECT_RECENT_WEAR_TITLE = "最近着たときの気持ちを振り返ってみよう";
 const WAIT_FOR_SEASON_TITLE = "次のシーズンでもう一度確かめよう";
 const CREATE_OPPORTUNITY_TITLE = "一度着る機会をつくってみよう";
+const TRY_ONCE_FIRST_TITLE = "一度着てみてから判断しよう";
 
 // small_trial（RETRYの通常ケース）は理由ごとに短い見出しを出し分ける
 const SMALL_TRIAL_TITLES: Record<NotWornReason, string> = {
@@ -145,9 +147,9 @@ const SMALL_TRIAL_TITLES: Record<NotWornReason, string> = {
 // キーは "主要理由|副次理由"。ここに無い組み合わせはフォールバックで統合する。
 const REASON_COMBO_MESSAGES: Partial<Record<string, string>> = {
   "out_of_season|somehow_not_reaching_for_it":
-    "季節が合わない上に、なんとなく手も伸びていない服のようです。次のシーズンまで保留して、着られる時期になったら一度だけ意識して選んでみよう。それでも手が伸びなければ、そのときまた考えよう。",
+    "季節が合わない上に、なんとなく手も伸びていない服のようです。次のシーズンまで保留して、着られる時期になったら一度だけ意識して選んでみましょう。それでも手が伸びなければ、そのときまた考えてみましょう。",
   "no_occasion|somehow_not_reaching_for_it":
-    "着る場面が思い浮かばず、なんとなく手も伸びていない服のようです。次に近い機会があれば、まず候補に入れてみよう。それでも思い浮かばなければ、手放し候補として少し様子を見よう。",
+    "着る場面が思い浮かばず、なんとなく手も伸びていない服のようです。次に近い機会があれば、まず候補に入れてみましょう。それでも思い浮かばなければ、手放し候補として少し様子を見てみましょう。",
 };
 
 function getReasonLabel(reason: NotWornReason): string {
@@ -175,7 +177,8 @@ function mergeWithSecondaryReason(
 const LONG_UNWORN_SUFFIX =
   "しばらく着ていない分、実際に試してみると判断しやすくなりそうです。";
 
-const RECENTLY_PURCHASED_SUFFIX = "買ってからまだ日が浅いので、今すぐ決めなくても大丈夫。";
+const TRY_ONCE_FIRST_MESSAGE =
+  "Re:closetでの着用記録がまだなく、気持ちもまだ固まっていないようです。一度着てみて、そのときの気持ちを次に考える材料にしてみましょう。";
 
 /**
  * Decision（Jevの結果）・FACT・FEELINGから、structuredなNext Actionを組み立てる。
@@ -189,9 +192,6 @@ export function buildNextAction(
   feeling: DiagnosisFeelingInput,
 ): NextAction {
   const recentWornBucket = getRecentWornBucket(fact.days_since_last_worn);
-  const purchaseRecencyBucket = getPurchaseRecencyBucket(
-    fact.days_since_purchase,
-  );
 
   if (decision === "KEEP") {
     return {
@@ -200,17 +200,18 @@ export function buildNextAction(
       primaryReason: null,
       secondaryReason: null,
       recentWornBucket,
-      purchaseRecencyBucket,
       title: KEEP_TITLE,
       message: KEEP_MESSAGE,
     };
   }
 
   if (decision === "REBYE") {
-    const message =
-      purchaseRecencyBucket === "recently_purchased"
-        ? `${REBYE_MESSAGE}${RECENTLY_PURCHASED_SUFFIX}`
-        : REBYE_MESSAGE;
+    // 本人の気持ちがまだ固まっていない（isAmbiguousFeeling）のにREBYEが
+    // 独立した結論のように見えると矛盾して見えるため、その場合だけ
+    // 「今すぐ手放す必要はない」という前置きを添えて1つの文章にする。
+    const message = isAmbiguousFeeling(feeling)
+      ? `${AMBIGUOUS_REBYE_PREFIX}${REBYE_MESSAGE}`
+      : REBYE_MESSAGE;
 
     return {
       kind: "review_as_candidate",
@@ -218,7 +219,6 @@ export function buildNextAction(
       primaryReason: null,
       secondaryReason: null,
       recentWornBucket,
-      purchaseRecencyBucket,
       title: REVIEW_AS_CANDIDATE_TITLE,
       message,
     };
@@ -241,6 +241,12 @@ export function buildNextAction(
       primary === "out_of_season"
         ? REFLECT_RECENT_WEAR_OUT_OF_SEASON_MESSAGE
         : REFLECT_RECENT_WEAR_GENERIC_MESSAGE;
+  } else if (recentWornBucket === "never_recorded" && isAmbiguousFeeling(feeling)) {
+    // Re:closetでの着用記録がなく、本人もまだ迷っている場合は、
+    // 判断を急がせず「まず一度着てみる」ことを提案する
+    kind = "try_once_first";
+    title = TRY_ONCE_FIRST_TITLE;
+    message = TRY_ONCE_FIRST_MESSAGE;
   } else if (recentWornBucket === "long_unworn" && primary !== "out_of_season") {
     // 長期未着用の場合は、機会を積極的に作る方向へ強める
     // （out_of_seasonは季節を待つ方針を優先するため対象外）
@@ -258,17 +264,12 @@ export function buildNextAction(
       : RETRY_REASON_MESSAGES[primary];
   }
 
-  if (purchaseRecencyBucket === "recently_purchased") {
-    message = `${message}${RECENTLY_PURCHASED_SUFFIX}`;
-  }
-
   return {
     kind,
     decision,
     primaryReason: primary,
     secondaryReason: secondary,
     recentWornBucket,
-    purchaseRecencyBucket,
     title,
     message,
   };

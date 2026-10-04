@@ -36,7 +36,6 @@ type AiDiagnosisFlowProps = {
 
 type DiagnosisResultState = {
   decision: JevDiagnosisResult;
-  isAmbiguousFeeling: boolean;
   nextAction: NextAction;
 };
 
@@ -172,7 +171,6 @@ export function AiDiagnosisFlow({
       }
       setResult({
         decision: response.decision,
-        isAmbiguousFeeling: response.isAmbiguousFeeling,
         nextAction: response.nextAction,
       });
     });
@@ -276,7 +274,7 @@ export function AiDiagnosisFlow({
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium">客観的なデータ</p>
               <ul className="text-sm text-muted-foreground">
-                <li>着用回数：{wearCount}回</li>
+                <li>Re:closetでの着用記録：{wearCount}回</li>
                 <li>着用状況：{wearRecencyLabel}</li>
                 <li>
                   購入からの経過：
@@ -298,11 +296,6 @@ export function AiDiagnosisFlow({
 
             <div className="flex flex-col gap-2 rounded-md border p-4">
               <p className="text-sm font-medium">次の一歩</p>
-              {result.isAmbiguousFeeling && (
-                <p className="text-sm text-muted-foreground">
-                  まだ迷っている服かもしれません。今すぐ結論を出さなくても大丈夫です。
-                </p>
-              )}
               <p className="font-medium">{result.nextAction.title}</p>
               <p className="text-sm text-muted-foreground">
                 {result.nextAction.message}

@@ -172,7 +172,18 @@ const decisionInstructions =
   "という事実だけでREBYEを選ばないでください。ユーザーの気持ち（current_feeling, " +
   "want_to_wear_again）や、着ていない理由（not_worn_reasons、複数の場合あり）を重視してください。" +
   "not_worn_reasonsに複数の理由が含まれていても、理由の数だけでREBYEに傾けないでください。" +
-  "それぞれの理由の内容と、FACT・FEELING全体を踏まえて総合的に判断してください。";
+  "それぞれの理由の内容と、FACT・FEELING全体を踏まえて総合的に判断してください。" +
+  "days_since_purchase（購入からの経過日数）はnull（不明）の場合があります。nullは単に" +
+  "購入時期の情報がないという意味であり、それ自体をKEEP/RETRY/REBYEのいずれかに結びつける" +
+  "根拠にしないでください。また、days_since_purchaseの値が分かっている場合でも、最近購入した" +
+  "という事実だけでKEEPやRETRYに寄せたり、購入から時間が経っているという事実だけでREBYEに" +
+  "寄せたりしないでください。purchase_dateに関する情報より、wear_count・days_since_last_worn" +
+  "などの着用履歴と、ユーザー本人の回答を優先して判断してください。" +
+  "want_to_wear_again が「わからない（unsure）」の場合、これは『もう一度着たい』にも" +
+  "『もう着たくない』にも決まっていない、本人がまだ迷っている状態を表します。unsureという" +
+  "回答だけを理由にRETRYまたはREBYEのどちらかに固定せず、current_feelingやnot_worn_reasons、" +
+  "着用履歴（wear_count, days_since_last_worn）など他のFACT・FEELINGも合わせて総合的に判断し、" +
+  "それらが明確にREBYE側を示している場合はREBYEを選ぶことも許容してください。";
 
 const decisionCriteria = {
   KEEP: "現在も活用している、または明確に残しておきたい理由がある",

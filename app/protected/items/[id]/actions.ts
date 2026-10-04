@@ -3,7 +3,6 @@
 import {
   type DiagnosisFact,
   type JevDiagnosisResult,
-  isAmbiguousFeeling,
   runJevDiagnosis,
   validateFeelingInput,
 } from "@/lib/ai-diagnosis";
@@ -26,12 +25,15 @@ type UpdateStatusResult = {
   error: string | null;
 };
 
+type DeleteClothingItemResult = {
+  error: string | null;
+};
+
 type RunAiDiagnosisResult =
   | { error: string }
   | {
       error: null;
       decision: JevDiagnosisResult;
-      isAmbiguousFeeling: boolean;
       nextAction: NextAction;
     };
 
@@ -150,6 +152,72 @@ export async function updateClothingItemStatus(
 }
 
 /**
+ * clothing_itemsを削除する。
+ * clothing_images / wear_logs は on delete cascade によりDB側で削除される
+ * （将来、AI診断履歴・Rebuy関連テーブルを clothing_item_id に
+ * on delete cascade で追加しても、この関数自体の変更は不要）。
+ *
+ * Storage上の画像ファイルはDBのCASCADEでは削除されないため、
+ * DB削除が成功した後にこの関数内でStorageからも削除する。
+ * Storage削除が失敗しても、既に成功しているDB削除を失敗として
+ * 扱わない（ユーザーには成功を返し、失敗はログにのみ残す）。
+ */
+export async function deleteClothingItem(
+  itemId: string,
+): Promise<DeleteClothingItemResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { error: "ログイン情報が確認できませんでした" };
+  }
+
+  // RLSにより、自分が所有する服でなければ取得できない。
+  // Storage削除のため、DB削除前にimage_pathを取得しておく。
+  const { data: item, error: itemError } = await supabase
+    .from("clothing_items")
+    .select("id, clothing_images(image_path)")
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (itemError) {
+    console.error("deleteClothingItem: fetch item error", itemError);
+    return { error: "服の情報を取得できませんでした" };
+  }
+  if (!item) {
+    return { error: "対象の服が見つかりません" };
+  }
+
+  const imagePaths = item.clothing_images.map(
+    (image: { image_path: string }) => image.image_path,
+  );
+
+  const { error: deleteError } = await supabase
+    .from("clothing_items")
+    .delete()
+    .eq("id", itemId);
+  if (deleteError) {
+    console.error("deleteClothingItem: delete error", deleteError);
+    return { error: "服の削除に失敗しました" };
+  }
+
+  if (imagePaths.length > 0) {
+    const { error: removeError } = await supabase.storage
+      .from("clothing-images")
+      .remove(imagePaths);
+    if (removeError) {
+      console.error("deleteClothingItem: storage cleanup failed", removeError);
+    }
+  }
+
+  revalidatePath("/protected/items");
+  return { error: null };
+}
+
+/**
  * itemIdとFEELING回答からAI診断（Jev）を実行する。
  * DBへの保存は行わない（その場限りの診断結果を返すだけ）。
  * clothing_items.status は診断結果によって自動更新しない。
@@ -210,7 +278,6 @@ export async function runAiDiagnosis(
     return {
       error: null,
       decision,
-      isAmbiguousFeeling: isAmbiguousFeeling(feeling),
       nextAction: buildNextAction(decision.choice, fact, feeling),
     };
   } catch (error) {

@@ -80,7 +80,8 @@ export function ClothingImageGallery({
           alt={alt}
           fill
           sizes="(min-width: 640px) 448px, 100vw"
-          className="object-cover"
+          className="object-contain"
+          style={{ objectFit: "contain" }}
           priority
         />
 
@@ -116,7 +117,7 @@ export function ClothingImageGallery({
               aria-label={`${index + 1}枚目の画像を表示`}
               aria-current={index === currentIndex}
               className={cn(
-                "relative h-16 w-16 shrink-0 overflow-hidden rounded-md border-2",
+                "relative h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 bg-muted",
                 index === currentIndex
                   ? "border-primary"
                   : "border-transparent",
@@ -127,7 +128,8 @@ export function ClothingImageGallery({
                 alt=""
                 fill
                 sizes="64px"
-                className="object-cover"
+                className="object-contain"
+                style={{ objectFit: "contain" }}
               />
             </button>
           ))}

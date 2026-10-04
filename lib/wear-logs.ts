@@ -96,14 +96,18 @@ export function getDaysSinceLastWorn(
 
 /**
  * last_worn_at から、一覧カードなどにそのまま表示できる着用状況の
- * 短い文言を返す（例:「今日着ました」「3日着ていません」「着用記録なし」）。
+ * 短い文言を返す（例:「今日着ました」「3日着ていません」
+ * 「Re:closetでの着用記録なし」）。
+ * last_worn_atはRe:closet登録後にアプリ内で記録した着用のみを反映する値のため、
+ * 「記録なし」は実際に一度も着ていないことまでは意味しない。文言でもその旨を
+ * 明示する（過去の購入前からの着用実績を断定しないため）。
  */
 export function getWearRecencyLabel(
   lastWornAt: string | null,
   referenceDate: Date = new Date(),
 ): string {
   const daysSince = getDaysSinceLastWorn(lastWornAt, referenceDate);
-  if (daysSince === null) return "着用記録なし";
+  if (daysSince === null) return "Re:closetでの着用記録なし";
   if (daysSince <= 0) return "今日着ました";
   return `${daysSince}日着ていません`;
 }

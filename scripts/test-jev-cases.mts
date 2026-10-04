@@ -82,17 +82,93 @@ const cases: CaseInput[] = [
       not_worn_reasons: ["do_not_remember"],
     },
   },
+  // 以下、purchase_date（days_since_purchase）がnullでもKEEP/RETRY/REBYEの
+  // 判断が成立すること、および want_to_wear_again: "unsure" をRETRY/REBYEの
+  // どちらかに固定しないことを確認するためのケース。
+  {
+    name: "CASE E",
+    description:
+      "実使用で見つかった実データに近いケース。購入日・着用記録がともに不明で、" +
+      "本人は今は好きではないが再着用意欲は『わからない』。unsureだけでRETRY/REBYEに" +
+      "固定されず、他のFACT・FEELING全体から判断されることを期待する。",
+    state: {
+      wear_count: 0,
+      days_since_last_worn: null,
+      days_since_purchase: null,
+      favorite: false,
+      status: "closet",
+      category: "tops",
+      season: "all_season",
+      current_season: "autumn",
+      current_feeling: "dislike",
+      want_to_wear_again: "unsure",
+      not_worn_reasons: ["hard_to_style", "no_occasion"],
+    },
+  },
+  {
+    name: "CASE F",
+    description:
+      "購入日は不明だが、もう一度着たい意思が明確なケース（RETRYが出やすいことを期待。" +
+      "days_since_purchaseがnullでもRETRYの判断が妨げられないかを確認）。",
+    state: {
+      wear_count: 1,
+      days_since_last_worn: 120,
+      days_since_purchase: null,
+      favorite: false,
+      status: "closet",
+      category: "outerwear",
+      season: "winter",
+      current_season: "winter",
+      current_feeling: "like",
+      want_to_wear_again: "yes",
+      not_worn_reasons: ["no_occasion"],
+    },
+  },
+  {
+    name: "CASE G",
+    description:
+      "購入日・着用記録がともに不明で、本人が明確にもう着たくないと回答しているケース" +
+      "（REBYEが出やすいことを期待。days_since_purchaseがnullでもREBYEの判断が" +
+      "妨げられないかを確認）。",
+    state: {
+      wear_count: 0,
+      days_since_last_worn: null,
+      days_since_purchase: null,
+      favorite: false,
+      status: "closet",
+      category: "tops",
+      season: "all_season",
+      current_season: "autumn",
+      current_feeling: "dislike",
+      want_to_wear_again: "no",
+      not_worn_reasons: ["somehow_not_reaching_for_it"],
+    },
+  },
 ];
 
 // KEEP / RETRY / REBYE の定義。
 // 「着ていない = REBYE」と短絡させず、あくまで次の行動候補の提示であって
 // 最終決定ではないことをJevへの指示にも明記する。
+// lib/ai-diagnosis.ts の decisionInstructions と同じ方針を反映した複製。
+// このスクリプトはSupabase/本番コードに接続しない疎通確認用のため、
+// 意図的に別ファイルとして内容を複製している（変更時は両方を更新する）。
 const decisionInstructions =
   "ユーザーの服1着について、FACT（客観的な着用データ）とFEELING（本人の気持ち）を踏まえて、" +
   "次にとるべき行動の候補を1つ選んでください。これは最終決定ではなく、ユーザー自身が" +
   "着る・残す・手放すを考えるための判断材料です。着用回数が少ない、または長期間着ていない" +
   "という事実だけでREBYEを選ばないでください。ユーザーの気持ち（current_feeling, " +
-  "want_to_wear_again）や、着ていない理由（not_worn_reasons）を重視してください。";
+  "want_to_wear_again）や、着ていない理由（not_worn_reasons）を重視してください。" +
+  "days_since_purchase（購入からの経過日数）はnull（不明）の場合があります。nullは単に" +
+  "購入時期の情報がないという意味であり、それ自体をKEEP/RETRY/REBYEのいずれかに結びつける" +
+  "根拠にしないでください。また、days_since_purchaseの値が分かっている場合でも、最近購入した" +
+  "という事実だけでKEEPやRETRYに寄せたり、購入から時間が経っているという事実だけでREBYEに" +
+  "寄せたりしないでください。purchase_dateに関する情報より、wear_count・days_since_last_worn" +
+  "などの着用履歴と、ユーザー本人の回答を優先して判断してください。" +
+  "want_to_wear_again が「わからない（unsure）」の場合、これは『もう一度着たい』にも" +
+  "『もう着たくない』にも決まっていない、本人がまだ迷っている状態を表します。unsureという" +
+  "回答だけを理由にRETRYまたはREBYEのどちらかに固定せず、current_feelingやnot_worn_reasons、" +
+  "着用履歴（wear_count, days_since_last_worn）など他のFACT・FEELINGも合わせて総合的に判断し、" +
+  "それらが明確にREBYE側を示している場合はREBYEを選ぶことも許容してください。";
 
 const decisionCriteria = {
   KEEP: "現在も活用している、または明確に残しておきたい理由がある",

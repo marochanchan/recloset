@@ -43,7 +43,8 @@ export function ClothingItemCard({
             alt={title}
             fill
             sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-            className="object-cover"
+            className="object-contain"
+            style={{ objectFit: "contain" }}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
