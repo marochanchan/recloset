@@ -20,6 +20,11 @@ import {
 } from "@/lib/wear-logs";
 import { revalidatePath } from "next/cache";
 
+// コスト暴走防止のためのクールダウン。同一ユーザーの直近の診断から
+// この秒数以内は、runJevDiagnosis()（Vercel AI Gateway経由のJev呼び出し）
+// を呼ばない。Gemini側（generateDiagnosisElaboration）には適用しない。
+const AI_DIAGNOSIS_COOLDOWN_SECONDS = 15;
+
 type RecordWearTodayResult = {
   error: string | null;
 };
@@ -277,6 +282,39 @@ export async function runAiDiagnosis(
   }
   if (!item) {
     return { error: "対象の服が見つかりません" };
+  }
+
+  // コスト暴走防止のためのクールダウンチェック。runJevDiagnosis()
+  // （Vercel AI Gatewayへのリクエスト）に到達する前に必ず行う。
+  // DB確認自体が失敗した場合も、"コスト暴走防止"を優先し安全側に倒して
+  // ここで止める（確認できないからJevを呼んでよい、とはしない）。
+  const { data: recentDiagnosis, error: recentDiagnosisError } =
+    await supabase
+      .from("ai_diagnoses")
+      .select("created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+  if (recentDiagnosisError) {
+    console.error(
+      "runAiDiagnosis: cooldown check error",
+      recentDiagnosisError,
+    );
+    return {
+      error: "AI診断に失敗しました。時間をおいて再度お試しください。",
+    };
+  }
+
+  if (recentDiagnosis) {
+    const secondsSinceLastDiagnosis =
+      (Date.now() - new Date(recentDiagnosis.created_at).getTime()) / 1000;
+    if (secondsSinceLastDiagnosis < AI_DIAGNOSIS_COOLDOWN_SECONDS) {
+      return {
+        error: "少し間を置いてから、もう一度診断してください。",
+      };
+    }
   }
 
   const fact: DiagnosisFact = {
