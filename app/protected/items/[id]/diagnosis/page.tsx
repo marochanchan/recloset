@@ -24,7 +24,7 @@ async function AiDiagnosisContent({
   const { data: item, error } = await supabase
     .from("clothing_items")
     .select(
-      "id, title, brand, category, season, favorite, wear_count, last_worn_at, purchase_date",
+      "id, title, brand, category, season, favorite, wear_count, last_worn_at, purchase_date, status",
     )
     .eq("id", id)
     .maybeSingle();
@@ -56,6 +56,7 @@ async function AiDiagnosisContent({
         wearCount={item.wear_count}
         wearRecencyLabel={getWearRecencyLabel(item.last_worn_at)}
         daysSincePurchase={getDaysSincePurchase(item.purchase_date)}
+        currentStatus={item.status}
       />
     </div>
   );

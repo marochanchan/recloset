@@ -1,6 +1,9 @@
 "use client";
 
-import { runAiDiagnosis } from "@/app/protected/items/[id]/actions";
+import {
+  runAiDiagnosis,
+  updateClothingItemStatus,
+} from "@/app/protected/items/[id]/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,10 +18,12 @@ import {
   NOT_WORN_REASON_OPTIONS,
   WANT_TO_WEAR_AGAIN_OPTIONS,
   type CurrentFeeling,
+  type DiagnosisDecisionChoice,
   type JevDiagnosisResult,
   type NotWornReason,
   type WantToWearAgain,
 } from "@/lib/ai-diagnosis";
+import { getStatusLabel } from "@/lib/clothing-options";
 import type { NextAction } from "@/lib/next-action";
 import { useState, useTransition } from "react";
 
@@ -32,7 +37,78 @@ type AiDiagnosisFlowProps = {
   wearCount: number;
   wearRecencyLabel: string;
   daysSincePurchase: number | null;
+  currentStatus: string;
 };
+
+const CANDIDATE_STATUS = "candidate";
+
+/**
+ * REBYE診断時だけ表示する、statusを「手放し候補」に変更するための
+ * 控えめな提案UI。AIが自動でstatusを書き換えることはなく、
+ * ボタンを押したときだけ既存のupdateClothingItemStatusを呼ぶ。
+ */
+function RebyeCandidateAction({
+  itemId,
+  initialStatus,
+}: {
+  itemId: string;
+  initialStatus: string;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [justUpdated, setJustUpdated] = useState(false);
+  const candidateLabel = getStatusLabel(CANDIDATE_STATUS);
+
+  const handleClick = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await updateClothingItemStatus(
+        itemId,
+        CANDIDATE_STATUS,
+      );
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setJustUpdated(true);
+    });
+  };
+
+  if (justUpdated) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        ステータスを「{candidateLabel}」に変更しました
+      </p>
+    );
+  }
+
+  if (initialStatus === CANDIDATE_STATUS) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        現在「{candidateLabel}」に設定されています
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm text-muted-foreground">
+        この服を「{candidateLabel}」に変更しますか？
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-fit"
+        disabled={isPending}
+        onClick={handleClick}
+      >
+        {isPending ? "変更中..." : `${candidateLabel}に変更する`}
+      </Button>
+      {error && <p className="text-sm text-red-500">{error}</p>}
+    </div>
+  );
+}
 
 type DiagnosisResultState = {
   decision: JevDiagnosisResult;
@@ -40,6 +116,18 @@ type DiagnosisResultState = {
 };
 
 const MAX_NOT_WORN_REASONS = 2;
+
+// 「診断タイプ」の表示用ラベル。clothing_items.statusとは別概念であり、
+// あくまで今回のAI診断（Jevの判定）そのものを示すバッジ＋短い補足。
+// 3種類とも同じ構造・同じBadge variantで、視覚的な強さを揃える。
+const DIAGNOSIS_TYPE_LABELS: Record<
+  DiagnosisDecisionChoice,
+  { badge: string; caption: string }
+> = {
+  KEEP: { badge: "KEEP", caption: "このまま持っておく" },
+  RETRY: { badge: "RE:TRY", caption: "もう一度試してみる" },
+  REBYE: { badge: "RE:BYE", caption: "手放す方向で考えてみる" },
+};
 
 function OptionButtons<T extends string>({
   options,
@@ -139,6 +227,7 @@ export function AiDiagnosisFlow({
   wearCount,
   wearRecencyLabel,
   daysSincePurchase,
+  currentStatus,
 }: AiDiagnosisFlowProps) {
   const [currentFeeling, setCurrentFeeling] = useState<CurrentFeeling | null>(
     null,
@@ -272,6 +361,18 @@ export function AiDiagnosisFlow({
           </CardHeader>
           <CardContent className="flex flex-col gap-6">
             <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium">診断タイプ</p>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">
+                  {DIAGNOSIS_TYPE_LABELS[result.decision.choice].badge}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  {DIAGNOSIS_TYPE_LABELS[result.decision.choice].caption}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
               <p className="text-sm font-medium">客観的なデータ</p>
               <ul className="text-sm text-muted-foreground">
                 <li>Re:closetでの着用記録：{wearCount}回</li>
@@ -300,6 +401,15 @@ export function AiDiagnosisFlow({
               <p className="text-sm text-muted-foreground">
                 {result.nextAction.message}
               </p>
+
+              {result.decision.choice === "REBYE" && (
+                <div className="flex flex-col gap-2 border-t pt-3">
+                  <RebyeCandidateAction
+                    itemId={itemId}
+                    initialStatus={currentStatus}
+                  />
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
