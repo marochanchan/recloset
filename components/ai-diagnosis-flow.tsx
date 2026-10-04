@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  generateDiagnosisElaboration,
   runAiDiagnosis,
   updateClothingItemStatus,
 } from "@/app/protected/items/[id]/actions";
@@ -113,7 +114,61 @@ function RebyeCandidateAction({
 type DiagnosisResultState = {
   decision: JevDiagnosisResult;
   nextAction: NextAction;
+  /** ai_diagnoses履歴の行id。履歴保存に失敗した場合はnull。 */
+  diagnosisId: string | null;
 };
+
+/**
+ * 「もっと詳しく考える」ボタン。ユーザーが明示的に押した場合だけ
+ * generateDiagnosisElaboration（Gemini）を1回呼ぶ。成功後は生成結果を
+ * そのまま表示し、再生成はできない（サーバー側でも1診断1回に制限している）。
+ * 失敗時はJevの診断結果に影響しない旨のメッセージを表示し、再試行は許可する。
+ */
+function ElaborationAction({ diagnosisId }: { diagnosisId: string }) {
+  const [isPending, startTransition] = useTransition();
+  const [elaboration, setElaboration] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleClick = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await generateDiagnosisElaboration(diagnosisId);
+      if (result.error !== null) {
+        setError(result.error);
+        return;
+      }
+      setElaboration(result.elaboration);
+    });
+  };
+
+  if (elaboration) {
+    return (
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-medium">AIからの補足</p>
+        <p className="text-sm text-muted-foreground">{elaboration}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm text-muted-foreground">
+        もう少し考えてみたいですか？
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-fit"
+        disabled={isPending}
+        onClick={handleClick}
+      >
+        {isPending ? "生成中..." : error ? "再試行" : "もっと詳しく考える"}
+      </Button>
+      {error && <p className="text-sm text-red-500">{error}</p>}
+    </div>
+  );
+}
 
 const MAX_NOT_WORN_REASONS = 2;
 
@@ -261,6 +316,7 @@ export function AiDiagnosisFlow({
       setResult({
         decision: response.decision,
         nextAction: response.nextAction,
+        diagnosisId: response.diagnosisId,
       });
     });
   };
@@ -411,6 +467,12 @@ export function AiDiagnosisFlow({
                 </div>
               )}
             </div>
+
+            {result.diagnosisId && (
+              <div className="flex flex-col gap-2 border-t pt-3">
+                <ElaborationAction diagnosisId={result.diagnosisId} />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

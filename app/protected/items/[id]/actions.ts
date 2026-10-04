@@ -1,11 +1,14 @@
 "use server";
 
 import {
+  type DiagnosisDecisionChoice,
   type DiagnosisFact,
+  type DiagnosisFeelingInput,
   type JevDiagnosisResult,
   runJevDiagnosis,
   validateFeelingInput,
 } from "@/lib/ai-diagnosis";
+import { GEMINI_ELABORATION_MODEL, runGeminiElaboration } from "@/lib/ai-elaboration";
 import { STATUS_OPTIONS } from "@/lib/clothing-options";
 import { type NextAction, buildNextAction } from "@/lib/next-action";
 import { createClient } from "@/lib/supabase/server";
@@ -35,7 +38,19 @@ type RunAiDiagnosisResult =
       error: null;
       decision: JevDiagnosisResult;
       nextAction: NextAction;
+      /**
+       * ai_diagnoses履歴の行id。履歴保存（INSERT）自体が失敗した場合は
+       * nullになる。診断結果の表示はこれに関わらず行う
+       * （履歴保存失敗は診断結果表示を妨げない、という既存方針を維持）。
+       * generateDiagnosisElaborationを呼ぶために必要なため、
+       * nullの場合は「もっと詳しく考える」ボタンを表示しない。
+       */
+      diagnosisId: string | null;
     };
+
+type GenerateDiagnosisElaborationResult =
+  | { error: string }
+  | { error: null; elaboration: string; geminiModel: string };
 
 export async function recordWearToday(
   itemId: string,
@@ -280,16 +295,22 @@ export async function runAiDiagnosis(
 
     // 履歴として保存する。失敗してもユーザーには今回の診断結果を
     // そのまま返す（履歴保存はその場の診断結果表示の必須条件ではない）。
-    const { error: insertError } = await supabase.from("ai_diagnoses").insert({
-      clothing_item_id: itemId,
-      user_id: user.id,
-      decision: decision.choice,
-      decision_probabilities: decision.probabilities,
-      fact,
-      feeling,
-      next_action: nextAction,
-      model: "typesafe-ai/jev",
-    });
+    // Gemini呼び出しはここでは一切行わない
+    // （generateDiagnosisElaborationとして完全に独立させている）。
+    const { data: insertedDiagnosis, error: insertError } = await supabase
+      .from("ai_diagnoses")
+      .insert({
+        clothing_item_id: itemId,
+        user_id: user.id,
+        decision: decision.choice,
+        decision_probabilities: decision.probabilities,
+        fact,
+        feeling,
+        next_action: nextAction,
+        model: "typesafe-ai/jev",
+      })
+      .select("id")
+      .single();
     if (insertError) {
       console.error("runAiDiagnosis: insert ai_diagnoses error", insertError);
     }
@@ -298,11 +319,106 @@ export async function runAiDiagnosis(
       error: null,
       decision,
       nextAction,
+      diagnosisId: insertedDiagnosis?.id ?? null,
     };
   } catch (error) {
     console.error("runAiDiagnosis: Jev evaluate error", error);
     return {
       error: "AI診断に失敗しました。時間をおいて再度お試しください。",
+    };
+  }
+}
+
+/**
+ * 「もっと詳しく考える」が押されたときだけ呼ばれる、独立したServer Action。
+ * runAiDiagnosisの中からは呼ばれない（通常の診断フローではGeminiを使わない）。
+ *
+ * クライアントからFACT/FEELING等を再送させず、DBに保存済みの診断スナップショット
+ * （ai_diagnosesの該当行）をサーバー側で取得して使う。
+ *
+ * 1診断につきGemini補足は最大1回:
+ * - 既にelaborationが入っている場合はGeminiを呼ばず、保存済みの値をそのまま返す
+ * - 新規生成時も、UPDATE対象はelaboration/gemini_model列のみ（migration 006の
+ *   列GRANT・RLSにより、decision/fact/feeling/next_action等は書き換えられず、
+ *   既にelaborationがある行への再UPDATEもDBレベルで0件になる）
+ */
+export async function generateDiagnosisElaboration(
+  diagnosisId: string,
+): Promise<GenerateDiagnosisElaborationResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { error: "ログイン情報が確認できませんでした" };
+  }
+
+  // RLSにより、自分が所有する診断履歴でなければ取得できない
+  const { data: diagnosis, error: fetchError } = await supabase
+    .from("ai_diagnoses")
+    .select("decision, fact, feeling, next_action, elaboration, gemini_model")
+    .eq("id", diagnosisId)
+    .maybeSingle();
+
+  if (fetchError) {
+    console.error(
+      "generateDiagnosisElaboration: fetch diagnosis error",
+      fetchError,
+    );
+    return { error: "診断履歴を取得できませんでした" };
+  }
+  if (!diagnosis) {
+    return { error: "対象の診断履歴が見つかりません" };
+  }
+
+  // 既に生成済みなら、Geminiを呼ばず既存の補足をそのまま返す
+  if (diagnosis.elaboration) {
+    return {
+      error: null,
+      elaboration: diagnosis.elaboration,
+      geminiModel: diagnosis.gemini_model ?? GEMINI_ELABORATION_MODEL,
+    };
+  }
+
+  try {
+    const elaboration = await runGeminiElaboration({
+      decision: diagnosis.decision as DiagnosisDecisionChoice,
+      fact: diagnosis.fact as DiagnosisFact,
+      feeling: diagnosis.feeling as DiagnosisFeelingInput,
+      nextAction: diagnosis.next_action as Pick<
+        NextAction,
+        "title" | "message"
+      >,
+    });
+
+    // elaboration/gemini_model列だけをUPDATEする。既存の診断スナップショット
+    // （decision/fact/feeling/next_action）には一切触れない。
+    const { error: updateError } = await supabase
+      .from("ai_diagnoses")
+      .update({
+        elaboration,
+        gemini_model: GEMINI_ELABORATION_MODEL,
+      })
+      .eq("id", diagnosisId);
+    if (updateError) {
+      console.error(
+        "generateDiagnosisElaboration: update error",
+        updateError,
+      );
+    }
+
+    return {
+      error: null,
+      elaboration,
+      geminiModel: GEMINI_ELABORATION_MODEL,
+    };
+  } catch (error) {
+    console.error("generateDiagnosisElaboration: Gemini error", error);
+    return {
+      error:
+        "詳しいコメントを生成できませんでした。診断結果はそのまま確認できます。",
     };
   }
 }
