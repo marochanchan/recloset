@@ -219,7 +219,8 @@ export async function deleteClothingItem(
 
 /**
  * itemIdとFEELING回答からAI診断（Jev）を実行する。
- * DBへの保存は行わない（その場限りの診断結果を返すだけ）。
+ * 診断結果は ai_diagnoses に履歴として保存する（履歴保存自体の失敗は
+ * ユーザーへの診断結果表示を妨げない。console.errorにのみ記録する）。
  * clothing_items.status は診断結果によって自動更新しない。
  */
 export async function runAiDiagnosis(
@@ -275,10 +276,28 @@ export async function runAiDiagnosis(
 
   try {
     const decision = await runJevDiagnosis(fact, feeling);
+    const nextAction = buildNextAction(decision.choice, fact, feeling);
+
+    // 履歴として保存する。失敗してもユーザーには今回の診断結果を
+    // そのまま返す（履歴保存はその場の診断結果表示の必須条件ではない）。
+    const { error: insertError } = await supabase.from("ai_diagnoses").insert({
+      clothing_item_id: itemId,
+      user_id: user.id,
+      decision: decision.choice,
+      decision_probabilities: decision.probabilities,
+      fact,
+      feeling,
+      next_action: nextAction,
+      model: "typesafe-ai/jev",
+    });
+    if (insertError) {
+      console.error("runAiDiagnosis: insert ai_diagnoses error", insertError);
+    }
+
     return {
       error: null,
       decision,
-      nextAction: buildNextAction(decision.choice, fact, feeling),
+      nextAction,
     };
   } catch (error) {
     console.error("runAiDiagnosis: Jev evaluate error", error);
