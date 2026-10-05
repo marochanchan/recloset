@@ -9,6 +9,7 @@ import {
 import { StatusSelector } from "@/components/status-selector";
 import { Button } from "@/components/ui/button";
 import { DeleteItemButton } from "@/components/delete-item-button";
+import { PublishToggle } from "@/components/publish-toggle";
 import { WearTodayButton } from "@/components/wear-today-button";
 import {
   getCategoryLabel,
@@ -40,7 +41,7 @@ async function ClothingItemDetail({
   const { data: item, error } = await supabase
     .from("clothing_items")
     .select(
-      "id, title, brand, category, season, purchase_date, purchase_price, favorite, status, wear_count, last_worn_at, clothing_images(image_path, sort_order)",
+      "id, title, brand, category, season, purchase_date, purchase_price, favorite, status, wear_count, last_worn_at, is_public, published_at, clothing_images(image_path, sort_order)",
     )
     .eq("id", id)
     .order("sort_order", { referencedTable: "clothing_images" })
@@ -138,6 +139,16 @@ async function ClothingItemDetail({
                 : "まだRe:closetでの着用記録がありません"}
             </dd>
           </dl>
+
+          <div className="flex flex-col gap-2 border-t pt-4">
+            <PublishToggle
+              itemId={item.id}
+              isPublic={item.is_public}
+              publishedAtLabel={
+                item.published_at ? formatJstDate(item.published_at) : null
+              }
+            />
+          </div>
 
           <div className="flex flex-col gap-2 border-t pt-4">
             <p className="text-sm text-muted-foreground">

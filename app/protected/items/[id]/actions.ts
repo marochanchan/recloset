@@ -25,6 +25,9 @@ import { revalidatePath } from "next/cache";
 // を呼ばない。Gemini側（generateDiagnosisElaboration）には適用しない。
 const AI_DIAGNOSIS_COOLDOWN_SECONDS = 15;
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type RecordWearTodayResult = {
   error: string | null;
 };
@@ -34,6 +37,10 @@ type UpdateStatusResult = {
 };
 
 type DeleteClothingItemResult = {
+  error: string | null;
+};
+
+type UpdatePublicationResult = {
   error: string | null;
 };
 
@@ -168,6 +175,95 @@ export async function updateClothingItemStatus(
   }
 
   revalidatePath(`/protected/items/${itemId}`);
+  return { error: null };
+}
+
+/**
+ * 服を一般公開する（未ログインユーザーも閲覧可能になる）。
+ * statusは一切変更しない（公開状態とstatusは完全に独立）。
+ */
+export async function publishClothingItem(
+  itemId: string,
+): Promise<UpdatePublicationResult> {
+  return setClothingItemPublication(itemId, true);
+}
+
+/**
+ * 服を非公開に戻す。published_atはmigration 008のCHECK制約に合わせてnullに戻す。
+ * statusは一切変更しない。
+ */
+export async function unpublishClothingItem(
+  itemId: string,
+): Promise<UpdatePublicationResult> {
+  return setClothingItemPublication(itemId, false);
+}
+
+/**
+ * publish/unpublishの共通処理。
+ * - 対象ユーザーはクライアントから受け取らず、auth.getUser()の結果だけを使う
+ * - RLS（owner-only）に加え、SELECT/UPDATEとも user_id = 本人 で絞る（多重防御）
+ * - 既に目的の状態なら何もしない。UPDATEも is_public = 現在と逆の値 を条件にする
+ *   ため、二重クリックや別タブからの同時操作でもpublished_atが上書きされない
+ */
+async function setClothingItemPublication(
+  itemId: string,
+  isPublic: boolean,
+): Promise<UpdatePublicationResult> {
+  if (!UUID_PATTERN.test(itemId)) {
+    return { error: "対象の服が見つかりません" };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { error: "ログイン情報が確認できませんでした" };
+  }
+
+  const { data: item, error: itemError } = await supabase
+    .from("clothing_items")
+    .select("id, is_public")
+    .eq("id", itemId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (itemError) {
+    console.error("setClothingItemPublication: fetch item error", itemError);
+    return { error: "服の情報を取得できませんでした" };
+  }
+  if (!item) {
+    return { error: "対象の服が見つかりません" };
+  }
+
+  if (item.is_public !== isPublic) {
+    // 0件更新（直前に別タブ等で同じ操作が反映済み）の場合も、
+    // 結果として目的の状態になっているため成功として扱う
+    const { error: updateError } = await supabase
+      .from("clothing_items")
+      .update({
+        is_public: isPublic,
+        published_at: isPublic ? new Date().toISOString() : null,
+      })
+      .eq("id", itemId)
+      .eq("user_id", user.id)
+      .eq("is_public", !isPublic);
+    if (updateError) {
+      console.error("setClothingItemPublication: update error", updateError);
+      return {
+        error: isPublic
+          ? "公開に失敗しました"
+          : "非公開への変更に失敗しました",
+      };
+    }
+  }
+
+  revalidatePath(`/protected/items/${itemId}`);
+  // 公開ページ（Phase 3で追加予定）にも反映させる
+  revalidatePath("/discover");
+  revalidatePath(`/discover/${itemId}`);
   return { error: null };
 }
 
