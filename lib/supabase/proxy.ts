@@ -47,9 +47,16 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims;
 
+  // 公開服ページ（/discover, /discover/...）は未ログインでも閲覧可能。
+  // "/discoverX" のような別パスまで含めないよう、境界を明示して判定する。
+  const isDiscoverPath =
+    request.nextUrl.pathname === "/discover" ||
+    request.nextUrl.pathname.startsWith("/discover/");
+
   if (
     request.nextUrl.pathname !== "/" &&
     !user &&
+    !isDiscoverPath &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth")
   ) {

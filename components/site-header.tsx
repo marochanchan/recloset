@@ -14,6 +14,12 @@ async function SiteHeaderNav() {
   if (!user) {
     return (
       <div className="flex flex-wrap items-center gap-2">
+        <Link
+          href="/discover"
+          className="mr-2 text-muted-foreground hover:text-foreground"
+        >
+          みんなの服
+        </Link>
         <Button asChild size="sm" variant="outline">
           <Link href="/auth/login">ログイン</Link>
         </Button>
@@ -40,6 +46,18 @@ async function SiteHeaderNav() {
         className="text-muted-foreground hover:text-foreground"
       >
         服を登録
+      </Link>
+      <Link
+        href="/discover"
+        className="text-muted-foreground hover:text-foreground"
+      >
+        みんなの服
+      </Link>
+      <Link
+        href="/protected/settings"
+        className="text-muted-foreground hover:text-foreground"
+      >
+        設定
       </Link>
       <AuthButton />
     </div>

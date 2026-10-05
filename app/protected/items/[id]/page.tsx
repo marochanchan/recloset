@@ -82,6 +82,24 @@ async function ClothingItemDetail({
 
   const alreadyLoggedToday = await hasWornToday(supabase, item.id);
 
+  // 公開UIで「公開名が設定済みか」を判定するため、本人の公開名を取得する。
+  // 公開可否の最終判定はServer Action（setClothingItemPublication）側で行う。
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
+  let displayName: string | null = null;
+  if (userId) {
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", userId)
+      .maybeSingle();
+    if (profileError) {
+      console.error("clothing item detail: fetch profile error", profileError);
+    } else {
+      displayName = profile?.display_name ?? null;
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <ClothingImageGallery images={imageUrls} alt={item.title} />
@@ -144,6 +162,7 @@ async function ClothingItemDetail({
             <PublishToggle
               itemId={item.id}
               isPublic={item.is_public}
+              displayName={displayName}
               publishedAtLabel={
                 item.published_at ? formatJstDate(item.published_at) : null
               }

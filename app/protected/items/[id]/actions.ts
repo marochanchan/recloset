@@ -10,6 +10,7 @@ import {
 } from "@/lib/ai-diagnosis";
 import { GEMINI_ELABORATION_MODEL, runGeminiElaboration } from "@/lib/ai-elaboration";
 import { STATUS_OPTIONS } from "@/lib/clothing-options";
+import { isUsableDisplayName } from "@/lib/display-name";
 import { type NextAction, buildNextAction } from "@/lib/next-action";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -42,6 +43,8 @@ type DeleteClothingItemResult = {
 
 type UpdatePublicationResult = {
   error: string | null;
+  /** 公開名が未設定のため公開できなかった場合にtrue（UIで設定ページへ誘導する） */
+  displayNameRequired?: boolean;
 };
 
 type RunAiDiagnosisResult =
@@ -204,6 +207,8 @@ export async function unpublishClothingItem(
  * - RLS（owner-only）に加え、SELECT/UPDATEとも user_id = 本人 で絞る（多重防御）
  * - 既に目的の状態なら何もしない。UPDATEも is_public = 現在と逆の値 を条件にする
  *   ため、二重クリックや別タブからの同時操作でもpublished_atが上書きされない
+ * - 新しく公開する場合は、本人の公開名（profiles.display_name）が設定済みで
+ *   あることを必須にする（UIを経由せず直接呼ばれても公開できないようにする）
  */
 async function setClothingItemPublication(
   itemId: string,
@@ -238,6 +243,29 @@ async function setClothingItemPublication(
     return { error: "対象の服が見つかりません" };
   }
 
+  if (isPublic && !item.is_public) {
+    // 公開名が未設定（null）・不正な値なら公開しない
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error(
+        "setClothingItemPublication: fetch profile error",
+        profileError,
+      );
+      return { error: "公開名を確認できませんでした" };
+    }
+    if (!isUsableDisplayName(profile?.display_name)) {
+      return {
+        error: "服を公開するには、先に公開名を設定してください",
+        displayNameRequired: true,
+      };
+    }
+  }
+
   if (item.is_public !== isPublic) {
     // 0件更新（直前に別タブ等で同じ操作が反映済み）の場合も、
     // 結果として目的の状態になっているため成功として扱う
@@ -261,7 +289,7 @@ async function setClothingItemPublication(
   }
 
   revalidatePath(`/protected/items/${itemId}`);
-  // 公開ページ（Phase 3で追加予定）にも反映させる
+  // 公開ページにも反映させる
   revalidatePath("/discover");
   revalidatePath(`/discover/${itemId}`);
   return { error: null };
