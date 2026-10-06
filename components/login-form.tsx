@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getSafeLoginRedirect } from "@/lib/safe-redirect";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -38,7 +39,12 @@ export function LoginForm({
         password,
       });
       if (error) throw error;
-      router.push("/");
+      // Loop詳細から来た場合（?next=/discover/{uuid}）だけ元のページへ戻す。
+      // それ以外・不正な値はこれまでどおりトップへ。
+      const next = getSafeLoginRedirect(
+        new URLSearchParams(window.location.search).get("next"),
+      );
+      router.push(next ?? "/");
     } catch (error: unknown) {
       setError(
         error instanceof Error ? error.message : "エラーが発生しました",

@@ -2,8 +2,11 @@ import {
   DiscoverHeroActions,
   DiscoverStickyCta,
 } from "@/components/discover-cta";
+import { LikeButton } from "@/components/like-button";
 import { ItemGridSkeleton } from "@/components/loading-skeletons";
 import { PublicClothingItemCard } from "@/components/public-clothing-item-card";
+import { getMyLoopItemStates } from "@/lib/loop-likes";
+import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -83,28 +86,50 @@ async function PublicClothingItemsList() {
     }
   }
 
+  // ログイン中だけ、表示中の服の「気になる」状態と自分の服かどうかを
+  // まとめて1回で取得する（未ログイン・取得失敗時はボタンを出さない）
+  const user = await getCurrentClaims();
+  const itemStates = user
+    ? await getMyLoopItemStates(
+        supabase,
+        items.map((item) => item.id),
+      )
+    : new Map();
+
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
       {items.map((item) => {
         const imageUrl = item.cover_image_path
           ? (signedUrlMap.get(item.cover_image_path) ?? null)
           : null;
+        const state = itemStates.get(item.id);
 
+        // buttonをLinkの中に入れないよう、カード本体のLinkと
+        // 「気になる」ボタンを兄弟要素として重ねる
         return (
-          <Link
-            key={item.id}
-            href={`/discover/${item.id}`}
-            className="block h-full"
-          >
-            <PublicClothingItemCard
-              title={item.title}
-              brand={item.brand}
-              category={item.category}
-              season={item.season}
-              ownerDisplayName={item.owner_display_name ?? "Re:Closetユーザー"}
-              imageUrl={imageUrl}
-            />
-          </Link>
+          <div key={item.id} className="relative h-full">
+            <Link href={`/discover/${item.id}`} className="block h-full">
+              <PublicClothingItemCard
+                title={item.title}
+                brand={item.brand}
+                category={item.category}
+                season={item.season}
+                ownerDisplayName={
+                  item.owner_display_name ?? "Re:Closetユーザー"
+                }
+                imageUrl={imageUrl}
+              />
+            </Link>
+            {state && !state.isOwner && (
+              <div className="absolute right-2 top-2">
+                <LikeButton
+                  itemId={item.id}
+                  initialLiked={state.isLiked}
+                  variant="compact"
+                />
+              </div>
+            )}
+          </div>
         );
       })}
     </div>

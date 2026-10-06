@@ -17,27 +17,35 @@ import Link from "next/link";
 export async function DiscoverHeroActions() {
   const user = await getCurrentClaims();
 
-  return (
-    <div className="flex flex-wrap justify-center gap-3">
-      {user ? (
-        <>
+  if (user) {
+    return (
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           <Button asChild>
             <Link href="/protected/items">自分のクローゼットを見る</Link>
           </Button>
           <Button asChild variant="outline">
             <Link href="/protected/items/new">服を登録する</Link>
           </Button>
-        </>
-      ) : (
-        <>
-          <Button asChild>
-            <Link href="/auth/sign-up">自分のクローゼットをつくる</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/auth/login">ログイン</Link>
-          </Button>
-        </>
-      )}
+        </div>
+        <Link
+          href="/protected/likes"
+          className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        >
+          気になる服を見る
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap justify-center gap-3">
+      <Button asChild>
+        <Link href="/auth/sign-up">自分のクローゼットをつくる</Link>
+      </Button>
+      <Button asChild variant="outline">
+        <Link href="/auth/login">ログイン</Link>
+      </Button>
     </div>
   );
 }
