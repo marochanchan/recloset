@@ -107,7 +107,7 @@ export function getWearRecencyLabel(
   referenceDate: Date = new Date(),
 ): string {
   const daysSince = getDaysSinceLastWorn(lastWornAt, referenceDate);
-  if (daysSince === null) return "Re:closetでの着用記録なし";
+  if (daysSince === null) return "Re:Closetでの着用記録なし";
   if (daysSince <= 0) return "今日着ました";
   return `${daysSince}日着ていません`;
 }

@@ -1,7 +1,18 @@
+import {
+  DiscoverHeroActions,
+  DiscoverStickyCta,
+} from "@/components/discover-cta";
 import { PublicClothingItemCard } from "@/components/public-clothing-item-card";
 import { createClient } from "@/lib/supabase/server";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+
+export const metadata: Metadata = {
+  title: "Re:Closet Loop",
+  description:
+    "服を手放すことは、捨てることじゃない。Re:Closetのユーザーが手放そうとしている服を、次の人へつなぐ場所です。",
+};
 
 const SIGNED_URL_EXPIRES_IN = 600; // 10分
 const PUBLIC_ITEMS_LIMIT = 50;
@@ -36,9 +47,12 @@ async function PublicClothingItemsList() {
 
   if (items.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        まだ公開されている服はありません。
-      </p>
+      <div className="flex flex-col items-center gap-1 rounded-lg border border-dashed px-4 py-10 text-center">
+        <p className="font-medium">まだ公開されている服はありません</p>
+        <p className="text-sm text-muted-foreground">
+          ユーザーが服を公開すると、ここに並びます。
+        </p>
+      </div>
     );
   }
 
@@ -69,20 +83,24 @@ async function PublicClothingItemsList() {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
       {items.map((item) => {
         const imageUrl = item.cover_image_path
           ? (signedUrlMap.get(item.cover_image_path) ?? null)
           : null;
 
         return (
-          <Link key={item.id} href={`/discover/${item.id}`}>
+          <Link
+            key={item.id}
+            href={`/discover/${item.id}`}
+            className="block h-full"
+          >
             <PublicClothingItemCard
               title={item.title}
               brand={item.brand}
               category={item.category}
               season={item.season}
-              ownerDisplayName={item.owner_display_name ?? "Re:closetユーザー"}
+              ownerDisplayName={item.owner_display_name ?? "Re:Closetユーザー"}
               imageUrl={imageUrl}
             />
           </Link>
@@ -94,20 +112,32 @@ async function PublicClothingItemsList() {
 
 export default function DiscoverPage() {
   return (
-    <div className="w-full flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold">みんなの服</h1>
-        <p className="text-sm text-muted-foreground">
-          Re:closetのユーザーが公開している服です
+    <div className="w-full flex flex-col gap-8">
+      <section className="flex flex-col items-center gap-4 rounded-xl border bg-muted/30 px-5 py-8 text-center sm:py-10">
+        <h1 className="text-3xl font-bold tracking-tight">Re:Closet Loop</h1>
+        <p className="max-w-md text-muted-foreground leading-relaxed">
+          服を手放すことは、捨てることじゃない。
+          <br />
+          誰かのクローゼットへ、次の一着をつなごう。
         </p>
-      </div>
+        <Suspense fallback={<div className="h-10" />}>
+          <DiscoverHeroActions />
+        </Suspense>
+      </section>
 
-      <Suspense
-        fallback={
-          <p className="text-sm text-muted-foreground">読み込み中...</p>
-        }
-      >
-        <PublicClothingItemsList />
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold">誰かのクローゼットをのぞいてみる</h2>
+        <Suspense
+          fallback={
+            <p className="text-sm text-muted-foreground">読み込み中...</p>
+          }
+        >
+          <PublicClothingItemsList />
+        </Suspense>
+      </section>
+
+      <Suspense fallback={null}>
+        <DiscoverStickyCta />
       </Suspense>
     </div>
   );

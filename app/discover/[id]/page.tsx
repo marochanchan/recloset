@@ -1,4 +1,5 @@
 import { ClothingImageGallery } from "@/components/clothing-image-gallery";
+import { DiscoverCta } from "@/components/discover-cta";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -9,9 +10,10 @@ import {
 import { getCategoryLabel, getSeasonLabel } from "@/lib/clothing-options";
 import { createClient } from "@/lib/supabase/server";
 import { formatJstDate } from "@/lib/wear-logs";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -30,6 +32,51 @@ type PublicClothingItemDetailRow = {
   image_paths: string[];
 };
 
+// 公開データはRPCからのみ取得する。非公開の服・存在しない服はどちらも
+// 0行（null）になる（「存在するが非公開」を外部へ漏らさない）。
+// generateMetadataと本文の両方から呼ぶため、React.cacheで1リクエスト1回にまとめる。
+const getPublicClothingItem = cache(async (id: string) => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .rpc("get_public_clothing_item", { p_item_id: id })
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as PublicClothingItemDetailRow | null) ?? null;
+});
+
+// タイトル・公開名だけを使う（OGP画像には期限付きの署名URLを使わない）。
+// 取得に失敗しても本文側のエラー表示に任せ、ここでは固定の値に戻す。
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const fallback: Metadata = { title: "Re:Closet Loop" };
+
+  if (!UUID_PATTERN.test(id)) {
+    return fallback;
+  }
+
+  try {
+    const item = await getPublicClothingItem(id);
+    if (!item) {
+      return fallback;
+    }
+    const ownerName = item.owner_display_name ?? "Re:Closetユーザー";
+    return {
+      title: `${item.title} | Re:Closet Loop`,
+      description: `${ownerName}さんがRe:Closet Loopで、次の人へつなごうとしている服です。`,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 async function PublicClothingItemDetail({
   params,
 }: {
@@ -41,22 +88,13 @@ async function PublicClothingItemDetail({
     notFound();
   }
 
-  // 公開データはRPCからのみ取得する。非公開の服・存在しない服はどちらも
-  // 0行になり、同じnotFound()になる（「存在するが非公開」を外部へ漏らさない）。
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .rpc("get_public_clothing_item", { p_item_id: id })
-    .maybeSingle();
+  const item = await getPublicClothingItem(id);
 
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
+  if (!item) {
     notFound();
   }
 
-  const item = data as PublicClothingItemDetailRow;
+  const supabase = await createClient();
   const paths = item.image_paths ?? [];
   const signedUrlMap = new Map<string, string>();
 
@@ -105,13 +143,17 @@ async function PublicClothingItemDetail({
 
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <dt className="text-muted-foreground">公開した人</dt>
-            <dd>{item.owner_display_name ?? "Re:closetユーザー"}</dd>
+            <dd>{item.owner_display_name ?? "Re:Closetユーザー"}</dd>
 
             <dt className="text-muted-foreground">公開日</dt>
             <dd>{formatJstDate(item.published_at)}</dd>
           </dl>
         </CardContent>
       </Card>
+
+      <div className="mt-6">
+        <DiscoverCta />
+      </div>
     </div>
   );
 }
@@ -127,7 +169,7 @@ export default function PublicClothingItemPage({
         href="/discover"
         className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
       >
-        ← みんなの服に戻る
+        ← Re:Closet Loopに戻る
       </Link>
 
       <Suspense

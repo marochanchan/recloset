@@ -1,15 +1,13 @@
 import { AuthButton } from "@/components/auth-button";
 import { EnvVarWarning } from "@/components/env-var-warning";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { hasEnvVars } from "@/lib/utils";
 import Link from "next/link";
 import { Suspense } from "react";
 
 async function SiteHeaderNav() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
-  const user = data?.claims;
+  const user = await getCurrentClaims();
 
   if (!user) {
     return (
@@ -18,7 +16,7 @@ async function SiteHeaderNav() {
           href="/discover"
           className="mr-2 text-muted-foreground hover:text-foreground"
         >
-          みんなの服
+          Re:Closet Loop
         </Link>
         <Button asChild size="sm" variant="outline">
           <Link href="/auth/login">ログイン</Link>
@@ -51,7 +49,7 @@ async function SiteHeaderNav() {
         href="/discover"
         className="text-muted-foreground hover:text-foreground"
       >
-        みんなの服
+        Re:Closet Loop
       </Link>
       <Link
         href="/protected/settings"
@@ -69,7 +67,7 @@ export function SiteHeader() {
     <nav className="w-full flex justify-center border-b border-b-foreground/10">
       <div className="w-full max-w-5xl flex flex-wrap justify-between items-center gap-3 p-3 px-5 text-sm">
         <Link href="/" className="font-semibold text-base">
-          Re:closet
+          Re:Closet
         </Link>
         {!hasEnvVars ? (
           <EnvVarWarning />

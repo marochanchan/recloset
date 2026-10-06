@@ -147,14 +147,14 @@ async function ClothingItemDetail({
                 : "未登録"}
             </dd>
 
-            <dt className="text-muted-foreground">Re:closetでの着用記録</dt>
+            <dt className="text-muted-foreground">Re:Closetでの着用記録</dt>
             <dd>{item.wear_count}回</dd>
 
             <dt className="text-muted-foreground">最後に着た日</dt>
             <dd>
               {item.last_worn_at
                 ? formatJstDate(item.last_worn_at)
-                : "まだRe:closetでの着用記録がありません"}
+                : "まだRe:Closetでの着用記録がありません"}
             </dd>
           </dl>
 

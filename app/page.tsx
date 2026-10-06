@@ -1,7 +1,6 @@
 import { ClosetSummary } from "@/components/closet-summary";
 import { SiteHeader } from "@/components/site-header";
 import { TodayReTryCard } from "@/components/today-re-try-card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -38,6 +37,12 @@ async function HomeContent() {
             <Link href="/auth/sign-up">新規登録</Link>
           </Button>
         </div>
+        <Link
+          href="/discover"
+          className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        >
+          Re:Closet Loopを見る
+        </Link>
       </div>
     );
   }
@@ -134,8 +139,13 @@ async function HomeContent() {
             着用履歴をもとに、「残す・もう一度着る・手放す」を一緒に考えます。
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Badge variant="secondary">Coming soon</Badge>
+        <CardContent className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            クローゼットから服を選び、詳細ページの「AI診断」から診断できます。
+          </p>
+          <Button asChild variant="outline" className="w-fit">
+            <Link href="/protected/items">診断する服を選ぶ</Link>
+          </Button>
         </CardContent>
       </Card>
     </div>
@@ -148,7 +158,7 @@ export default function Home() {
       <SiteHeader />
       <div className="flex flex-1 w-full flex-col items-center gap-10 px-4 py-12">
         <div className="flex flex-col items-center gap-2 text-center">
-          <h1 className="text-3xl font-bold">Re:closet</h1>
+          <h1 className="text-3xl font-bold">Re:Closet</h1>
           <p className="text-lg text-muted-foreground">
             クローゼットの服を、もう一度。
           </p>

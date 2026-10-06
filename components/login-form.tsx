@@ -53,7 +53,7 @@ export function LoginForm({
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">ログイン</CardTitle>
-          <CardDescription>Re:closetへログイン</CardDescription>
+          <CardDescription>Re:Closetへログイン</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin}>

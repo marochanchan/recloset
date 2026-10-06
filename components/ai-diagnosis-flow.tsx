@@ -431,7 +431,7 @@ export function AiDiagnosisFlow({
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium">客観的なデータ</p>
               <ul className="text-sm text-muted-foreground">
-                <li>Re:closetでの着用記録：{wearCount}回</li>
+                <li>Re:Closetでの着用記録：{wearCount}回</li>
                 <li>着用状況：{wearRecencyLabel}</li>
                 <li>
                   購入からの経過：

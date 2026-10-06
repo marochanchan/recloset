@@ -63,7 +63,7 @@ export function SignUpForm({
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">新規登録</CardTitle>
-          <CardDescription>Re:closetのアカウントを作成</CardDescription>
+          <CardDescription>Re:Closetのアカウントを作成</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignUp}>

@@ -21,6 +21,7 @@ type ClothingItemCardProps = {
   favorite: boolean;
   status: string;
   lastWornAt: string | null;
+  isPublic: boolean;
   imageUrl: string | null;
 };
 
@@ -32,6 +33,7 @@ export function ClothingItemCard({
   favorite,
   status,
   lastWornAt,
+  isPublic,
   imageUrl,
 }: ClothingItemCardProps) {
   return (
@@ -50,6 +52,15 @@ export function ClothingItemCard({
           <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
             画像なし
           </div>
+        )}
+        {/* 公開中の服だけ、画像の隅に小さく示す（バッジ行の情報量を増やさない） */}
+        {isPublic && (
+          <Badge
+            variant="outline"
+            className="absolute left-2 top-2 bg-background/90"
+          >
+            公開中
+          </Badge>
         )}
       </div>
       <CardHeader>

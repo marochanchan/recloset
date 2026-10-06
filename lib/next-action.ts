@@ -178,7 +178,7 @@ const LONG_UNWORN_SUFFIX =
   "しばらく着ていない分、実際に試してみると判断しやすくなりそうです。";
 
 const TRY_ONCE_FIRST_MESSAGE =
-  "Re:closetでの着用記録がまだなく、気持ちもまだ固まっていないようです。一度着てみて、そのときの気持ちを次に考える材料にしてみましょう。";
+  "Re:Closetでの着用記録がまだなく、気持ちもまだ固まっていないようです。一度着てみて、そのときの気持ちを次に考える材料にしてみましょう。";
 
 /**
  * Decision（Jevの結果）・FACT・FEELINGから、structuredなNext Actionを組み立てる。

@@ -81,7 +81,7 @@ export function PublishToggle({
         </p>
         {!hasDisplayName && (
           <p className="text-sm text-muted-foreground">
-            公開名が未設定のため、「Re:closetユーザー」と表示されています。
+            公開名が未設定のため、「Re:Closetユーザー」と表示されています。
             <Link href={settingsHref} className="underline underline-offset-4">
               公開名を設定する
             </Link>
