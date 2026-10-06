@@ -1,7 +1,6 @@
 import { AiDiagnosisFlow } from "@/components/ai-diagnosis-flow";
 import { getCategoryLabel, getSeasonLabel } from "@/lib/clothing-options";
 import { createClient } from "@/lib/supabase/server";
-import { getDaysSincePurchase, getWearRecencyLabel } from "@/lib/wear-logs";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -24,7 +23,7 @@ async function AiDiagnosisContent({
   const { data: item, error } = await supabase
     .from("clothing_items")
     .select(
-      "id, title, brand, category, season, favorite, wear_count, last_worn_at, purchase_date, status",
+      "id, title, brand, category, season, favorite, status",
     )
     .eq("id", id)
     .maybeSingle();
@@ -53,9 +52,6 @@ async function AiDiagnosisContent({
         categoryLabel={getCategoryLabel(item.category)}
         seasonLabel={item.season ? getSeasonLabel(item.season) : null}
         favorite={item.favorite}
-        wearCount={item.wear_count}
-        wearRecencyLabel={getWearRecencyLabel(item.last_worn_at)}
-        daysSincePurchase={getDaysSincePurchase(item.purchase_date)}
         currentStatus={item.status}
       />
     </div>

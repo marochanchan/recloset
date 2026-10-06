@@ -10,6 +10,7 @@ import {
 } from "@/lib/ai-diagnosis";
 import { GEMINI_ELABORATION_MODEL, runGeminiElaboration } from "@/lib/ai-elaboration";
 import { STATUS_OPTIONS } from "@/lib/clothing-options";
+import { buildDecisionHints } from "@/lib/decision-hints";
 import { isUsableDisplayName } from "@/lib/display-name";
 import { type NextAction, buildNextAction } from "@/lib/next-action";
 import { createClient } from "@/lib/supabase/server";
@@ -52,13 +53,15 @@ type RunAiDiagnosisResult =
   | {
       error: null;
       decision: JevDiagnosisResult;
+      /** 判断のヒント（FACT/FEELINGからルールベースで2〜4件。DBには保存しない） */
+      decisionHints: string[];
       nextAction: NextAction;
       /**
        * ai_diagnoses履歴の行id。履歴保存（INSERT）自体が失敗した場合は
        * nullになる。診断結果の表示はこれに関わらず行う
        * （履歴保存失敗は診断結果表示を妨げない、という既存方針を維持）。
        * generateDiagnosisElaborationを呼ぶために必要なため、
-       * nullの場合は「もっと詳しく考える」ボタンを表示しない。
+       * nullの場合はGeminiのボタンを表示しない。
        */
       diagnosisId: string | null;
     };
@@ -454,6 +457,7 @@ export async function runAiDiagnosis(
   try {
     const decision = await runJevDiagnosis(fact, feeling);
     const nextAction = buildNextAction(decision.choice, fact, feeling);
+    const decisionHints = buildDecisionHints(decision.choice, fact, feeling);
 
     // 履歴として保存する。失敗してもユーザーには今回の診断結果を
     // そのまま返す（履歴保存はその場の診断結果表示の必須条件ではない）。
@@ -480,6 +484,7 @@ export async function runAiDiagnosis(
     return {
       error: null,
       decision,
+      decisionHints,
       nextAction,
       diagnosisId: insertedDiagnosis?.id ?? null,
     };
@@ -492,7 +497,7 @@ export async function runAiDiagnosis(
 }
 
 /**
- * 「もっと詳しく考える」が押されたときだけ呼ばれる、独立したServer Action。
+ * 「この服との関係を言葉にしてみる」が押されたときだけ呼ばれる、独立したServer Action。
  * runAiDiagnosisの中からは呼ばれない（通常の診断フローではGeminiを使わない）。
  *
  * クライアントからFACT/FEELING等を再送させず、DBに保存済みの診断スナップショット
@@ -549,10 +554,10 @@ export async function generateDiagnosisElaboration(
       decision: diagnosis.decision as DiagnosisDecisionChoice,
       fact: diagnosis.fact as DiagnosisFact,
       feeling: diagnosis.feeling as DiagnosisFeelingInput,
-      nextAction: diagnosis.next_action as Pick<
-        NextAction,
-        "title" | "message"
-      >,
+      // 本文(message)は言い換えの元になるため、見出し(title)だけを渡す
+      nextAction: {
+        title: (diagnosis.next_action as Pick<NextAction, "title">).title,
+      },
     });
 
     // elaboration/gemini_model列だけをUPDATEする。既存の診断スナップショット
@@ -580,7 +585,7 @@ export async function generateDiagnosisElaboration(
     console.error("generateDiagnosisElaboration: Gemini error", error);
     return {
       error:
-        "詳しいコメントを生成できませんでした。診断結果はそのまま確認できます。",
+        "言葉にできませんでした。診断結果はそのまま確認できます。",
     };
   }
 }

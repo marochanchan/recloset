@@ -19,12 +19,12 @@ import {
   NOT_WORN_REASON_OPTIONS,
   WANT_TO_WEAR_AGAIN_OPTIONS,
   type CurrentFeeling,
-  type DiagnosisDecisionChoice,
   type JevDiagnosisResult,
   type NotWornReason,
   type WantToWearAgain,
 } from "@/lib/ai-diagnosis";
 import { getStatusLabel } from "@/lib/clothing-options";
+import { DIAGNOSIS_TYPE_LABELS } from "@/lib/decision-hints";
 import type { NextAction } from "@/lib/next-action";
 import { useState, useTransition } from "react";
 
@@ -35,9 +35,6 @@ type AiDiagnosisFlowProps = {
   categoryLabel: string;
   seasonLabel: string | null;
   favorite: boolean;
-  wearCount: number;
-  wearRecencyLabel: string;
-  daysSincePurchase: number | null;
   currentStatus: string;
 };
 
@@ -113,14 +110,16 @@ function RebyeCandidateAction({
 
 type DiagnosisResultState = {
   decision: JevDiagnosisResult;
+  decisionHints: string[];
   nextAction: NextAction;
   /** ai_diagnoses履歴の行id。履歴保存に失敗した場合はnull。 */
   diagnosisId: string | null;
 };
 
 /**
- * 「もっと詳しく考える」ボタン。ユーザーが明示的に押した場合だけ
- * generateDiagnosisElaboration（Gemini）を1回呼ぶ。成功後は生成結果を
+ * 「この服との関係を言葉にしてみる」ボタン。ユーザーが明示的に押した場合だけ
+ * generateDiagnosisElaboration（Gemini）を1回呼ぶ。次の一歩（行動）とは別に、
+ * その服との今の関係を見る角度を変える言葉を表示する。成功後は生成結果を
  * そのまま表示し、再生成はできない（サーバー側でも1診断1回に制限している）。
  * 失敗時はJevの診断結果に影響しない旨のメッセージを表示し、再試行は許可する。
  */
@@ -144,8 +143,12 @@ function ElaborationAction({ diagnosisId }: { diagnosisId: string }) {
   if (elaboration) {
     return (
       <div className="flex flex-col gap-1">
-        <p className="text-sm font-medium">AIからの補足</p>
-        <p className="text-sm text-muted-foreground">{elaboration}</p>
+        <p className="text-sm font-medium">
+          Geminiと、この服との今の距離を考える
+        </p>
+        <p className="whitespace-pre-line text-sm text-muted-foreground">
+          {elaboration}
+        </p>
       </div>
     );
   }
@@ -153,7 +156,7 @@ function ElaborationAction({ diagnosisId }: { diagnosisId: string }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm text-muted-foreground">
-        もう少し考えてみたいですか？
+        次の一歩とは少し違う角度から、この服との今の関係を言葉にしてみます。
       </p>
       <Button
         type="button"
@@ -163,7 +166,11 @@ function ElaborationAction({ diagnosisId }: { diagnosisId: string }) {
         disabled={isPending}
         onClick={handleClick}
       >
-        {isPending ? "生成中..." : error ? "再試行" : "もっと詳しく考える"}
+        {isPending
+          ? "言葉にしています..."
+          : error
+            ? "再試行"
+            : "この服との関係を言葉にしてみる"}
       </Button>
       {error && <p className="text-sm text-red-500">{error}</p>}
     </div>
@@ -171,18 +178,6 @@ function ElaborationAction({ diagnosisId }: { diagnosisId: string }) {
 }
 
 const MAX_NOT_WORN_REASONS = 2;
-
-// 「診断タイプ」の表示用ラベル。clothing_items.statusとは別概念であり、
-// あくまで今回のAI診断（Jevの判定）そのものを示すバッジ＋短い補足。
-// 3種類とも同じ構造・同じBadge variantで、視覚的な強さを揃える。
-const DIAGNOSIS_TYPE_LABELS: Record<
-  DiagnosisDecisionChoice,
-  { badge: string; caption: string }
-> = {
-  KEEP: { badge: "KEEP", caption: "このまま持っておく" },
-  RETRY: { badge: "RE:TRY", caption: "もう一度試してみる" },
-  REBYE: { badge: "RE:BYE", caption: "手放す方向で考えてみる" },
-};
 
 function OptionButtons<T extends string>({
   options,
@@ -279,9 +274,6 @@ export function AiDiagnosisFlow({
   categoryLabel,
   seasonLabel,
   favorite,
-  wearCount,
-  wearRecencyLabel,
-  daysSincePurchase,
   currentStatus,
 }: AiDiagnosisFlowProps) {
   const [currentFeeling, setCurrentFeeling] = useState<CurrentFeeling | null>(
@@ -315,26 +307,12 @@ export function AiDiagnosisFlow({
       }
       setResult({
         decision: response.decision,
+        decisionHints: response.decisionHints,
         nextAction: response.nextAction,
         diagnosisId: response.diagnosisId,
       });
     });
   };
-
-  const currentFeelingLabel = CURRENT_FEELING_OPTIONS.find(
-    (option) => option.value === currentFeeling,
-  )?.label;
-  const wantToWearAgainLabel = WANT_TO_WEAR_AGAIN_OPTIONS.find(
-    (option) => option.value === wantToWearAgain,
-  )?.label;
-  const notWornReasonLabels = notWornReasons
-    .map(
-      (reason) =>
-        NOT_WORN_REASON_OPTIONS.find((option) => option.value === reason)
-          ?.label ?? "",
-    )
-    .filter((label) => label !== "")
-    .join("、");
 
   return (
     <div className="flex flex-col gap-6">
@@ -428,26 +406,14 @@ export function AiDiagnosisFlow({
               </div>
             </div>
 
+            {/* 着用記録とあなたの回答のうち、今回の診断に関係が深いものを
+                ルールベースで選んで表示する（lib/decision-hints.ts） */}
             <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium">客観的なデータ</p>
-              <ul className="text-sm text-muted-foreground">
-                <li>Re:Closetでの着用記録：{wearCount}回</li>
-                <li>着用状況：{wearRecencyLabel}</li>
-                <li>
-                  購入からの経過：
-                  {daysSincePurchase !== null
-                    ? `${daysSincePurchase}日`
-                    : "購入日は未登録です"}
-                </li>
-              </ul>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium">あなたの回答</p>
-              <ul className="text-sm text-muted-foreground">
-                <li>今の気持ち：{currentFeelingLabel}</li>
-                <li>また着たいか：{wantToWearAgainLabel}</li>
-                <li>着ていない理由：{notWornReasonLabels}</li>
+              <p className="text-sm font-medium">判断のヒント</p>
+              <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                {result.decisionHints.map((hint) => (
+                  <li key={hint}>{hint}</li>
+                ))}
               </ul>
             </div>
 
