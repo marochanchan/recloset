@@ -2,6 +2,7 @@ import {
   DiscoverHeroActions,
   DiscoverStickyCta,
 } from "@/components/discover-cta";
+import { ItemGridSkeleton } from "@/components/loading-skeletons";
 import { PublicClothingItemCard } from "@/components/public-clothing-item-card";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
@@ -127,11 +128,7 @@ export default function DiscoverPage() {
 
       <section className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold">誰かのクローゼットをのぞいてみる</h2>
-        <Suspense
-          fallback={
-            <p className="text-sm text-muted-foreground">読み込み中...</p>
-          }
-        >
+        <Suspense fallback={<ItemGridSkeleton variant="discover" />}>
           <PublicClothingItemsList />
         </Suspense>
       </section>

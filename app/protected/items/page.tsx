@@ -1,4 +1,5 @@
 import { ClothingItemCard } from "@/components/clothing-item-card";
+import { ItemGridSkeleton } from "@/components/loading-skeletons";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
@@ -90,11 +91,7 @@ export default function ClothingItemsPage() {
         </Button>
       </div>
 
-      <Suspense
-        fallback={
-          <p className="text-sm text-muted-foreground">読み込み中...</p>
-        }
-      >
+      <Suspense fallback={<ItemGridSkeleton variant="closet" />}>
         <ClothingItemsList />
       </Suspense>
     </div>

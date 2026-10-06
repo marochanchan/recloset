@@ -9,6 +9,7 @@ import {
 import { StatusSelector } from "@/components/status-selector";
 import { Button } from "@/components/ui/button";
 import { DeleteItemButton } from "@/components/delete-item-button";
+import { ItemDetailSkeleton } from "@/components/loading-skeletons";
 import { PublishToggle } from "@/components/publish-toggle";
 import { WearTodayButton } from "@/components/wear-today-button";
 import {
@@ -203,11 +204,7 @@ export default function ClothingItemDetailPage({
         ← 一覧に戻る
       </Link>
 
-      <Suspense
-        fallback={
-          <p className="text-sm text-muted-foreground">読み込み中...</p>
-        }
-      >
+      <Suspense fallback={<ItemDetailSkeleton />}>
         <ClothingItemDetail params={params} />
       </Suspense>
     </div>

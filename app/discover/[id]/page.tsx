@@ -1,5 +1,6 @@
 import { ClothingImageGallery } from "@/components/clothing-image-gallery";
 import { DiscoverCta } from "@/components/discover-cta";
+import { ItemDetailSkeleton } from "@/components/loading-skeletons";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -172,11 +173,7 @@ export default function PublicClothingItemPage({
         ← Re:Closet Loopに戻る
       </Link>
 
-      <Suspense
-        fallback={
-          <p className="text-sm text-muted-foreground">読み込み中...</p>
-        }
-      >
+      <Suspense fallback={<ItemDetailSkeleton />}>
         <PublicClothingItemDetail params={params} />
       </Suspense>
     </div>
