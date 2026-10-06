@@ -23,9 +23,15 @@ async function ClothingItemsList() {
 
   if (items.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        まだ登録された服がありません。「服を登録」から追加してください。
-      </p>
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center">
+        <p className="font-medium">まだ服が登録されていません</p>
+        <p className="text-sm text-muted-foreground">
+          手持ちの服を登録すると、ここに並びます。
+        </p>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/protected/items/new">服を登録する</Link>
+        </Button>
+      </div>
     );
   }
 

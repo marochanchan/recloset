@@ -1,4 +1,5 @@
 import { ClosetSummary } from "@/components/closet-summary";
+import { OnboardingSteps } from "@/components/onboarding-steps";
 import { SiteHeader } from "@/components/site-header";
 import { TodayReTryCard } from "@/components/today-re-try-card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ async function HomeContent() {
 
   if (!user) {
     return (
-      <div className="flex flex-col items-center gap-6 text-center">
+      <div className="flex w-full flex-col items-center gap-6 text-center">
         <p className="max-w-md text-muted-foreground">
           着ていない服に気づき、
           もう一度着る・残す・手放すを考える
@@ -43,6 +44,7 @@ async function HomeContent() {
         >
           Re:Closet Loopを見る
         </Link>
+        <OnboardingSteps className="mt-4 max-w-2xl" />
       </div>
     );
   }
@@ -90,29 +92,37 @@ async function HomeContent() {
     }
   }
 
+  // 件数の取得に成功し、かつ0件のときだけ初回向けの案内を出す
+  // （取得失敗を0件扱いして既存ユーザーに表示しないため）
+  const isClosetEmpty = !totalResult.error && totalResult.count === 0;
+
   return (
     <div className="flex w-full max-w-3xl flex-col gap-10">
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">今日のRe:try</h2>
-        {reTryItem ? (
-          <TodayReTryCard
-            itemId={reTryItem.id}
-            title={reTryItem.title}
-            brand={reTryItem.brand}
-            wearRecencyLabel={getWearRecencyLabel(reTryItem.last_worn_at)}
-            imageUrl={reTryImageUrl}
-          />
-        ) : (
-          <Card>
-            <CardContent className="flex flex-col gap-1 pt-6 text-sm text-muted-foreground">
-              <p>まだRe:tryできる服がありません</p>
-              <p>
-                着用記録をつけると、しばらく着ていない服をここでお知らせします
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </section>
+      {isClosetEmpty ? (
+        <OnboardingSteps showRegisterCta />
+      ) : (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">今日のRe:try</h2>
+          {reTryItem ? (
+            <TodayReTryCard
+              itemId={reTryItem.id}
+              title={reTryItem.title}
+              brand={reTryItem.brand}
+              wearRecencyLabel={getWearRecencyLabel(reTryItem.last_worn_at)}
+              imageUrl={reTryImageUrl}
+            />
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col gap-1 pt-6 text-sm text-muted-foreground">
+                <p>まだRe:tryできる服がありません</p>
+                <p>
+                  着用記録をつけると、しばらく着ていない服をここでお知らせします
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </section>
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">クローゼットサマリー</h2>
