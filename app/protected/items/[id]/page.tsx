@@ -10,6 +10,7 @@ import { StatusSelector } from "@/components/status-selector";
 import { Button } from "@/components/ui/button";
 import { DeleteItemButton } from "@/components/delete-item-button";
 import { ItemDetailSkeleton } from "@/components/loading-skeletons";
+import { MarketplaceLinks } from "@/components/marketplace-links";
 import { PublishToggle } from "@/components/publish-toggle";
 import { WearTodayButton } from "@/components/wear-today-button";
 import {
@@ -17,6 +18,7 @@ import {
   getSeasonLabel,
   getStatusLabel,
 } from "@/lib/clothing-options";
+import { getMarketplaceLinks } from "@/lib/marketplace-urls";
 import { createClient } from "@/lib/supabase/server";
 import { formatJstDate, hasWornToday } from "@/lib/wear-logs";
 import Link from "next/link";
@@ -42,7 +44,7 @@ async function ClothingItemDetail({
   const { data: item, error } = await supabase
     .from("clothing_items")
     .select(
-      "id, title, brand, category, season, purchase_date, purchase_price, favorite, status, wear_count, last_worn_at, is_public, published_at, clothing_images(image_path, sort_order)",
+      "id, title, brand, category, season, purchase_date, purchase_price, favorite, status, wear_count, last_worn_at, is_public, published_at, mercari_url, rakuma_url, yahoo_furima_url, clothing_images(image_path, sort_order)",
     )
     .eq("id", id)
     .order("sort_order", { referencedTable: "clothing_images" })
@@ -82,6 +84,12 @@ async function ClothingItemDetail({
     .filter((url): url is string => Boolean(url));
 
   const alreadyLoggedToday = await hasWornToday(supabase, item.id);
+
+  const marketplaceLinks = getMarketplaceLinks({
+    mercari: item.mercari_url,
+    rakuma: item.rakuma_url,
+    yahooFurima: item.yahoo_furima_url,
+  });
 
   // 公開UIで「公開名が設定済みか」を判定するため、本人の公開名を取得する。
   // 公開可否の最終判定はServer Action（setClothingItemPublication）側で行う。
@@ -158,6 +166,18 @@ async function ClothingItemDetail({
                 : "まだRe:Closetでの着用記録がありません"}
             </dd>
           </dl>
+
+          {marketplaceLinks.length > 0 && (
+            <div className="flex flex-col gap-2 border-t pt-4">
+              <p className="text-sm font-medium">出品先</p>
+              <MarketplaceLinks links={marketplaceLinks} />
+              {!item.is_public && (
+                <p className="text-xs text-muted-foreground">
+                  Loopで公開すると、出品先も公開ページに表示されます。
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-col gap-2 border-t pt-4">
             <PublishToggle

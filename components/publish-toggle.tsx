@@ -165,11 +165,12 @@ export function PublishToggle({
           <li>タイトル・ブランド・カテゴリ・季節</li>
           <li>登録しているすべての画像</li>
           <li>あなたの公開名「{displayName}」</li>
+          <li>登録している出品先URL（メルカリ・ラクマ・Yahoo!フリマ）</li>
         </ul>
       </div>
       <p className="text-muted-foreground">
         購入日・購入価格・お気に入り・着用記録・ステータス・AI診断の結果は公開されません。
-        公開中に追加した画像も公開されます。非公開にはいつでも戻せます。
+        公開中に追加した画像・出品先URLも公開されます。非公開にはいつでも戻せます。
       </p>
       <div className="flex gap-2">
         <Button

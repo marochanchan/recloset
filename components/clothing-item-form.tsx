@@ -14,6 +14,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CATEGORY_OPTIONS, SEASON_OPTIONS } from "@/lib/clothing-options";
+import {
+  MARKETPLACE_SERVICES,
+  MARKETPLACES,
+  validateMarketplaceUrl,
+  type MarketplaceService,
+} from "@/lib/marketplace-urls";
 import { GripVertical } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -59,6 +65,7 @@ export type ClothingItemFormInitialValues = {
   purchaseDate: string | null;
   purchasePrice: number | null;
   favorite: boolean;
+  marketplaceUrls: Record<MarketplaceService, string | null>;
 };
 
 // 既存画像・新規選択画像を1つの並び順として扱うための統合表現。
@@ -111,6 +118,22 @@ export function ClothingItemForm({
       : "",
   );
   const [favorite, setFavorite] = useState(initialValues?.favorite ?? false);
+  const [marketplaceUrls, setMarketplaceUrls] = useState<
+    Record<MarketplaceService, string>
+  >(() => ({
+    mercari: initialValues?.marketplaceUrls.mercari ?? "",
+    rakuma: initialValues?.marketplaceUrls.rakuma ?? "",
+    yahooFurima: initialValues?.marketplaceUrls.yahooFurima ?? "",
+  }));
+  const [marketplaceUrlErrors, setMarketplaceUrlErrors] = useState<
+    Partial<Record<MarketplaceService, string>>
+  >({});
+  // 保存済みURLがある場合・エラーがある場合は折りたたみを開いておく
+  const [isMarketplaceOpen, setIsMarketplaceOpen] = useState(() =>
+    MARKETPLACE_SERVICES.some(
+      (service) => initialValues?.marketplaceUrls[service],
+    ),
+  );
 
   // 既存画像＋新規選択画像を、画面に表示している順番そのままで保持する。
   // 「削除」は既存画像をpendingDelete:trueにするだけで、保存するまでは
@@ -303,6 +326,8 @@ export function ClothingItemForm({
     setPurchaseDate("");
     setPurchasePrice("");
     setFavorite(false);
+    setMarketplaceUrls({ mercari: "", rakuma: "", yahooFurima: "" });
+    setMarketplaceUrlErrors({});
     images.forEach((img) => {
       if (img.kind === "new") {
         URL.revokeObjectURL(img.previewUrl);
@@ -319,6 +344,25 @@ export function ClothingItemForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // 出品URLは保存前に検証し、1つでも不正なら保存しない
+    // （DB側にも同じ内容のCHECK制約がある）
+    const validatedUrls = {} as Record<MarketplaceService, string | null>;
+    const urlErrors: Partial<Record<MarketplaceService, string>> = {};
+    for (const service of MARKETPLACE_SERVICES) {
+      const result = validateMarketplaceUrl(service, marketplaceUrls[service]);
+      if (result.ok) {
+        validatedUrls[service] = result.value;
+      } else {
+        urlErrors[service] = result.error;
+      }
+    }
+    setMarketplaceUrlErrors(urlErrors);
+    if (Object.keys(urlErrors).length > 0) {
+      setIsMarketplaceOpen(true);
+      setError("出品先URLの入力内容を確認してください");
+      return;
+    }
 
     const newImages = images.filter(
       (img): img is NewImageItem => img.kind === "new",
@@ -373,6 +417,9 @@ export function ClothingItemForm({
         purchase_date: purchaseDate || null,
         purchase_price: purchasePrice === "" ? null : Number(purchasePrice),
         favorite,
+        mercari_url: validatedUrls.mercari,
+        rakuma_url: validatedUrls.rakuma,
+        yahoo_furima_url: validatedUrls.yahooFurima,
       };
 
       // 1. 服本体の情報を更新する。ここが失敗した場合は、画像の並び替え・
@@ -830,6 +877,50 @@ export function ClothingItemForm({
                 />
                 <Label htmlFor="favorite">お気に入りに登録する</Label>
               </div>
+
+              <details
+                className="rounded-md border px-3 py-2"
+                open={isMarketplaceOpen}
+                onToggle={(e) => setIsMarketplaceOpen(e.currentTarget.open)}
+              >
+                <summary className="cursor-pointer text-sm font-medium">
+                  出品先URL（任意）
+                </summary>
+                <div className="flex flex-col gap-4 pb-1 pt-3">
+                  <p className="text-sm text-muted-foreground">
+                    出品しているサービスのURLだけ入力してください。
+                  </p>
+                  {MARKETPLACE_SERVICES.map((service) => {
+                    const inputId = `marketplace-${service}`;
+                    const fieldError = marketplaceUrlErrors[service];
+                    return (
+                      <div key={service} className="grid gap-2">
+                        <Label htmlFor={inputId}>
+                          {MARKETPLACES[service].label}
+                        </Label>
+                        <Input
+                          id={inputId}
+                          type="text"
+                          inputMode="url"
+                          autoComplete="off"
+                          placeholder={MARKETPLACES[service].example}
+                          value={marketplaceUrls[service]}
+                          aria-invalid={fieldError ? true : undefined}
+                          onChange={(e) =>
+                            setMarketplaceUrls((prev) => ({
+                              ...prev,
+                              [service]: e.target.value,
+                            }))
+                          }
+                        />
+                        {fieldError && (
+                          <p className="text-sm text-red-500">{fieldError}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
 
               {error && <p className="text-sm text-red-500">{error}</p>}
               <Button type="submit" className="w-full" disabled={isLoading}>

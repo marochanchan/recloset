@@ -1,6 +1,7 @@
 import { ClothingImageGallery } from "@/components/clothing-image-gallery";
 import { DiscoverCta } from "@/components/discover-cta";
 import { ItemDetailSkeleton } from "@/components/loading-skeletons";
+import { MarketplaceLinks } from "@/components/marketplace-links";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -9,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCategoryLabel, getSeasonLabel } from "@/lib/clothing-options";
+import { getMarketplaceLinks } from "@/lib/marketplace-urls";
 import { createClient } from "@/lib/supabase/server";
 import { formatJstDate } from "@/lib/wear-logs";
 import type { Metadata } from "next";
@@ -31,6 +33,9 @@ type PublicClothingItemDetailRow = {
   published_at: string;
   owner_display_name: string | null;
   image_paths: string[];
+  mercari_url: string | null;
+  rakuma_url: string | null;
+  yahoo_furima_url: string | null;
 };
 
 // 公開データはRPCからのみ取得する。非公開の服・存在しない服はどちらも
@@ -121,6 +126,13 @@ async function PublicClothingItemDetail({
     .map((path) => signedUrlMap.get(path))
     .filter((url): url is string => Boolean(url));
 
+  // RPCが意図的に公開している出品URL。DB制約に加え、表示直前にも検証する
+  const marketplaceLinks = getMarketplaceLinks({
+    mercari: item.mercari_url,
+    rakuma: item.rakuma_url,
+    yahooFurima: item.yahoo_furima_url,
+  });
+
   return (
     <div className="flex flex-col gap-4">
       <ClothingImageGallery images={imageUrls} alt={item.title} />
@@ -149,6 +161,16 @@ async function PublicClothingItemDetail({
             <dt className="text-muted-foreground">公開日</dt>
             <dd>{formatJstDate(item.published_at)}</dd>
           </dl>
+
+          {marketplaceLinks.length > 0 && (
+            <div className="flex flex-col gap-2 border-t pt-4">
+              <p className="text-sm font-medium">この服が気になったら</p>
+              <MarketplaceLinks links={marketplaceLinks} />
+              <p className="text-xs text-muted-foreground">
+                外部サイトに移動します。出品状況は各サービスでご確認ください。
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

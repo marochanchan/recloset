@@ -25,7 +25,7 @@ async function EditClothingItemContent({
   const { data: item, error } = await supabase
     .from("clothing_items")
     .select(
-      "id, title, brand, category, season, purchase_date, purchase_price, favorite, clothing_images(id, image_path, sort_order)",
+      "id, title, brand, category, season, purchase_date, purchase_price, favorite, mercari_url, rakuma_url, yahoo_furima_url, clothing_images(id, image_path, sort_order)",
     )
     .eq("id", id)
     .order("sort_order", { referencedTable: "clothing_images" })
@@ -93,6 +93,11 @@ async function EditClothingItemContent({
           purchaseDate: item.purchase_date,
           purchasePrice: item.purchase_price,
           favorite: item.favorite,
+          marketplaceUrls: {
+            mercari: item.mercari_url,
+            rakuma: item.rakuma_url,
+            yahooFurima: item.yahoo_furima_url,
+          },
         }}
         initialImages={initialImages}
       />
