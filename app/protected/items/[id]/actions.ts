@@ -101,6 +101,7 @@ export async function recordWearToday(
   if (await hasWornToday(supabase, itemId)) {
     // 既に今日の記録がある場合は何もしない（二重登録防止）
     revalidatePath(`/protected/items/${itemId}`);
+    revalidatePath("/");
     return { error: null };
   }
 
@@ -134,6 +135,8 @@ export async function recordWearToday(
   }
 
   revalidatePath(`/protected/items/${itemId}`);
+  // トップの「今日のコーデ候補」も着用状態に合わせて更新する
+  revalidatePath("/");
   return { error: null };
 }
 

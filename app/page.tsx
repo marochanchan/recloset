@@ -1,5 +1,6 @@
 import { ClosetSummary } from "@/components/closet-summary";
 import { OnboardingSteps } from "@/components/onboarding-steps";
+import { TodayOutfitCard } from "@/components/today-outfit-card";
 import { SiteHeader } from "@/components/site-header";
 import { TodayReTryCard } from "@/components/today-re-try-card";
 import { Button } from "@/components/ui/button";
@@ -10,8 +11,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  suggestTodayOutfit,
+  type OutfitItemInput,
+} from "@/lib/outfit-suggestion";
 import { createClient } from "@/lib/supabase/server";
-import { getWearRecencyLabel } from "@/lib/wear-logs";
+import { getJstDateKey, getTodayWeather } from "@/lib/weather";
+import {
+  getCurrentSeasonJst,
+  getDaysSinceLastWorn,
+  getWearRecencyLabel,
+} from "@/lib/wear-logs";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -49,8 +59,14 @@ async function HomeContent() {
     );
   }
 
-  const [reTryResult, totalResult, favoriteResult, candidateResult] =
-    await Promise.all([
+  const [
+    reTryResult,
+    totalResult,
+    favoriteResult,
+    candidateResult,
+    outfitItemsResult,
+    weather,
+  ] = await Promise.all([
       supabase
         .from("clothing_items")
         .select(
@@ -72,6 +88,18 @@ async function HomeContent() {
         .from("clothing_items")
         .select("*", { count: "exact", head: true })
         .eq("status", "candidate"),
+      // 今日のコーデ候補の対象（手放す予定・売却済みは除外、シューズ等は対象外）
+      supabase
+        .from("clothing_items")
+        .select(
+          "id, title, brand, category, season, status, favorite, last_worn_at, clothing_images(image_path, sort_order)",
+        )
+        .in("status", ["closet", "candidate"])
+        .in("category", ["tops", "bottoms", "dress", "outer"])
+        .order("sort_order", { referencedTable: "clothing_images" })
+        .limit(300),
+      // 横浜の今日の天気（30分キャッシュ。失敗時はnull）
+      getTodayWeather(),
     ]);
 
   const reTryItem = reTryResult.data;
@@ -96,8 +124,74 @@ async function HomeContent() {
   // （取得失敗を0件扱いして既存ユーザーに表示しないため）
   const isClosetEmpty = !totalResult.error && totalResult.count === 0;
 
+  // 今日のコーデ候補（服の取得に失敗した場合はカードごと表示しない）
+  let outfit: {
+    suggestion: ReturnType<typeof suggestTodayOutfit>;
+    imageUrls: Map<string, string>;
+  } | null = null;
+
+  if (!isClosetEmpty && !outfitItemsResult.error) {
+    const now = new Date();
+    const outfitItems: OutfitItemInput[] = outfitItemsResult.data.map(
+      (item) => ({
+        id: item.id,
+        title: item.title,
+        brand: item.brand,
+        category: item.category,
+        season: item.season,
+        status: item.status,
+        favorite: item.favorite,
+        daysSinceLastWorn: getDaysSinceLastWorn(item.last_worn_at, now),
+        imagePath: item.clothing_images[0]?.image_path ?? null,
+      }),
+    );
+    const suggestion = suggestTodayOutfit({
+      items: outfitItems,
+      weather,
+      currentSeason: getCurrentSeasonJst(now),
+      dateKey: getJstDateKey(now),
+    });
+
+    const imageUrls = new Map<string, string>();
+    const pickPaths = suggestion.picks
+      .map((pick) => pick.item.imagePath)
+      .filter((path): path is string => Boolean(path));
+    if (pickPaths.length > 0) {
+      const { data: signedUrls, error: signError } = await supabase.storage
+        .from("clothing-images")
+        .createSignedUrls(pickPaths, SIGNED_URL_EXPIRES_IN);
+      if (signError) {
+        console.error("home outfit signed url error:", signError);
+      } else {
+        const urlByPath = new Map(
+          signedUrls
+            .filter((entry) => !entry.error && entry.path && entry.signedUrl)
+            .map((entry) => [entry.path as string, entry.signedUrl]),
+        );
+        for (const pick of suggestion.picks) {
+          const url = pick.item.imagePath
+            ? urlByPath.get(pick.item.imagePath)
+            : undefined;
+          if (url) imageUrls.set(pick.item.id, url);
+        }
+      }
+    }
+
+    outfit = { suggestion, imageUrls };
+  } else if (outfitItemsResult.error) {
+    console.error("home outfit items error:", outfitItemsResult.error);
+  }
+
   return (
     <div className="flex w-full max-w-3xl flex-col gap-10">
+      {outfit && (
+        <TodayOutfitCard
+          weather={weather}
+          suggestion={outfit.suggestion}
+          imageUrls={outfit.imageUrls}
+        />
+      )}
+
       {isClosetEmpty ? (
         <OnboardingSteps showRegisterCta />
       ) : (
