@@ -1,5 +1,5 @@
 import { SiteHeader } from "@/components/site-header";
-import { ThemeSwitcher } from "@/components/theme-switcher";
+import { SiteFooter } from "@/components/site-footer";
 
 export default function ProtectedLayout({
   children,
@@ -14,9 +14,7 @@ export default function ProtectedLayout({
           {children}
         </div>
 
-        <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs py-8">
-          <ThemeSwitcher />
-        </footer>
+        <SiteFooter />
       </div>
     </main>
   );

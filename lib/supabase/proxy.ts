@@ -53,10 +53,15 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname === "/discover" ||
     request.nextUrl.pathname.startsWith("/discover/");
 
+  // 共有用のOpen Graph画像（app/opengraph-image.tsx）はSNS等のクローラーが
+  // 未ログインで取得するため許可する（拡張子がなくmatcherの除外対象外のため）。
+  const isOpenGraphImagePath = request.nextUrl.pathname === "/opengraph-image";
+
   if (
     request.nextUrl.pathname !== "/" &&
     !user &&
     !isDiscoverPath &&
+    !isOpenGraphImagePath &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth")
   ) {

@@ -1,5 +1,5 @@
 import { SiteHeader } from "@/components/site-header";
-import { ThemeSwitcher } from "@/components/theme-switcher";
+import { SiteFooter } from "@/components/site-footer";
 
 // 一般公開ページ用のレイアウト。未ログインでも閲覧できる（proxyで除外済み）。
 // 見た目はprotected/layout.tsxに揃えている。
@@ -16,9 +16,7 @@ export default function DiscoverLayout({
           {children}
         </div>
 
-        <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs py-8">
-          <ThemeSwitcher />
-        </footer>
+        <SiteFooter />
       </div>
     </main>
   );

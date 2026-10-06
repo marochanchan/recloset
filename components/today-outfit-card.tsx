@@ -115,7 +115,7 @@ function OutfitPickCard({
 }
 
 /**
- * ログイン中トップの「今日のコーデ候補」。
+ * ログイン中トップの「今日のRe:try」（天気ベースのコーデ候補）。
  * 横浜の今日の天気と、自分のクローゼットからカテゴリごとに選んだ候補を表示する。
  * 服同士の色や形の相性を判断したものではない。
  */
@@ -133,12 +133,12 @@ export function TodayOutfitCard({
     >
       <div className="flex flex-col gap-1">
         <h2 id="today-outfit-title" className="text-lg font-semibold">
-          今日のコーデ候補
+          今日のRe:try
         </h2>
         <p className="text-sm text-muted-foreground">
           {suggestion.basis === "weather"
-            ? "横浜の今日の天気に合わせて、クローゼットから1着ずつ選びました。"
-            : "今の季節に合わせて、クローゼットから1着ずつ選びました。"}
+            ? "横浜の今日の天気に合わせて、しばらく着ていない服を中心に選びました。"
+            : "今の季節に合わせて、しばらく着ていない服を中心に選びました。"}
         </p>
       </div>
 

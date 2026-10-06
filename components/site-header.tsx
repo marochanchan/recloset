@@ -1,4 +1,5 @@
 import { AuthButton } from "@/components/auth-button";
+import { BrandMark } from "@/components/brand-mark";
 import { EnvVarWarning } from "@/components/env-var-warning";
 import { Button } from "@/components/ui/button";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
@@ -51,12 +52,6 @@ async function SiteHeaderNav() {
       >
         Re:Closet Loop
       </Link>
-      <Link
-        href="/protected/settings"
-        className="text-muted-foreground hover:text-foreground"
-      >
-        設定
-      </Link>
       <AuthButton />
     </div>
   );
@@ -66,7 +61,11 @@ export function SiteHeader() {
   return (
     <nav className="w-full flex justify-center border-b border-b-foreground/10">
       <div className="w-full max-w-5xl flex flex-wrap justify-between items-center gap-3 p-3 px-5 text-sm">
-        <Link href="/" className="font-semibold text-base">
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 font-semibold text-base"
+        >
+          <BrandMark size={20} />
           Re:Closet
         </Link>
         {!hasEnvVars ? (

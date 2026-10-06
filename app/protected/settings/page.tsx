@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getSafeReturnTo } from "@/lib/display-name";
+import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -68,6 +69,20 @@ async function DisplayNameSettings({
   );
 }
 
+// ログイン中のアカウント（メールアドレス）の確認用。編集機能は持たない。
+// ヘッダーと同じgetCurrentClaims（リクエスト内でキャッシュ）を使う。
+async function AccountEmail() {
+  const claims = await getCurrentClaims();
+  const email = typeof claims?.email === "string" ? claims.email : null;
+
+  return (
+    <p className="text-sm text-muted-foreground">
+      ログイン中のアカウント：
+      <span className="break-all">{email ?? "確認できませんでした"}</span>
+    </p>
+  );
+}
+
 export default function SettingsPage({
   searchParams,
 }: {
@@ -106,6 +121,10 @@ export default function SettingsPage({
           </Suspense>
         </CardContent>
       </Card>
+
+      <Suspense fallback={null}>
+        <AccountEmail />
+      </Suspense>
     </div>
   );
 }
