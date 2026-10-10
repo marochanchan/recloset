@@ -1,6 +1,5 @@
 import { ClothingImageGallery } from "@/components/clothing-image-gallery";
-import { DiscoverCta } from "@/components/discover-cta";
-import { LikeButton } from "@/components/like-button";
+import { LikeButton, LoginToLikeLink } from "@/components/like-button";
 import { ItemDetailSkeleton } from "@/components/loading-skeletons";
 import { MarketplaceLinks } from "@/components/marketplace-links";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +16,6 @@ import { buildLoginHrefForDiscoverItem } from "@/lib/safe-redirect";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { formatJstDate } from "@/lib/wear-logs";
-import { Heart } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -146,7 +144,19 @@ async function PublicClothingItemDetail({
 
   return (
     <div className="flex flex-col gap-4">
-      <ClothingImageGallery images={imageUrls} alt={item.title} />
+      {/* ハートはメイン画像の右上に重ねる（自分の服には出さない） */}
+      <div className="relative">
+        <ClothingImageGallery images={imageUrls} alt={item.title} />
+        {!user ? (
+          <div className="absolute right-3 top-3 z-10">
+            <LoginToLikeLink href={buildLoginHrefForDiscoverItem(item.id)} />
+          </div>
+        ) : itemState && !itemState.isOwner ? (
+          <div className="absolute right-3 top-3 z-10">
+            <LikeButton itemId={item.id} initialLiked={itemState.isLiked} />
+          </div>
+        ) : null}
+      </div>
 
       <Card>
         <CardHeader>
@@ -165,21 +175,11 @@ async function PublicClothingItemDetail({
             )}
           </div>
 
-          {!user ? (
-            <Link
-              href={buildLoginHrefForDiscoverItem(item.id)}
-              className="flex w-fit items-center gap-2 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-            >
-              <Heart className="h-4 w-4" aria-hidden="true" />
-              ログインして気になるに保存
-            </Link>
-          ) : itemState?.isOwner ? (
+          {itemState?.isOwner && (
             <p className="text-xs text-muted-foreground">
               あなたが公開している服です
             </p>
-          ) : itemState ? (
-            <LikeButton itemId={item.id} initialLiked={itemState.isLiked} />
-          ) : null}
+          )}
 
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <dt className="text-muted-foreground">公開した人</dt>
@@ -200,11 +200,21 @@ async function PublicClothingItemDetail({
           )}
         </CardContent>
       </Card>
-
-      <div className="mt-6">
-        <DiscoverCta />
-      </div>
     </div>
+  );
+}
+
+// 戻り先: 未ログインはLoopトップ（/）、ログイン中はLoop一覧（/discover）。
+// どちらも同じ公開服一覧を表示している。
+async function BackToLoopLink() {
+  const user = await getCurrentClaims();
+  return (
+    <Link
+      href={user ? "/discover" : "/"}
+      className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
+    >
+      ← Re:Closet Loopに戻る
+    </Link>
   );
 }
 
@@ -215,12 +225,15 @@ export default function PublicClothingItemPage({
 }) {
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-6">
-      <Link
-        href="/discover"
-        className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
+      <Suspense
+        fallback={
+          <span className="text-sm text-muted-foreground">
+            ← Re:Closet Loopに戻る
+          </span>
+        }
       >
-        ← Re:Closet Loopに戻る
-      </Link>
+        <BackToLoopLink />
+      </Suspense>
 
       <Suspense fallback={<ItemDetailSkeleton />}>
         <PublicClothingItemDetail params={params} />

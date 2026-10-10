@@ -60,7 +60,8 @@ export async function updateDisplayName(
   }
 
   revalidatePath("/protected/settings");
+  revalidatePath("/me");
   // 公開中の服がある場合、一覧・詳細の「公開した人」に新しい名前を反映する
-  revalidatePath("/discover", "layout");
+  revalidatePath("/(main)/discover", "layout");
   return { error: null, displayName: updated.display_name as string };
 }

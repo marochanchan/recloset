@@ -1,23 +1,11 @@
-import {
-  DiscoverHeroActions,
-  DiscoverStickyCta,
-} from "@/components/discover-cta";
 import { LikeButton } from "@/components/like-button";
-import { ItemGridSkeleton } from "@/components/loading-skeletons";
 import { PublicClothingItemCard } from "@/components/public-clothing-item-card";
 import { getMyLoopItemStates } from "@/lib/loop-likes";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
-import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
 
-export const metadata: Metadata = {
-  title: "Re:Closet Loop",
-  description:
-    "服を手放すことは、捨てることじゃない。Re:Closetのユーザーが手放そうとしている服を、次の人へつなぐ場所です。",
-};
-
+// Re:Closet Loopの公開服一覧。/discover と未ログインのトップ（/）で共通に使う。
 const SIGNED_URL_EXPIRES_IN = 600; // 10分
 const PUBLIC_ITEMS_LIMIT = 50;
 
@@ -34,7 +22,7 @@ type PublicClothingItemRow = {
   cover_image_path: string | null;
 };
 
-async function PublicClothingItemsList() {
+export async function LoopFeed() {
   // cookies()を経由するため動的レンダリングになり、署名付きURLが
   // ビルド時に固定されることはない。公開データはRPCからのみ取得し、
   // clothing_items等のテーブルは直接参照しない。
@@ -125,42 +113,12 @@ async function PublicClothingItemsList() {
                 <LikeButton
                   itemId={item.id}
                   initialLiked={state.isLiked}
-                  variant="compact"
                 />
               </div>
             )}
           </div>
         );
       })}
-    </div>
-  );
-}
-
-export default function DiscoverPage() {
-  return (
-    <div className="w-full flex flex-col gap-8">
-      <section className="flex flex-col items-center gap-4 rounded-xl border bg-muted/30 px-5 py-8 text-center sm:py-10">
-        <h1 className="text-3xl font-bold tracking-tight">Re:Closet Loop</h1>
-        <p className="max-w-md text-muted-foreground leading-relaxed">
-          服を手放すことは、捨てることじゃない。
-          <br />
-          誰かのクローゼットへ、次の一着をつなごう。
-        </p>
-        <Suspense fallback={<div className="h-10" />}>
-          <DiscoverHeroActions />
-        </Suspense>
-      </section>
-
-      <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold">誰かのクローゼットをのぞいてみる</h2>
-        <Suspense fallback={<ItemGridSkeleton variant="discover" />}>
-          <PublicClothingItemsList />
-        </Suspense>
-      </section>
-
-      <Suspense fallback={null}>
-        <DiscoverStickyCta />
-      </Suspense>
     </div>
   );
 }

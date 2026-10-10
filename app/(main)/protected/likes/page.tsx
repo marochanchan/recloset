@@ -108,6 +108,12 @@ async function LikedClothingItemsList() {
 export default function LikedClothingItemsPage() {
   return (
     <div className="w-full flex flex-col gap-6">
+      <Link
+        href="/discover"
+        className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
+      >
+        ← Re:Closet Loopに戻る
+      </Link>
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold">気になる服</h1>
         <p className="text-sm text-muted-foreground">

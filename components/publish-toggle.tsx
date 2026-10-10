@@ -3,7 +3,7 @@
 import {
   publishClothingItem,
   unpublishClothingItem,
-} from "@/app/protected/items/[id]/actions";
+} from "@/app/(main)/protected/items/[id]/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { isUsableDisplayName } from "@/lib/display-name";

@@ -1,65 +1,42 @@
-import { BrandMark } from "@/components/brand-mark";
 import { ClosetSummary } from "@/components/closet-summary";
 import { OnboardingSteps } from "@/components/onboarding-steps";
-import { SiteFooter } from "@/components/site-footer";
-import { SiteHeader } from "@/components/site-header";
-import { TodayOutfitCard } from "@/components/today-outfit-card";
-import { Button } from "@/components/ui/button";
+import {
+  TodayOutfitCard,
+  WeatherAttribution,
+} from "@/components/today-outfit-card";
 import {
   suggestTodayOutfit,
   type OutfitItemInput,
 } from "@/lib/outfit-suggestion";
-import {
-  getCurrentClaims,
-  getCurrentDisplayName,
-} from "@/lib/supabase/current-user";
+import { getCurrentDisplayName } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { getJstDateKey, getTodayWeather } from "@/lib/weather";
 import { getCurrentSeasonJst, getDaysSinceLastWorn } from "@/lib/wear-logs";
-import { ArrowRight } from "lucide-react";
+import { ChevronRight, Plus, Recycle } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+export const metadata: Metadata = {
+  title: "Today | Re:Closet",
+};
+
 const SIGNED_URL_EXPIRES_IN = 600; // 10分
 
-async function HomeContent() {
-  const user = await getCurrentClaims();
+// Today下部の主要導線（同じ見た目で並べる）。
+// クローゼット一覧へはサマリーの「登録している服」から開けるため置かない。
+const NEXT_LINKS = [
+  { href: "/protected/items/new", label: "服を登録する", icon: Plus },
+  {
+    href: "/discover",
+    label: "Loopで誰かのクローゼットをのぞく",
+    icon: Recycle,
+  },
+];
 
-  if (!user) {
-    // 未ログインのファーストビュー。ブランド名はヘッダーに任せ、
-    // マークとキャッチコピーを主見出しにする
-    return (
-      <div className="flex w-full flex-col items-center gap-6 text-center">
-        <div className="flex flex-col items-center gap-4">
-          <BrandMark size={64} />
-          <h1 className="text-3xl font-bold tracking-tight">
-            クローゼットの服を、もう一度。
-          </h1>
-        </div>
-        <p className="max-w-md text-muted-foreground">
-          着ていない服に気づき、
-          もう一度着る・残す・手放すを考える
-          クローゼットアシスタント。
-        </p>
-        <div className="flex gap-3">
-          <Button asChild>
-            <Link href="/auth/login">ログイン</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/auth/sign-up">新規登録</Link>
-          </Button>
-        </div>
-        <Link
-          href="/discover"
-          className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-        >
-          Re:Closet Loopを見る
-        </Link>
-        <OnboardingSteps className="mt-4 max-w-2xl" />
-      </div>
-    );
-  }
-
+// ログイン後のトップ（天気・今日のRe:try・クローゼットサマリー）。
+// 未ログインはproxyで/auth/loginへリダイレクトされる。
+async function TodayContent() {
   const supabase = await createClient();
   const [
     displayName,
@@ -81,7 +58,7 @@ async function HomeContent() {
         .from("clothing_items")
         .select("*", { count: "exact", head: true })
         .eq("status", "candidate"),
-      // 今日のコーデ候補の対象（手放す予定・売却済みは除外、シューズ等は対象外）
+      // 今日のコーデ候補の対象（出品中・売却済みは除外、シューズ等は対象外）
       supabase
         .from("clothing_items")
         .select(
@@ -136,7 +113,7 @@ async function HomeContent() {
         .from("clothing-images")
         .createSignedUrls(pickPaths, SIGNED_URL_EXPIRES_IN);
       if (signError) {
-        console.error("home outfit signed url error:", signError);
+        console.error("today outfit signed url error:", signError);
       } else {
         const urlByPath = new Map(
           signedUrls
@@ -154,7 +131,7 @@ async function HomeContent() {
 
     outfit = { suggestion, imageUrls };
   } else if (outfitItemsResult.error) {
-    console.error("home outfit items error:", outfitItemsResult.error);
+    console.error("today outfit items error:", outfitItemsResult.error);
   }
 
   return (
@@ -189,52 +166,45 @@ async function HomeContent() {
         />
       </section>
 
-      <div className="flex flex-wrap gap-3">
-        <Button asChild>
-          <Link href="/protected/items">クローゼットを見る</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/protected/items/new">服を登録する</Link>
-        </Button>
-      </div>
-
-      <nav
-        aria-label="Re:Closet Loop"
-        className="flex flex-col gap-2 border-t pt-6 text-sm"
-      >
-        <Link
-          href="/discover"
-          className="flex w-fit items-center gap-1 text-muted-foreground hover:text-foreground"
-        >
-          Re:Closet Loopで誰かのクローゼットをのぞく
-          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-        </Link>
-        <Link
-          href="/protected/likes"
-          className="flex w-fit items-center gap-1 text-muted-foreground hover:text-foreground"
-        >
-          気になる服を見る
-          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-        </Link>
+      <nav aria-label="次にすること" className="flex flex-col gap-2">
+        {NEXT_LINKS.map((link) => {
+          const Icon = link.icon;
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="flex min-h-12 items-center gap-3 rounded-lg border px-4 py-3 text-sm transition-colors hover:bg-accent"
+            >
+              <Icon
+                className="h-5 w-5 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <span className="flex-1 font-medium">{link.label}</span>
+              <ChevronRight
+                className="h-4 w-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+            </Link>
+          );
+        })}
       </nav>
+
+      {/* 天気を表示したときだけ、出典（CC BY 4.0）をページ末尾に小さく示す */}
+      {weather && outfit && !isClosetEmpty && <WeatherAttribution />}
     </div>
   );
 }
 
-export default function Home() {
+export default function TodayPage() {
   return (
-    <main className="min-h-screen flex flex-col items-center">
-      <SiteHeader />
-      <div className="flex flex-1 w-full flex-col items-center gap-10 px-4 py-8 sm:py-10">
-        <Suspense
-          fallback={
-            <p className="text-sm text-muted-foreground">読み込み中...</p>
-          }
-        >
-          <HomeContent />
-        </Suspense>
-      </div>
-      <SiteFooter />
-    </main>
+    <div className="flex flex-1 w-full flex-col items-center gap-10 px-4 py-8 sm:py-10">
+      <Suspense
+        fallback={
+          <p className="text-sm text-muted-foreground">読み込み中...</p>
+        }
+      >
+        <TodayContent />
+      </Suspense>
+    </div>
   );
 }

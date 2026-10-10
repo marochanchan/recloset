@@ -3,13 +3,13 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 // Re:Closetの基本体験（登録 → 記録 → 整理 → 次へ）を4ステップで説明する。
-// 未ログインのトップと、ログイン中で服が0件のトップで使う。
+// ログイン中で服が0件のTodayで使う（未ログインのトップは初回ダイアログで案内する）。
 // ページ側のレイアウトに依存しないよう、幅の上限等はclassNameで渡す。
 
 const STEPS = [
   {
-    title: "クローゼットに登録",
-    description: "手持ちの服を、写真と一緒に。",
+    title: "1着登録",
+    description: "全部じゃなくていい。今日の1着を、写真と一緒に。",
   },
   {
     title: "着た日を記録",

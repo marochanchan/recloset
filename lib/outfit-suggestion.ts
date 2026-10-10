@@ -31,7 +31,7 @@ export type OutfitPick = {
   item: OutfitItemInput;
   /** 提案理由（最大2つ） */
   reasons: string[];
-  /** 今日すでに着用記録がある服（提案ではなく「今日着ている服」として表示） */
+  /** 今日すでに着用記録がある服（提案ではなく「今日着た服」として表示） */
   wornToday: boolean;
 };
 
@@ -213,7 +213,7 @@ export function suggestTodayOutfit({
     slot: OutfitSlot,
     categories: string[],
   ): OutfitPick | null => {
-    // 今日すでに着た服があれば、その枠は「今日着ている服」として表示する
+    // 今日すでに着た服があれば、その枠は「今日着た服」として表示する
     const worn = wornToday
       .filter((item) => categories.includes(item.category))
       .sort(
@@ -221,7 +221,7 @@ export function suggestTodayOutfit({
           stableHash(`${dateKey}:${b.id}`) - stableHash(`${dateKey}:${a.id}`),
       )[0];
     if (worn) {
-      return { slot, item: worn, reasons: ["今日着ている服"], wornToday: true };
+      return { slot, item: worn, reasons: ["今日着た服"], wornToday: true };
     }
 
     const best = scoreItems(

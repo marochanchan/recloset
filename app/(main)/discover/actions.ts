@@ -16,7 +16,7 @@ type LikeActionResult = {
 
 function revalidateLikePaths() {
   // Loop（一覧・詳細）と気になる服一覧の表示を最新の保存状態に揃える
-  revalidatePath("/discover", "layout");
+  revalidatePath("/(main)/discover", "layout");
   revalidatePath("/protected/likes");
 }
 

@@ -57,6 +57,19 @@ export async function updateSession(request: NextRequest) {
   // 未ログインで取得するため許可する（拡張子がなくmatcherの除外対象外のため）。
   const isOpenGraphImagePath = request.nextUrl.pathname === "/opengraph-image";
 
+  // ログイン中のトップ（/）はTodayへ。未ログインの / はRe:Closet Loopを表示する。
+  // getClaims()で更新されたセッションcookieを失わないよう、
+  // supabaseResponseのcookieをリダイレクトのレスポンスへ引き継ぐ。
+  if (request.nextUrl.pathname === "/" && user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/today";
+    const redirectResponse = NextResponse.redirect(url);
+    supabaseResponse.cookies
+      .getAll()
+      .forEach((cookie) => redirectResponse.cookies.set(cookie));
+    return redirectResponse;
+  }
+
   if (
     request.nextUrl.pathname !== "/" &&
     !user &&

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
@@ -12,6 +12,12 @@ export const metadata: Metadata = {
   title: "Re:Closet",
   description:
     "着ていない服に気づき、もう一度着る・残す・手放すを考えるクローゼットアシスタント",
+};
+
+// iPhoneのホームインジケーター領域（safe-area）を env(safe-area-inset-*) で
+// 扱えるようにする（スマホのBottomNavで使用）
+export const viewport: Viewport = {
+  viewportFit: "cover",
 };
 
 const geistSans = Geist({

@@ -103,6 +103,23 @@ async function ClosetFilterBar({
           />
         ))}
       </FilterGroup>
+      <FilterGroup label="絞り込み">
+        <FilterChip
+          href={hrefFor({ favorite: false, status: null })}
+          label="すべて"
+          selected={!filters.favorite && filters.status === null}
+        />
+        <FilterChip
+          href={hrefFor({ favorite: true, status: null })}
+          label="お気に入り"
+          selected={filters.favorite}
+        />
+        <FilterChip
+          href={hrefFor({ favorite: false, status: "candidate" })}
+          label="手放し候補"
+          selected={filters.status === "candidate"}
+        />
+      </FilterGroup>
     </div>
   );
 }
@@ -123,6 +140,8 @@ async function ClothingItemsList({
     );
   if (filters.category) query = query.eq("category", filters.category);
   if (filters.season) query = query.eq("season", filters.season);
+  if (filters.favorite) query = query.eq("favorite", true);
+  if (filters.status) query = query.eq("status", filters.status);
 
   const { data: items, error } = await query
     .order("created_at", { ascending: false })
@@ -201,7 +220,11 @@ async function ClothingItemsList({
           : null;
 
         return (
-          <Link key={item.id} href={`/protected/items/${item.id}`}>
+          <Link
+            key={item.id}
+            href={`/protected/items/${item.id}`}
+            className="block h-full"
+          >
             <ClothingItemCard
               title={item.title}
               brand={item.brand}

@@ -1,6 +1,6 @@
 "use client";
 
-import { updateDisplayName } from "@/app/protected/settings/actions";
+import { updateDisplayName } from "@/app/(main)/protected/settings/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

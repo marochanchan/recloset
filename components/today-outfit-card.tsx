@@ -106,7 +106,7 @@ function OutfitPickCard({
           <WearTodayButton
             itemId={item.id}
             alreadyLoggedToday={pick.wornToday}
-            variant="compact"
+            variant="plan"
           />
         </div>
       </div>
@@ -189,30 +189,36 @@ export function TodayOutfitCard({
           </Button>
         </div>
       )}
-
-      {weather && (
-        <p className="text-xs text-muted-foreground">
-          天気データ:{" "}
-          <a
-            href={OPEN_METEO_ATTRIBUTION_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline underline-offset-4 hover:text-foreground"
-          >
-            Weather data by Open-Meteo.com
-          </a>{" "}
-          (
-          <a
-            href={OPEN_METEO_LICENSE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline underline-offset-4 hover:text-foreground"
-          >
-            CC BY 4.0
-          </a>
-          )
-        </p>
-      )}
     </section>
+  );
+}
+
+/**
+ * Open-Meteoの出典表示（CC BY 4.0のため必須）。
+ * 天気を表示するページの末尾に小さく置く（Todayのコーデ候補の近くでは目立たせない）。
+ */
+export function WeatherAttribution() {
+  return (
+    <p className="text-[11px] text-muted-foreground">
+      天気データ:{" "}
+      <a
+        href={OPEN_METEO_ATTRIBUTION_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-4 hover:text-foreground"
+      >
+        Weather data by Open-Meteo.com
+      </a>{" "}
+      (
+      <a
+        href={OPEN_METEO_LICENSE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline underline-offset-4 hover:text-foreground"
+      >
+        CC BY 4.0
+      </a>
+      )
+    </p>
   );
 }

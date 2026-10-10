@@ -101,7 +101,7 @@ export async function recordWearToday(
   if (await hasWornToday(supabase, itemId)) {
     // 既に今日の記録がある場合は何もしない（二重登録防止）
     revalidatePath(`/protected/items/${itemId}`);
-    revalidatePath("/");
+    revalidatePath("/today");
     return { error: null };
   }
 
@@ -135,8 +135,8 @@ export async function recordWearToday(
   }
 
   revalidatePath(`/protected/items/${itemId}`);
-  // トップの「今日のコーデ候補」も着用状態に合わせて更新する
-  revalidatePath("/");
+  // Todayの「今日のRe:try」も着用状態に合わせて更新する
+  revalidatePath("/today");
   return { error: null };
 }
 
@@ -298,6 +298,8 @@ async function setClothingItemPublication(
   // 公開ページにも反映させる
   revalidatePath("/discover");
   revalidatePath(`/discover/${itemId}`);
+  // My Pageの「公開中の服」
+  revalidatePath("/me");
   return { error: null };
 }
 

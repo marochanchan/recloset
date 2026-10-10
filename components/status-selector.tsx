@@ -1,6 +1,6 @@
 "use client";
 
-import { updateClothingItemStatus } from "@/app/protected/items/[id]/actions";
+import { updateClothingItemStatus } from "@/app/(main)/protected/items/[id]/actions";
 import { Button } from "@/components/ui/button";
 import { STATUS_OPTIONS } from "@/lib/clothing-options";
 import { useState, useTransition } from "react";

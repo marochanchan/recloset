@@ -19,7 +19,10 @@ export const SEASON_OPTIONS = [
 export const STATUS_OPTIONS = [
   { value: "closet", label: "クローゼット" },
   { value: "candidate", label: "手放し候補" },
-  { value: "letting_go", label: "手放す" },
+  // 内部値はletting_goのまま（DBの既存値を変えない）。表示上は
+  // 「フリマ等に実際に出品している」状態として扱う。
+  // marketplace URLの有無とは連動しない（ユーザーが選んだ状態だけを表す）。
+  { value: "letting_go", label: "出品中" },
   { value: "sold", label: "売却済み" },
 ] as const;
 

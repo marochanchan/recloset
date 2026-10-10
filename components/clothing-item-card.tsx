@@ -37,8 +37,11 @@ export function ClothingItemCard({
   imageUrl,
 }: ClothingItemCardProps) {
   return (
-    <Card className="overflow-hidden">
-      <div className="relative aspect-square bg-muted">
+    // 画像の縦横比に関係なく、同じ正方形の枠にobject-containで収める
+    // （服全体を見せるためトリミングしない）。画像なしでも同じ枠を保つ。
+    // カードは行の高さに揃え、バッジは下端に寄せて開始位置のずれを抑える。
+    <Card className="flex h-full flex-col overflow-hidden">
+      <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-muted">
         {imageUrl ? (
           <Image
             src={imageUrl}
@@ -65,12 +68,12 @@ export function ClothingItemCard({
       </div>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-lg">{title}</CardTitle>
+          <CardTitle className="line-clamp-2 text-lg">{title}</CardTitle>
           {favorite && <Badge>お気に入り</Badge>}
         </div>
         {brand && <p className="text-sm text-muted-foreground">{brand}</p>}
       </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
+      <CardContent className="mt-auto flex flex-wrap gap-2">
         <Badge variant="secondary">{getCategoryLabel(category)}</Badge>
         {season && (
           <Badge variant="secondary">{getSeasonLabel(season)}</Badge>

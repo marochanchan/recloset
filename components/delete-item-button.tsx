@@ -1,6 +1,6 @@
 "use client";
 
-import { deleteClothingItem } from "@/app/protected/items/[id]/actions";
+import { deleteClothingItem } from "@/app/(main)/protected/items/[id]/actions";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";

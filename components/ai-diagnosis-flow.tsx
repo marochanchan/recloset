@@ -4,7 +4,7 @@ import {
   generateDiagnosisElaboration,
   runAiDiagnosis,
   updateClothingItemStatus,
-} from "@/app/protected/items/[id]/actions";
+} from "@/app/(main)/protected/items/[id]/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
