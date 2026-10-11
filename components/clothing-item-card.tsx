@@ -9,7 +9,9 @@ import {
   getCategoryLabel,
   formatSeasons,
   getStatusLabel,
+  PHOTO_ONLY_TITLE,
 } from "@/lib/clothing-options";
+import { cn } from "@/lib/utils";
 import { getWearRecencyLabel } from "@/lib/wear-logs";
 import Image from "next/image";
 
@@ -68,7 +70,17 @@ export function ClothingItemCard({
       </div>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="line-clamp-2 text-lg">{title}</CardTitle>
+          {/* 写真だけ登録した服の仮タイトルは、写真を主役にするため控えめに出す */}
+          <CardTitle
+            className={cn(
+              "line-clamp-2",
+              title === PHOTO_ONLY_TITLE
+                ? "text-sm font-normal text-muted-foreground"
+                : "text-lg",
+            )}
+          >
+            {title}
+          </CardTitle>
           {favorite && <Badge>お気に入り</Badge>}
         </div>
         {brand && <p className="text-sm text-muted-foreground">{brand}</p>}

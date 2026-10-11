@@ -11,7 +11,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ClothingImageSection } from "@/components/clothing-image-section";
-import { rememberDraftSavedNotice } from "@/components/draft-saved-notice";
+import {
+  rememberDraftSavedNotice,
+  rememberPhotoRegisteredNotice,
+} from "@/components/draft-saved-notice";
 import { FavoriteToggle } from "@/components/favorite-toggle";
 import { ImageAutofillStatus } from "@/components/image-autofill-status";
 import { LeaveConfirmDialog } from "@/components/leave-confirm-dialog";
@@ -32,6 +35,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  PHOTO_ONLY_CATEGORY,
+  PHOTO_ONLY_TITLE,
   CATEGORY_OPTIONS,
   COLOR_OPTIONS,
   getSubcategoryOptions,
@@ -49,7 +54,7 @@ import {
 } from "@/lib/marketplace-urls";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 const selectClassName = cn(
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
@@ -93,8 +98,13 @@ export type ClothingItemFormInitialValues = {
 };
 
 
+/** 新規登録の入力方法（通常登録・写真だけ登録） */
+export type ClothingEntryMode = "normal" | "photo";
+
 type ClothingItemFormProps = {
   mode?: "create" | "edit";
+  /** 新規登録で最初に選んでおく入力方法（下書きの再開・編集では通常登録） */
+  entryMode?: ClothingEntryMode;
   /** mode === "edit" のとき必須 */
   itemId?: string;
   initialValues?: ClothingItemFormInitialValues;
@@ -110,9 +120,16 @@ export function ClothingItemForm({
   initialValues,
   initialImages = [],
   draft = null,
+  entryMode = "normal",
   ...props
 }: ClothingItemFormProps) {
   const isEdit = mode === "edit";
+  // 写真だけ登録を選べるのは、新しく登録するとき（下書きの再開・編集を除く）だけ。
+  // 写真1枚で1着を登録する（写真以外は入力せず、AIも呼ばない）
+  const canChooseEntryMode = !isEdit && !draft;
+  const [isPhotoOnly, setIsPhotoOnly] = useState(
+    canChooseEntryMode && entryMode === "photo",
+  );
 
   // フォームの初期値。下書きから再開する場合は下書きの値、編集では保存済みの値。
   // 未保存の変更があるかどうかの基準にもなる
@@ -185,9 +202,26 @@ export function ClothingItemForm({
 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  // 二重登録の防止。isLoadingは次の描画まで反映されないため、refを併用する
+  // （登録に成功して画面を移動するときは、離れるまで戻さない）
+  const submittingRef = useRef(false);
   const [savedItem, setSavedItem] = useState<SavedItemState | null>(null);
   const router = useRouter();
-  const imageState = useClothingImages({ initialImages, onError: setError });
+
+  // 登録後に移動した画面から「戻る」でこのフォームが再表示されたとき
+  // （cacheComponents の <Activity> で状態が残る）、登録ボタンを押せるよう戻す
+  useLayoutEffect(() => {
+    return () => {
+      submittingRef.current = false;
+      setIsLoading(false);
+    };
+  }, []);
+  const imageState = useClothingImages({
+    initialImages,
+    onError: setError,
+    // 写真だけ登録は1着につき写真1枚（通常登録で選んだ写真は切り替えても消さない）
+    maxImages: isPhotoOnly ? 1 : undefined,
+  });
   const {
     images,
     activeImages,
@@ -199,9 +233,11 @@ export function ClothingItemForm({
 
   // 新規登録では、代表画像（先頭）からタイトル・カテゴリーを自動入力する
   const representativeImage = activeImages[0];
+  // 写真だけ登録ではAIを呼ばない（無効にし、解析対象も渡さない）
   const autofill = useImageAutofill({
-    enabled: !isEdit,
+    enabled: !isEdit && !isPhotoOnly,
     target:
+      !isPhotoOnly &&
       representativeImage?.kind === "new" &&
       representativeImage.processed &&
       !representativeImage.isProcessing
@@ -271,6 +307,7 @@ export function ClothingItemForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     setError(null);
 
     // 出品URLは保存前に検証し、1つでも不正なら保存しない
@@ -288,7 +325,12 @@ export function ClothingItemForm({
     setMarketplaceUrlErrors(urlErrors);
     if (Object.keys(urlErrors).length > 0) {
       setIsMarketplaceOpen(true);
-      setError("出品先URLの入力内容を確認してください");
+      // 写真だけ登録では出品先URLの欄を出していないため、切り替え先を伝える
+      setError(
+        isPhotoOnly
+          ? "通常登録に切り替えて、出品先URLの入力内容を確認してください"
+          : "出品先URLの入力内容を確認してください",
+      );
       return;
     }
 
@@ -299,6 +341,17 @@ export function ClothingItemForm({
       (img) => img.kind === "existing" && !img.pendingDelete,
     ).length;
 
+    // 写真だけ登録は、写真1枚で1着
+    if (isPhotoOnly && newImages.length === 0) {
+      setError("服の写真を1枚選んでください");
+      return;
+    }
+    if (isPhotoOnly && activeImages.length > 1) {
+      setError(
+        "写真だけ登録は1着につき写真1枚です。写真を1枚にするか、通常登録に切り替えてください",
+      );
+      return;
+    }
     if (activeExistingCount + newImages.length > MAX_IMAGE_COUNT) {
       setError(`画像は合計${MAX_IMAGE_COUNT}枚までです`);
       return;
@@ -314,7 +367,10 @@ export function ClothingItemForm({
     }
 
     const supabase = createClient();
+    submittingRef.current = true;
     setIsLoading(true);
+    // 登録に成功して画面を移動するときは、移動するまでボタンを押せないままにする
+    let isLeaving = false;
 
     // 保存時点での「削除予定を除いた、確定した並び順」を固定しておく。
     const orderedActiveImages = images.filter(
@@ -334,12 +390,18 @@ export function ClothingItemForm({
           ? itemId
           : (pendingItemIdRef.current ??= crypto.randomUUID());
 
+      // 写真だけ登録では、DBの必須項目（タイトル・カテゴリー）を決まった値で補う。
+      // 通常登録で入力済みの値があれば、そのまま使う
+      const savedCategory =
+        isPhotoOnly && !category ? PHOTO_ONLY_CATEGORY : category;
+      const savedTitle = isPhotoOnly && !title.trim() ? PHOTO_ONLY_TITLE : title;
+
       const payload = {
-        title,
+        title: savedTitle,
         brand: brand || null,
-        category,
+        category: savedCategory,
         // 種類はカテゴリーに属する値、メインカラーは選択肢にある値だけを保存する
-        subcategory: isSubcategoryForCategory(category, subcategory)
+        subcategory: isSubcategoryForCategory(savedCategory, subcategory)
           ? subcategory
           : null,
         main_color: isColorValue(mainColor) ? mainColor : null,
@@ -535,6 +597,7 @@ export function ClothingItemForm({
           draftKept: clothingDraft.draftId !== null,
         });
       } else if (isEdit) {
+        isLeaving = true;
         router.push(`/protected/items/${targetItemId}`);
       } else if (!(await clothingDraft.completeDraft())) {
         // 服は登録済み。下書きの削除だけ失敗したことを伝える（二重登録を防ぐため、
@@ -546,6 +609,8 @@ export function ClothingItemForm({
           draftCleanupFailed: true,
         });
       } else {
+        isLeaving = true;
+        if (isPhotoOnly) rememberPhotoRegisteredNotice();
         resetForm();
         router.push("/protected/items");
       }
@@ -562,7 +627,10 @@ export function ClothingItemForm({
             : "服の登録に失敗しました";
       setError(message);
     } finally {
-      setIsLoading(false);
+      if (!isLeaving) {
+        submittingRef.current = false;
+        setIsLoading(false);
+      }
     }
   };
 
@@ -621,7 +689,14 @@ export function ClothingItemForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <LeaveConfirmDialog {...clothingDraft.leaveConfirm} />
+      <LeaveConfirmDialog
+        {...clothingDraft.leaveConfirm}
+        description={
+          isPhotoOnly
+            ? "このまま移動すると、選んだ写真は登録されません。"
+            : undefined
+        }
+      />
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">
@@ -634,7 +709,18 @@ export function ClothingItemForm({
           )}
         </CardHeader>
         <CardContent>
-          <p className="mb-4 text-xs text-muted-foreground">* 必須項目</p>
+          {canChooseEntryMode && (
+            <EntryModeSelector
+              isPhotoOnly={isPhotoOnly}
+              onChange={setIsPhotoOnly}
+              disabled={isLoading || clothingDraft.isSavingDraft}
+            />
+          )}
+          <p className="mb-4 text-xs text-muted-foreground">
+            {isPhotoOnly
+              ? "写真を選んで登録するだけ。名前や種類はあとから追加できます"
+              : "* 必須項目"}
+          </p>
           <form
             onSubmit={handleSubmit}
             onInvalidCapture={(e) => {
@@ -649,10 +735,12 @@ export function ClothingItemForm({
                 description={
                   isEdit
                     ? "写真を追加・並べ替え・削除できます"
-                    : "写真からタイトルとカテゴリーを自動入力できます。写真なしでも登録できます"
+                    : isPhotoOnly
+                      ? "服の写真を1枚選んでください"
+                      : "写真からタイトルとカテゴリーを自動入力できます。写真なしでも登録できます"
                 }
                 autofillStatus={
-                  isEdit ? undefined : (
+                  isEdit || isPhotoOnly ? undefined : (
                     <ImageAutofillStatus
                       status={autofill.status}
                       canAnalyze={autofill.canAnalyze}
@@ -662,201 +750,211 @@ export function ClothingItemForm({
                 }
               />
 
-              <div className="grid gap-2">
-                <Label htmlFor="title" className="flex items-center gap-2">
-                  タイトル *
-                  {autofill.isAiValue("title") && <AiBadge />}
-                </Label>
-                <Input
-                  id="title"
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </div>
+              {/* 写真だけ登録では、写真以外の入力欄を出さない（入力済みの値は残る） */}
+              {!isPhotoOnly && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="title" className="flex items-center gap-2">
+                      タイトル *
+                      {autofill.isAiValue("title") && <AiBadge />}
+                    </Label>
+                    <Input
+                      id="title"
+                      type="text"
+                      required
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                    />
+                  </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="category" className="flex items-center gap-2">
-                  カテゴリー *
-                  {autofill.isAiValue("category") && <AiBadge />}
-                </Label>
-                <select
-                  id="category"
-                  required
-                  className={selectClassName}
-                  value={category}
-                  onChange={(e) => changeCategory(e.target.value)}
-                >
-                  <option value="" disabled>
-                    選択してください
-                  </option>
-                  {CATEGORY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 種類はカテゴリーごとに選択肢が変わる（シューズ・バッグ・その他にはない） */}
-              {getSubcategoryOptions(category).length > 0 && (
-                <div className="grid gap-2">
-                  <Label htmlFor="subcategory" className="flex items-center gap-2">
-                    種類
-                    {autofill.isAiValue("subcategory") && <AiBadge />}
-                  </Label>
-                  <select
-                    id="subcategory"
-                    className={selectClassName}
-                    value={subcategory}
-                    onChange={(e) => setSubcategory(e.target.value)}
-                  >
-                    <option value="">未選択</option>
-                    {getSubcategoryOptions(category).map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
+                  <div className="grid gap-2">
+                    <Label htmlFor="category" className="flex items-center gap-2">
+                      カテゴリー *
+                      {autofill.isAiValue("category") && <AiBadge />}
+                    </Label>
+                    <select
+                      id="category"
+                      required
+                      className={selectClassName}
+                      value={category}
+                      onChange={(e) => changeCategory(e.target.value)}
+                    >
+                      <option value="" disabled>
+                        選択してください
                       </option>
-                    ))}
-                  </select>
-                  {autofill.needsCheck("subcategory") && <NeedsCheckNote />}
-                </div>
+                      {CATEGORY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 種類はカテゴリーごとに選択肢が変わる（シューズ・バッグ・その他にはない） */}
+                  {getSubcategoryOptions(category).length > 0 && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="subcategory" className="flex items-center gap-2">
+                        種類
+                        {autofill.isAiValue("subcategory") && <AiBadge />}
+                      </Label>
+                      <select
+                        id="subcategory"
+                        className={selectClassName}
+                        value={subcategory}
+                        onChange={(e) => setSubcategory(e.target.value)}
+                      >
+                        <option value="">未選択</option>
+                        {getSubcategoryOptions(category).map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      {autofill.needsCheck("subcategory") && <NeedsCheckNote />}
+                    </div>
+                  )}
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="main-color" className="flex items-center gap-2">
+                      メインカラー
+                      {autofill.isAiValue("mainColor") && <AiBadge />}
+                    </Label>
+                    <select
+                      id="main-color"
+                      className={selectClassName}
+                      value={mainColor}
+                      onChange={(e) => setMainColor(e.target.value)}
+                    >
+                      <option value="">未選択</option>
+                      {COLOR_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    {autofill.needsCheck("mainColor") && <NeedsCheckNote />}
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="brand">ブランド</Label>
+                    <Input
+                      id="brand"
+                      type="text"
+                      value={brand}
+                      onChange={(e) => setBrand(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label id="seasons-label" className="flex items-center gap-2">
+                      シーズン
+                      {autofill.isAiValue("seasons") && <AiBadge />}
+                    </Label>
+                    <SeasonSelector
+                      value={seasons}
+                      onChange={setSeasons}
+                      labelId="seasons-label"
+                      describedBy="seasons-description"
+                    />
+                    <p id="seasons-description" className="text-sm text-muted-foreground">
+                      {autofill.needsCheck("seasons")
+                        ? "季節は写真だけでは判断しにくいため、確認してください"
+                        : "着られる季節をすべて選べます（未選択でも登録できます）"}
+                    </p>
+                  </div>
+
+                  <FavoriteToggle checked={favorite} onCheckedChange={setFavorite} />
+
+                  <details
+                    className="rounded-md border px-3 py-2"
+                    open={isDetailsOpen}
+                    onToggle={(e) => setIsDetailsOpen(e.currentTarget.open)}
+                  >
+                    <summary className="cursor-pointer text-sm font-medium">
+                      詳しく入力（任意）
+                    </summary>
+                    <div className="flex flex-col gap-6 pb-1 pt-3">
+                      <div className="grid gap-2">
+                        <Label htmlFor="purchase-date">購入日（任意）</Label>
+                        <Input
+                          id="purchase-date"
+                          type="date"
+                          value={purchaseDate}
+                          onChange={(e) => setPurchaseDate(e.target.value)}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          わからない場合は空欄でOKです
+                        </p>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="purchase-price">購入価格（税込・任意）</Label>
+                        <Input
+                          id="purchase-price"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={purchasePrice}
+                          onChange={(e) => setPurchasePrice(e.target.value)}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          税込価格。わからない場合は空欄でOKです
+                        </p>
+                      </div>
+                    </div>
+                  </details>
+
+                  <details
+                    className="rounded-md border px-3 py-2"
+                    open={isMarketplaceOpen}
+                    onToggle={(e) => setIsMarketplaceOpen(e.currentTarget.open)}
+                  >
+                    <summary className="cursor-pointer text-sm font-medium">
+                      出品先URL（任意）
+                    </summary>
+                    <div className="flex flex-col gap-4 pb-1 pt-3">
+                      <p className="text-sm text-muted-foreground">
+                        出品しているサービスのURLだけ入力してください。
+                      </p>
+                      {MARKETPLACE_SERVICES.map((service) => {
+                        const inputId = `marketplace-${service}`;
+                        const fieldError = marketplaceUrlErrors[service];
+                        return (
+                          <div key={service} className="grid gap-2">
+                            <Label htmlFor={inputId}>
+                              {MARKETPLACES[service].label}
+                            </Label>
+                            <Input
+                              id={inputId}
+                              type="text"
+                              inputMode="url"
+                              autoComplete="off"
+                              placeholder={MARKETPLACES[service].example}
+                              value={marketplaceUrls[service]}
+                              aria-invalid={fieldError ? true : undefined}
+                              onChange={(e) =>
+                                setMarketplaceUrls((prev) => ({
+                                  ...prev,
+                                  [service]: e.target.value,
+                                }))
+                              }
+                            />
+                            {fieldError && (
+                              <p className="text-sm text-red-500">{fieldError}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </details>
+                </>
               )}
 
-              <div className="grid gap-2">
-                <Label htmlFor="main-color" className="flex items-center gap-2">
-                  メインカラー
-                  {autofill.isAiValue("mainColor") && <AiBadge />}
-                </Label>
-                <select
-                  id="main-color"
-                  className={selectClassName}
-                  value={mainColor}
-                  onChange={(e) => setMainColor(e.target.value)}
-                >
-                  <option value="">未選択</option>
-                  {COLOR_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                {autofill.needsCheck("mainColor") && <NeedsCheckNote />}
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="brand">ブランド</Label>
-                <Input
-                  id="brand"
-                  type="text"
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label id="seasons-label" className="flex items-center gap-2">
-                  シーズン
-                  {autofill.isAiValue("seasons") && <AiBadge />}
-                </Label>
-                <SeasonSelector
-                  value={seasons}
-                  onChange={setSeasons}
-                  labelId="seasons-label"
-                  describedBy="seasons-description"
-                />
-                <p id="seasons-description" className="text-sm text-muted-foreground">
-                  {autofill.needsCheck("seasons")
-                    ? "季節は写真だけでは判断しにくいため、確認してください"
-                    : "着られる季節をすべて選べます（未選択でも登録できます）"}
+              {isPhotoOnly && activeImages.length > 1 && (
+                <p className="text-sm text-muted-foreground">
+                  写真だけ登録は1着につき写真1枚です。写真を1枚にするか、通常登録に切り替えてください
                 </p>
-              </div>
-
-              <FavoriteToggle checked={favorite} onCheckedChange={setFavorite} />
-
-              <details
-                className="rounded-md border px-3 py-2"
-                open={isDetailsOpen}
-                onToggle={(e) => setIsDetailsOpen(e.currentTarget.open)}
-              >
-                <summary className="cursor-pointer text-sm font-medium">
-                  詳しく入力（任意）
-                </summary>
-                <div className="flex flex-col gap-6 pb-1 pt-3">
-                  <div className="grid gap-2">
-                    <Label htmlFor="purchase-date">購入日（任意）</Label>
-                    <Input
-                      id="purchase-date"
-                      type="date"
-                      value={purchaseDate}
-                      onChange={(e) => setPurchaseDate(e.target.value)}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      わからない場合は空欄でOKです
-                    </p>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="purchase-price">購入価格（税込・任意）</Label>
-                    <Input
-                      id="purchase-price"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={purchasePrice}
-                      onChange={(e) => setPurchasePrice(e.target.value)}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      税込価格。わからない場合は空欄でOKです
-                    </p>
-                  </div>
-                </div>
-              </details>
-
-              <details
-                className="rounded-md border px-3 py-2"
-                open={isMarketplaceOpen}
-                onToggle={(e) => setIsMarketplaceOpen(e.currentTarget.open)}
-              >
-                <summary className="cursor-pointer text-sm font-medium">
-                  出品先URL（任意）
-                </summary>
-                <div className="flex flex-col gap-4 pb-1 pt-3">
-                  <p className="text-sm text-muted-foreground">
-                    出品しているサービスのURLだけ入力してください。
-                  </p>
-                  {MARKETPLACE_SERVICES.map((service) => {
-                    const inputId = `marketplace-${service}`;
-                    const fieldError = marketplaceUrlErrors[service];
-                    return (
-                      <div key={service} className="grid gap-2">
-                        <Label htmlFor={inputId}>
-                          {MARKETPLACES[service].label}
-                        </Label>
-                        <Input
-                          id={inputId}
-                          type="text"
-                          inputMode="url"
-                          autoComplete="off"
-                          placeholder={MARKETPLACES[service].example}
-                          value={marketplaceUrls[service]}
-                          aria-invalid={fieldError ? true : undefined}
-                          onChange={(e) =>
-                            setMarketplaceUrls((prev) => ({
-                              ...prev,
-                              [service]: e.target.value,
-                            }))
-                          }
-                        />
-                        {fieldError && (
-                          <p className="text-sm text-red-500">{fieldError}</p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </details>
-
+              )}
               {error && <p className="text-sm text-red-500">{error}</p>}
               {clothingDraft.isLoadingDraft && (
                 <p className="text-sm text-muted-foreground">
@@ -875,7 +973,9 @@ export function ClothingItemForm({
                   isLoading ||
                   isPreparingImages ||
                   clothingDraft.isSavingDraft ||
-                  isDraftBlocking
+                  isDraftBlocking ||
+                  // 写真だけ登録は、写真1枚のときだけ押せる
+                  (isPhotoOnly && activeImages.length !== 1)
                 }
               >
                 {isPreparingImages && !isLoading
@@ -886,9 +986,12 @@ export function ClothingItemForm({
                     : "登録中..."
                   : isEdit
                     ? "保存する"
-                    : "登録する"}
+                    : isPhotoOnly
+                      ? "クローゼットに登録"
+                      : "登録する"}
               </Button>
-              {!isEdit && (
+              {/* 写真だけ登録は入力がないため、下書きは使わない */}
+              {!isEdit && !isPhotoOnly && (
                 <div className="flex flex-col gap-1">
                   <Button
                     type="button"
@@ -934,6 +1037,56 @@ export function ClothingItemForm({
   );
 }
 
+// 新規登録の入力方法の切り替え（入力中の値・写真は切り替えても残る）
+function EntryModeSelector({
+  isPhotoOnly,
+  onChange,
+  disabled,
+}: {
+  isPhotoOnly: boolean;
+  onChange: (isPhotoOnly: boolean) => void;
+  disabled: boolean;
+}) {
+  const options = [
+    { photoOnly: false, label: "通常登録", description: "名前や種類も入力（AIが補助）" },
+    { photoOnly: true, label: "写真だけ登録", description: "写真1枚ですぐ登録" },
+  ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label="登録のしかた"
+      className="mb-4 grid grid-cols-2 gap-2"
+    >
+      {options.map((option) => {
+        const selected = option.photoOnly === isPhotoOnly;
+        return (
+          <button
+            key={option.label}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            disabled={disabled}
+            onClick={() => onChange(option.photoOnly)}
+            className={cn(
+              "flex flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left transition-colors disabled:opacity-50",
+              selected
+                ? "border-primary bg-primary/5"
+                : "text-muted-foreground hover:bg-accent",
+            )}
+          >
+            <span className="text-sm font-medium text-foreground">
+              {option.label}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {option.description}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // 写真からAIが入力した値の目印（ユーザーが修正すると消える）
 function AiBadge() {
   return (
@@ -961,14 +1114,17 @@ function NeedsCheckNote() {
  */
 export function NewClothingItemForm({
   draft = null,
+  entryMode = "normal",
 }: {
   draft?: ClothingDraftToResume | null;
+  entryMode?: ClothingEntryMode;
 }) {
   const { bfcacheId } = useRouter();
   return (
     <ClothingItemForm
-      key={`${bfcacheId}:${draft?.id ?? "new"}`}
+      key={`${bfcacheId}:${draft?.id ?? "new"}:${entryMode}`}
       draft={draft}
+      entryMode={entryMode}
     />
   );
 }

@@ -114,6 +114,12 @@ export function getCategoryLabel(value: string): string {
   return CATEGORY_OPTIONS.find((option) => option.value === value)?.label ?? value;
 }
 
+// 写真だけ登録（タイトル・カテゴリーを入力しない登録）で使う値。
+// DBの title・category は必須のため、未入力ならこの値で登録する。
+// 一覧では、この仮タイトルを控えめに表示する
+export const PHOTO_ONLY_TITLE = "写真から登録した服";
+export const PHOTO_ONLY_CATEGORY = "other";
+
 export function getSeasonLabel(value: string): string {
   return SEASON_OPTIONS.find((option) => option.value === value)?.label ?? value;
 }

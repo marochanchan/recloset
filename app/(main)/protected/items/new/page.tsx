@@ -42,9 +42,12 @@ async function NewClothingItemContent({
 }: {
   searchParams: SearchParamsPromise;
 }) {
-  const { draft: rawDraftId } = await searchParams;
+  const { draft: rawDraftId, mode } = await searchParams;
   if (rawDraftId === undefined) {
-    return <NewClothingItemForm />;
+    // ?mode=photo（Closetの「続けて写真だけ登録」）なら、写真だけ登録で開く
+    return (
+      <NewClothingItemForm entryMode={mode === "photo" ? "photo" : "normal"} />
+    );
   }
   if (!isDraftId(rawDraftId)) {
     return <DraftNotFound />;

@@ -10,8 +10,11 @@ export function LeaveConfirmDialog({
   open,
   onCancel,
   onConfirm,
+  description = "このまま移動すると、保存していない変更が失われます。続きから入力したい場合は、下書きとして保存してください。",
 }: {
   open: boolean;
+  /** 説明文（写真だけ登録では、下書きの案内を出さない） */
+  description?: string;
   /** 「編集を続ける」・Esc・背景のクリック */
   onCancel: () => void;
   /** 「保存せず移動」 */
@@ -54,7 +57,7 @@ export function LeaveConfirmDialog({
             id="leave-confirm-description"
             className="text-sm leading-relaxed text-muted-foreground"
           >
-            このまま移動すると、保存していない変更が失われます。続きから入力したい場合は、下書きとして保存してください。
+            {description}
           </p>
         </div>
         <div className="flex gap-2">

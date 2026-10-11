@@ -1,5 +1,5 @@
 import { ClothingItemCard } from "@/components/clothing-item-card";
-import { DraftSavedNotice } from "@/components/draft-saved-notice";
+import { ClosetNotice } from "@/components/draft-saved-notice";
 import { ReviewSuggestionsCard } from "@/components/review-suggestions-card";
 import {
   ClosetFilterBarSkeleton,
@@ -442,7 +442,7 @@ export default function ClothingItemsPage({
         </div>
       </div>
 
-      <DraftSavedNotice />
+      <ClosetNotice />
 
       <Suspense fallback={null}>
         <ReviewSuggestionsSection searchParams={searchParams} />

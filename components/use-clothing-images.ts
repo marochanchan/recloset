@@ -56,10 +56,13 @@ export type ImageItem = ExistingImageItem | NewImageItem;
 export function useClothingImages({
   initialImages,
   onError,
+  maxImages = MAX_IMAGE_COUNT,
 }: {
   initialImages: ExistingClothingImage[];
   /** ユーザーに表示するエラー（nullで消す） */
   onError: (message: string | null) => void;
+  /** 追加できる枚数の上限（写真だけ登録では1枚） */
+  maxImages?: number;
 }) {
   // 既存画像＋新規選択画像を、画面に表示している順番そのままで保持する。
   // 「削除」は既存画像をpendingDelete:trueにするだけで、保存するまでは
@@ -177,11 +180,11 @@ export function useClothingImages({
     const activeCount = images.filter(
       (img) => !(img.kind === "existing" && img.pendingDelete),
     ).length;
-    const remainingSlots = MAX_IMAGE_COUNT - activeCount;
+    const remainingSlots = maxImages - activeCount;
 
     if (files.length > remainingSlots) {
       onError(
-        `画像は合計${MAX_IMAGE_COUNT}枚までです（追加できるのは残り${Math.max(remainingSlots, 0)}枚です）`,
+        `画像は合計${maxImages}枚までです（追加できるのは残り${Math.max(remainingSlots, 0)}枚です）`,
       );
       return;
     }
@@ -372,6 +375,7 @@ export function useClothingImages({
   };
 
   return {
+    maxImages,
     images,
     activeImages,
     isPreparingImages,

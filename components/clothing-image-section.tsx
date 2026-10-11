@@ -2,10 +2,7 @@
 
 import { ClothingImageThumbnail } from "@/components/clothing-image-thumbnail";
 import { ImageLightbox } from "@/components/image-lightbox";
-import {
-  MAX_IMAGE_COUNT,
-  type useClothingImages,
-} from "@/components/use-clothing-images";
+import { type useClothingImages } from "@/components/use-clothing-images";
 import { cn } from "@/lib/utils";
 import { ImagePlus } from "lucide-react";
 
@@ -26,6 +23,7 @@ export function ClothingImageSection({
   autofillStatus?: React.ReactNode;
 }) {
   const {
+    maxImages,
     images,
     activeImages,
     fileInputRef,
@@ -48,14 +46,14 @@ export function ClothingImageSection({
     handleDragHandlePointerUp,
   } = imageState;
 
-  const remaining = Math.max(MAX_IMAGE_COUNT - activeImages.length, 0);
+  const remaining = Math.max(maxImages - activeImages.length, 0);
   const isFull = remaining === 0;
 
   return (
     <section aria-labelledby="images-heading" className="grid gap-3">
       <div className="grid gap-1">
         <h2 id="images-heading" className="text-sm font-medium">
-          写真（任意・最大{MAX_IMAGE_COUNT}枚）
+          {maxImages === 1 ? "写真（1枚）" : `写真（任意・最大${maxImages}枚）`}
         </h2>
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
@@ -67,7 +65,7 @@ export function ClothingImageSection({
           id="images"
           ref={fileInputRef}
           type="file"
-          multiple
+          multiple={maxImages > 1}
           accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
           onChange={handleImagesChange}
           disabled={isFull}
@@ -83,7 +81,7 @@ export function ClothingImageSection({
           )}
         >
           <ImagePlus className="h-5 w-5" aria-hidden="true" />
-          {isFull ? "写真は5枚まで追加済みです" : "写真を追加"}
+          {isFull ? `写真は${maxImages}枚まで追加済みです` : "写真を追加"}
         </label>
       </div>
 
@@ -129,7 +127,7 @@ export function ClothingImageSection({
         </div>
       )}
 
-      {images.length > 0 && (
+      {images.length > 0 && maxImages > 1 && (
         <p className="text-xs text-muted-foreground">
           先頭がメイン画像です。画像を押すと拡大・回転できます（残り{remaining}
           枚）

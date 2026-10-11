@@ -101,11 +101,12 @@ export function useImageAutofill({
   const [needsCheckFields, setNeedsCheckFields] = useState<AutofillField[]>([]);
 
   // 非同期の結果を受け取った時点の最新値を参照するためのref
-  const latest = useRef({ fields, aiValues, targetId: "" });
+  const latest = useRef({ fields, aiValues, targetId: "", enabled });
   latest.current = {
     fields,
     aiValues,
     targetId: target ? getTargetId(target) : "",
+    enabled,
   };
 
   const completedTargetIds = useRef<Set<string>>(new Set());
@@ -121,8 +122,10 @@ export function useImageAutofill({
     setAnalyzingTargetId(targetId);
     setStatus({ kind: "analyzing" });
 
-    // 今の対象と違う（古い）結果は捨てる
-    const isStale = () => latest.current.targetId !== targetId;
+    // 今の対象と違う（古い）結果や、解析中に無効になった（写真だけ登録に
+    // 切り替えた）ときの結果は捨てる
+    const isStale = () =>
+      latest.current.targetId !== targetId || !latest.current.enabled;
 
     try {
       const { blob } = await processImageForAnalysis(
@@ -263,7 +266,7 @@ export function useImageAutofill({
     status: visibleStatus,
     canAnalyze,
     analyzeNow: () => {
-      if (target) void analyze(target);
+      if (enabled && target) void analyze(target);
     },
     isAiValue,
     /** AIが入れた値のままで、確認を促したい項目か */
