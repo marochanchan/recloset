@@ -1,4 +1,5 @@
 import { ClothingItemCard } from "@/components/clothing-item-card";
+import { ReviewSuggestionsCard } from "@/components/review-suggestions-card";
 import { ItemGridSkeleton } from "@/components/loading-skeletons";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,8 +15,15 @@ import {
   SEASON_OPTIONS,
   SEASON_VALUES,
 } from "@/lib/clothing-options";
+import {
+  selectReviewSuggestions,
+  type ReviewDecision,
+  type ReviewItemInput,
+} from "@/lib/review-suggestions";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { getJstDateKey } from "@/lib/weather";
+import { getCurrentSeasonJst } from "@/lib/wear-logs";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -255,6 +263,132 @@ async function ClothingItemsList({
 
 // 下書きがあるときだけ「下書き N件」へのリンクを出す。
 // 件数を取得できない場合（下書きテーブルの適用前など）は何も出さない
+// 候補を選ぶために読む服の上限（画像は読まず、必要な列だけ）。
+// 超える場合は登録の古い順に1000着までを対象にする
+const REVIEW_ITEMS_LIMIT = 1000;
+const REVIEW_DIAGNOSES_LIMIT = 2000;
+
+// 「今日見直す3着」。絞り込み中は案内も含めて出さない。
+// 取得に失敗した場合はカードごと出さない（Closet一覧はそのまま使える）
+async function ReviewSuggestions({
+  searchParams,
+}: {
+  searchParams: SearchParamsPromise;
+}) {
+  if (hasActiveClosetFilters(parseClosetFilters(await searchParams))) {
+    return null;
+  }
+
+  const supabase = await createClient();
+  const [totalResult, itemsResult, diagnosesResult] = await Promise.all([
+    supabase
+      .from("clothing_items")
+      .select("*", { count: "exact", head: true }),
+    supabase
+      .from("clothing_items")
+      .select("id, title, status, seasons, favorite, last_worn_at, purchase_date")
+      .in("status", ["closet", "candidate"])
+      .order("created_at", { ascending: true })
+      .limit(REVIEW_ITEMS_LIMIT),
+    // 新しい順に読み、服ごとに最初の1件を最新の診断として使う
+    supabase
+      .from("ai_diagnoses")
+      .select("clothing_item_id, decision, created_at")
+      .order("created_at", { ascending: false })
+      .limit(REVIEW_DIAGNOSES_LIMIT),
+  ]);
+
+  if (totalResult.error || itemsResult.error || diagnosesResult.error) {
+    console.error(
+      "review suggestions fetch error:",
+      totalResult.error ?? itemsResult.error ?? diagnosesResult.error,
+    );
+    return null;
+  }
+
+  const latestDiagnosisByItem = new Map<
+    string,
+    { decision: ReviewDecision; createdAt: string }
+  >();
+  for (const diagnosis of diagnosesResult.data) {
+    if (!latestDiagnosisByItem.has(diagnosis.clothing_item_id)) {
+      latestDiagnosisByItem.set(diagnosis.clothing_item_id, {
+        decision: diagnosis.decision as ReviewDecision,
+        createdAt: diagnosis.created_at,
+      });
+    }
+  }
+
+  const items: ReviewItemInput[] = itemsResult.data.map((item) => ({
+    id: item.id,
+    title: item.title,
+    status: item.status,
+    seasons: item.seasons ?? [],
+    favorite: item.favorite,
+    lastWornAt: item.last_worn_at,
+    purchaseDate: item.purchase_date ?? null,
+    latestDiagnosis: latestDiagnosisByItem.get(item.id) ?? null,
+  }));
+
+  const now = new Date();
+  const suggestions = selectReviewSuggestions({
+    items,
+    now,
+    dateKey: getJstDateKey(now),
+    currentSeason: getCurrentSeasonJst(now),
+  });
+
+  // 選んだ服の代表画像（sort_orderが最小の1枚）だけ署名付きURLを発行する
+  const imageUrls = new Map<string, string>();
+  if (suggestions.length > 0) {
+    const { data: images, error: imagesError } = await supabase
+      .from("clothing_images")
+      .select("clothing_item_id, image_path, sort_order")
+      .in(
+        "clothing_item_id",
+        suggestions.map((suggestion) => suggestion.item.id),
+      )
+      .order("sort_order");
+    if (imagesError) {
+      console.error("review suggestion images error:", imagesError);
+    } else {
+      const coverPathByItem = new Map<string, string>();
+      for (const image of images) {
+        if (!coverPathByItem.has(image.clothing_item_id)) {
+          coverPathByItem.set(image.clothing_item_id, image.image_path);
+        }
+      }
+      const coverPaths = [...coverPathByItem.values()];
+      if (coverPaths.length > 0) {
+        const { data: signed, error: signError } = await supabase.storage
+          .from("clothing-images")
+          .createSignedUrls(coverPaths, SIGNED_URL_EXPIRES_IN);
+        if (signError) {
+          console.error("review suggestion signed url error:", signError);
+        } else {
+          const urlByPath = new Map(
+            signed
+              .filter((entry) => !entry.error && entry.path && entry.signedUrl)
+              .map((entry) => [entry.path as string, entry.signedUrl]),
+          );
+          for (const [itemId, path] of coverPathByItem) {
+            const url = urlByPath.get(path);
+            if (url) imageUrls.set(itemId, url);
+          }
+        }
+      }
+    }
+  }
+
+  return (
+    <ReviewSuggestionsCard
+      suggestions={suggestions}
+      imageUrls={imageUrls}
+      totalItemCount={totalResult.count ?? 0}
+    />
+  );
+}
+
 async function DraftsLink() {
   const supabase = await createClient();
   const { count, error } = await supabase
@@ -287,6 +421,10 @@ export default function ClothingItemsPage({
 
       <Suspense fallback={null}>
         <DraftsLink />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <ReviewSuggestions searchParams={searchParams} />
       </Suspense>
 
       <Suspense fallback={null}>
