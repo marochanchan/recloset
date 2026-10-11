@@ -101,6 +101,16 @@ export function ReviewSuggestionsCard({
           })}
         </ul>
       )}
+
+      {/* 1着ずつスワイプで見直す（最大10着） */}
+      {totalItemCount > 0 && (
+        <Link
+          href="/protected/review"
+          className="w-fit text-sm font-medium underline underline-offset-4 hover:text-foreground"
+        >
+          まとめて見直す（最大10着）→
+        </Link>
+      )}
     </section>
   );
 }

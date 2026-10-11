@@ -76,8 +76,9 @@ const KIND_PRIORITY: Record<ReviewReasonKind, number> = {
   no_record: 6,
 };
 
-// 日付が変わると並びが入れ替わる決定的なハッシュ（FNV-1a 32bit）
-function stableHash(text: string): number {
+// 日付が変わると並びが入れ替わる決定的なハッシュ（FNV-1a 32bit）。
+// スワイプ式の見直し（lib/closet-review.ts）の並び順にも使う
+export function stableHash(text: string): number {
   let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) {
     hash ^= text.charCodeAt(i);
@@ -163,6 +164,18 @@ function classify(
   }
   // 15〜29日前に着た服は、まだ見直す時期ではない
   return null;
+}
+
+/** 今日見直す3着の対象外（最近着た・診断した等）の服の優先度。候補より後に並べる */
+export const LOWEST_REVIEW_PRIORITY = Math.max(...Object.values(KIND_PRIORITY)) + 1;
+
+/**
+ * 見直しのきっかけとしての優先度（小さいほど先）。今日見直す3着と同じ判定を使い、
+ * 対象外の服は除外せず LOWEST_REVIEW_PRIORITY にする（スワイプ式の見直しで使う）
+ */
+export function getReviewPriority(item: ReviewItemInput, now: Date): number {
+  const result = classify(item, now);
+  return result ? KIND_PRIORITY[result.kind] : LOWEST_REVIEW_PRIORITY;
 }
 
 /**

@@ -205,3 +205,28 @@ export function DraftListSkeleton() {
     </div>
   );
 }
+
+// /protected/review/[sessionId]（スワイプ式の見直し）
+export function ReviewSessionSkeleton() {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-8 w-28" />
+      </div>
+      <Skeleton className="h-1.5 w-full" />
+      <Card className="overflow-hidden">
+        <Skeleton className="aspect-[4/5] max-h-[60vh] w-full rounded-none" />
+        <div className="px-4 py-3">
+          <Skeleton className="h-5 w-1/2" />
+        </div>
+      </Card>
+      <div className="grid grid-cols-2 gap-2">
+        <Skeleton className="h-10" />
+        <Skeleton className="h-10" />
+        <Skeleton className="h-9" />
+        <Skeleton className="h-9" />
+      </div>
+    </div>
+  );
+}
