@@ -253,6 +253,24 @@ async function ClothingItemsList({
   );
 }
 
+// 下書きがあるときだけ「下書き N件」へのリンクを出す。
+// 件数を取得できない場合（下書きテーブルの適用前など）は何も出さない
+async function DraftsLink() {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("clothing_item_drafts")
+    .select("*", { count: "exact", head: true });
+  if (error || !count) return null;
+  return (
+    <Link
+      href="/protected/items/drafts"
+      className="w-fit text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+    >
+      下書き {count}件 →
+    </Link>
+  );
+}
+
 export default function ClothingItemsPage({
   searchParams,
 }: {
@@ -266,6 +284,10 @@ export default function ClothingItemsPage({
           <Link href="/protected/items/new">服を登録</Link>
         </Button>
       </div>
+
+      <Suspense fallback={null}>
+        <DraftsLink />
+      </Suspense>
 
       <Suspense fallback={null}>
         <ClosetFilterBar searchParams={searchParams} />

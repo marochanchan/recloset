@@ -66,6 +66,8 @@ export type AutofillTarget = {
   key: string;
   rotation: ImageRotation;
   sourceFile: File;
+  /** 下書きから読み込んだ画像なら true（自動解析しない。ボタンでの再実行は可） */
+  fromDraft?: boolean;
 };
 
 export type AutofillStatus =
@@ -214,6 +216,8 @@ export function useImageAutofill({
   // 代表画像が決まったら、その画像（key）で1回だけ自動解析する
   useEffect(() => {
     if (!enabled || !target) return;
+    // 下書きから再開した写真では、Geminiを自動では呼ばない
+    if (target.fromDraft) return;
     if (autoAnalyzedKeys.current.has(target.key)) return;
 
     const timer = window.setTimeout(() => {

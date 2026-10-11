@@ -42,6 +42,13 @@ export type NewImageItem = {
   processed: Blob | null;
   previewUrl: string | null;
   isProcessing: boolean;
+  /**
+   * 今の processed が下書き（Storage）に保存済みならそのパス。
+   * 回転などで processed を作り直したら null に戻す（次の下書き保存で再アップロードする）
+   */
+  draftPath: string | null;
+  /** 下書きから読み込んだ画像か（再開時はAIの自動解析をしない） */
+  fromDraft: boolean;
 };
 
 export type ImageItem = ExistingImageItem | NewImageItem;
@@ -117,7 +124,13 @@ export function useClothingImages({
       setImages((prev) =>
         prev.map((img) =>
           img.key === key && img.kind === "new"
-            ? { ...img, processed: blob, previewUrl, isProcessing: false }
+            ? {
+                ...img,
+                processed: blob,
+                previewUrl,
+                isProcessing: false,
+                draftPath: null,
+              }
             : img,
         ),
       );
@@ -182,6 +195,8 @@ export function useClothingImages({
       processed: null,
       previewUrl: null,
       isProcessing: true,
+      draftPath: null,
+      fromDraft: false,
     }));
     setImages((prev) => [...prev, ...newItems]);
     for (const item of newItems) {
@@ -307,6 +322,40 @@ export function useClothingImages({
     setConfirmingKey(null);
   };
 
+  /**
+   * 下書きの写真（保存済みの処理済みJPEG）を、新しく選んだ画像として末尾に加える。
+   * 作り直さずにそのまま使い、回転したときだけ元にして作り直す。
+   */
+  const addDraftImages = (entries: { path: string; blob: Blob }[]) => {
+    const newItems: NewImageItem[] = entries.map(({ path, blob }) => {
+      const previewUrl = URL.createObjectURL(blob);
+      objectUrlsRef.current.add(previewUrl);
+      return {
+        kind: "new",
+        key: crypto.randomUUID(),
+        sourceFile: new File([blob], "draft.jpg", { type: "image/jpeg" }),
+        rotation: 0,
+        processed: blob,
+        previewUrl,
+        isProcessing: false,
+        draftPath: path,
+        fromDraft: true,
+      };
+    });
+    setImages((prev) => [...prev, ...newItems].slice(0, MAX_IMAGE_COUNT));
+  };
+
+  /** 下書きを保存した後に、各画像の保存先を記録する（次の保存で再アップロードしない） */
+  const setDraftPaths = (pathByKey: Record<string, string>) => {
+    setImages((prev) =>
+      prev.map((img) =>
+        img.kind === "new" && pathByKey[img.key]
+          ? { ...img, draftPath: pathByKey[img.key] }
+          : img,
+      ),
+    );
+  };
+
   /** 登録完了後などに、画像の選択状態をすべて初期化する */
   const resetImages = () => {
     images.forEach((img) => {
@@ -345,5 +394,7 @@ export function useClothingImages({
     handleDragHandlePointerMove,
     handleDragHandlePointerUp,
     resetImages,
+    addDraftImages,
+    setDraftPaths,
   };
 }

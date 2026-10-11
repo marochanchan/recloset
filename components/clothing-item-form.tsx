@@ -16,6 +16,11 @@ import { ImageAutofillStatus } from "@/components/image-autofill-status";
 import { SeasonSelector } from "@/components/season-selector";
 import { useImageAutofill } from "@/components/use-image-autofill";
 import {
+  useClothingDraft,
+  type ClothingDraftToResume,
+} from "@/components/use-clothing-draft";
+import type { DraftFields } from "@/lib/clothing-drafts";
+import {
   MAX_IMAGE_COUNT,
   useClothingImages,
   type ExistingClothingImage,
@@ -42,7 +47,7 @@ import {
 } from "@/lib/marketplace-urls";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 const selectClassName = cn(
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
@@ -60,6 +65,10 @@ type SavedItemState = {
   id: string;
   totalImages: number;
   failedImages: number;
+  /** 一部の画像が登録できず、下書きを残した */
+  draftKept?: boolean;
+  /** 服は登録できたが、下書きの削除に失敗した */
+  draftCleanupFailed?: boolean;
 };
 
 // 既存の呼び出し側（編集画面など）向けに、画像の型をここからも参照できるようにする
@@ -88,6 +97,8 @@ type ClothingItemFormProps = {
   itemId?: string;
   initialValues?: ClothingItemFormInitialValues;
   initialImages?: ExistingClothingImage[];
+  /** 新規登録で再開する下書き（サーバーで本人の下書きと確認済み） */
+  draft?: ClothingDraftToResume | null;
 } & React.ComponentPropsWithoutRef<"div">;
 
 export function ClothingItemForm({
@@ -96,25 +107,51 @@ export function ClothingItemForm({
   itemId,
   initialValues,
   initialImages = [],
+  draft = null,
   ...props
 }: ClothingItemFormProps) {
   const isEdit = mode === "edit";
 
-  const [title, setTitle] = useState(initialValues?.title ?? "");
-  const [brand, setBrand] = useState(initialValues?.brand ?? "");
-  const [category, setCategory] = useState(initialValues?.category ?? "");
-  // 種類・メインカラー（空文字は未設定）。種類はカテゴリーに属する値だけを持つ
-  const [subcategory, setSubcategory] = useState(() =>
-    isSubcategoryForCategory(
-      initialValues?.category ?? "",
-      initialValues?.subcategory,
-    )
-      ? (initialValues?.subcategory ?? "")
-      : "",
+  // フォームの初期値。下書きから再開する場合は下書きの値、編集では保存済みの値。
+  // 未保存の変更があるかどうかの基準にもなる
+  const [initialFields] = useState<DraftFields>(() =>
+    draft
+      ? draft.fields
+      : {
+          title: initialValues?.title ?? "",
+          brand: initialValues?.brand ?? "",
+          category: initialValues?.category ?? "",
+          // 種類はカテゴリーに属する値だけを持つ
+          subcategory: isSubcategoryForCategory(
+            initialValues?.category ?? "",
+            initialValues?.subcategory,
+          )
+            ? (initialValues?.subcategory ?? "")
+            : "",
+          mainColor: isColorValue(initialValues?.mainColor)
+            ? (initialValues?.mainColor ?? "")
+            : "",
+          seasons: normalizeSeasons(initialValues?.seasons),
+          purchaseDate: initialValues?.purchaseDate ?? "",
+          purchasePrice:
+            initialValues?.purchasePrice != null
+              ? String(initialValues.purchasePrice)
+              : "",
+          favorite: initialValues?.favorite ?? false,
+          marketplaceUrls: {
+            mercari: initialValues?.marketplaceUrls.mercari ?? "",
+            rakuma: initialValues?.marketplaceUrls.rakuma ?? "",
+            yahooFurima: initialValues?.marketplaceUrls.yahooFurima ?? "",
+          },
+        },
   );
-  const [mainColor, setMainColor] = useState(() =>
-    isColorValue(initialValues?.mainColor) ? (initialValues?.mainColor ?? "") : "",
-  );
+
+  const [title, setTitle] = useState(initialFields.title);
+  const [brand, setBrand] = useState(initialFields.brand);
+  const [category, setCategory] = useState(initialFields.category);
+  // 種類・メインカラー（空文字は未設定）
+  const [subcategory, setSubcategory] = useState(initialFields.subcategory);
+  const [mainColor, setMainColor] = useState(initialFields.mainColor);
   // カテゴリーを変えたとき（手動・AIどちらでも）、合わなくなった種類は空に戻す
   const changeCategory = (value: string) => {
     setCategory(value);
@@ -122,40 +159,26 @@ export function ClothingItemForm({
       isSubcategoryForCategory(value, current) ? current : "",
     );
   };
-  const [seasons, setSeasons] = useState<SeasonValue[]>(() =>
-    normalizeSeasons(initialValues?.seasons),
-  );
-  const [purchaseDate, setPurchaseDate] = useState(
-    initialValues?.purchaseDate ?? "",
-  );
+  const [seasons, setSeasons] = useState<SeasonValue[]>(initialFields.seasons);
+  const [purchaseDate, setPurchaseDate] = useState(initialFields.purchaseDate);
   const [purchasePrice, setPurchasePrice] = useState(
-    initialValues?.purchasePrice != null
-      ? String(initialValues.purchasePrice)
-      : "",
+    initialFields.purchasePrice,
   );
-  const [favorite, setFavorite] = useState(initialValues?.favorite ?? false);
+  const [favorite, setFavorite] = useState(initialFields.favorite);
   const [marketplaceUrls, setMarketplaceUrls] = useState<
     Record<MarketplaceService, string>
-  >(() => ({
-    mercari: initialValues?.marketplaceUrls.mercari ?? "",
-    rakuma: initialValues?.marketplaceUrls.rakuma ?? "",
-    yahooFurima: initialValues?.marketplaceUrls.yahooFurima ?? "",
-  }));
+  >(initialFields.marketplaceUrls);
   const [marketplaceUrlErrors, setMarketplaceUrlErrors] = useState<
     Partial<Record<MarketplaceService, string>>
   >({});
   // 保存済みURLがある場合・エラーがある場合は折りたたみを開いておく
   const [isMarketplaceOpen, setIsMarketplaceOpen] = useState(() =>
-    MARKETPLACE_SERVICES.some(
-      (service) => initialValues?.marketplaceUrls[service],
-    ),
+    MARKETPLACE_SERVICES.some((service) => initialFields.marketplaceUrls[service]),
   );
 
-  // 購入日・購入価格は「詳しく入力」に折りたたむ（編集時に値があれば開いておく）
+  // 購入日・購入価格は「詳しく入力」に折りたたむ（値があれば開いておく）
   const [isDetailsOpen, setIsDetailsOpen] = useState(
-    () =>
-      Boolean(initialValues?.purchaseDate) ||
-      initialValues?.purchasePrice != null,
+    () => Boolean(initialFields.purchaseDate) || initialFields.purchasePrice !== "",
   );
 
   const [error, setError] = useState<string | null>(null);
@@ -163,7 +186,14 @@ export function ClothingItemForm({
   const [savedItem, setSavedItem] = useState<SavedItemState | null>(null);
   const router = useRouter();
   const imageState = useClothingImages({ initialImages, onError: setError });
-  const { images, activeImages, isPreparingImages, resetImages } = imageState;
+  const {
+    images,
+    activeImages,
+    isPreparingImages,
+    resetImages,
+    addDraftImages,
+    setDraftPaths,
+  } = imageState;
 
   // 新規登録では、代表画像（先頭）からタイトル・カテゴリーを自動入力する
   const representativeImage = activeImages[0];
@@ -177,6 +207,7 @@ export function ClothingItemForm({
             key: representativeImage.key,
             rotation: representativeImage.rotation,
             sourceFile: representativeImage.sourceFile,
+            fromDraft: representativeImage.fromDraft,
           }
         : null,
     fields: {
@@ -188,7 +219,39 @@ export function ClothingItemForm({
     },
   });
 
+  // 下書き（新規登録のみ）。保存は手動、再開時は写真と入力値を戻す
+  const currentFields: DraftFields = {
+    title,
+    brand,
+    category,
+    subcategory,
+    mainColor,
+    seasons,
+    purchaseDate,
+    purchasePrice,
+    favorite,
+    marketplaceUrls,
+  };
+  const clothingDraft = useClothingDraft({
+    enabled: !isEdit,
+    initialDraft: draft,
+    initialFields,
+    fields: currentFields,
+    images: activeImages.filter(
+      (img): img is NewImageItem => img.kind === "new",
+    ),
+    addDraftImages,
+    setDraftPaths,
+  });
+  const isDraftBlocking =
+    clothingDraft.isLoadingDraft || clothingDraft.draftLoadFailed;
+
+  // 新規登録で使う服のID。フォームを開いている間は同じIDを使い、
+  // 再試行しても同じ服が2着できないようにする（登録が完了したら作り直す）
+  const pendingItemIdRef = useRef<string | null>(null);
+
   const resetForm = () => {
+    pendingItemIdRef.current = null;
     setTitle("");
     setBrand("");
     setCategory("");
@@ -264,7 +327,10 @@ export function ClothingItemForm({
       if (userError) throw userError;
       if (!user) throw new Error("ログイン情報が確認できませんでした");
 
-      const targetItemId = isEdit && itemId ? itemId : crypto.randomUUID();
+      const targetItemId =
+        isEdit && itemId
+          ? itemId
+          : (pendingItemIdRef.current ??= crypto.randomUUID());
 
       const payload = {
         title,
@@ -298,7 +364,20 @@ export function ClothingItemForm({
         const { error: insertError } = await supabase
           .from("clothing_items")
           .insert({ id: targetItemId, user_id: user.id, ...payload });
-        if (insertError) throw insertError;
+        if (insertError?.code === "23505") {
+          // 前回の登録で行の作成だけ成功していた（応答が届かなかった）場合。
+          // 新しく作らず、同じ服の内容を更新して続ける（RLSで本人の行だけ）
+          const { data: existing, error: retryError } = await supabase
+            .from("clothing_items")
+            .update(payload)
+            .eq("id", targetItemId)
+            .select("id")
+            .maybeSingle();
+          if (retryError) throw retryError;
+          if (!existing) throw insertError;
+        } else if (insertError) {
+          throw insertError;
+        }
       }
 
       if (isEdit) {
@@ -344,6 +423,7 @@ export function ClothingItemForm({
       //    既存の生存画像は2-bで既に自分の最終位置へ移動済みのため、
       //    新規画像の位置と衝突しない。
       let failedImages = 0;
+      const uploadedPaths: string[] = [];
       for (let i = 0; i < orderedActiveImages.length; i++) {
         const image = orderedActiveImages[i];
         if (image.kind !== "new" || !image.processed) continue;
@@ -373,6 +453,7 @@ export function ClothingItemForm({
             }
             throw imageInsertError;
           }
+          uploadedPaths.push(path);
         } catch (imageError: unknown) {
           console.error("clothing image registration failed:", imageError);
           failedImages++;
@@ -413,14 +494,55 @@ export function ClothingItemForm({
         }
       }
 
+      // 新規登録で画像が1枚でも登録できなかった場合は、登録を取り消して
+      // フォームに戻す（入力値・写真・下書きはそのまま。同じIDで再試行できる）。
+      // clothing_images の行は clothing_items の削除に連動して消える。
+      if (!isEdit && failedImages > 0) {
+        if (uploadedPaths.length > 0) {
+          const { error: removeError } = await supabase.storage
+            .from("clothing-images")
+            .remove(uploadedPaths);
+          if (removeError) {
+            console.error("registration rollback: image cleanup failed:", removeError);
+          }
+        }
+        const { data: rolledBack, error: rollbackError } = await supabase
+          .from("clothing_items")
+          .delete()
+          .eq("id", targetItemId)
+          .select("id")
+          .maybeSingle();
+        if (!rollbackError && rolledBack) {
+          throw new Error(
+            "写真の登録に失敗したため、登録を取り消しました。入力内容と写真はそのままです。もう一度お試しください",
+          );
+        }
+        // 取り消しにも失敗した場合だけ、従来どおり「一部の画像が未登録」として扱う
+        console.error("registration rollback failed:", rollbackError);
+      }
+
+      // ここで服の登録・更新は完了している。以降は離脱確認を出さない
+      clothingDraft.allowLeave();
+
       if (failedImages > 0) {
+        // 一部の画像が登録できなかった場合、下書き（写真の控え）は残しておく
         setSavedItem({
           id: targetItemId,
           totalImages: newImages.length,
           failedImages,
+          draftKept: clothingDraft.draftId !== null,
         });
       } else if (isEdit) {
         router.push(`/protected/items/${targetItemId}`);
+      } else if (!(await clothingDraft.completeDraft())) {
+        // 服は登録済み。下書きの削除だけ失敗したことを伝える（二重登録を防ぐため、
+        // フォームには戻さない）
+        setSavedItem({
+          id: targetItemId,
+          totalImages: newImages.length,
+          failedImages: 0,
+          draftCleanupFailed: true,
+        });
       } else {
         resetForm();
         router.push("/protected/items");
@@ -452,11 +574,21 @@ export function ClothingItemForm({
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <p className="text-sm text-yellow-600">
-              {isEdit ? "服の情報は保存されましたが、" : "服は登録されましたが、"}
-              {savedItem.totalImages}枚中
-              {savedItem.failedImages}枚の画像登録に失敗しました
-            </p>
+            {savedItem.failedImages > 0 && (
+              <p className="text-sm text-yellow-600">
+                {isEdit ? "服の情報は保存されましたが、" : "服は登録されましたが、"}
+                {savedItem.totalImages}枚中
+                {savedItem.failedImages}枚の画像登録に失敗しました
+                {savedItem.draftKept &&
+                  "。写真は下書きに残してあります（下書き一覧から確認できます）"}
+              </p>
+            )}
+            {savedItem.draftCleanupFailed && (
+              <p className="text-sm text-yellow-600">
+                服は登録されました。下書きの削除に失敗したため、下書き一覧から削除してください
+                （もう一度登録する必要はありません）
+              </p>
+            )}
             <div className="flex flex-col gap-2 text-sm">
               <Link
                 href={`/protected/items/${savedItem.id}`}
@@ -470,6 +602,14 @@ export function ClothingItemForm({
               >
                 クローゼット一覧へ戻る
               </Link>
+              {(savedItem.draftKept || savedItem.draftCleanupFailed) && (
+                <Link
+                  href="/protected/items/drafts"
+                  className="underline underline-offset-4"
+                >
+                  下書き一覧へ
+                </Link>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -715,10 +855,25 @@ export function ClothingItemForm({
               </details>
 
               {error && <p className="text-sm text-red-500">{error}</p>}
+              {clothingDraft.isLoadingDraft && (
+                <p className="text-sm text-muted-foreground">
+                  下書きの写真を読み込んでいます…
+                </p>
+              )}
+              {clothingDraft.draftLoadFailed && (
+                <p className="text-sm text-red-500">
+                  下書きの写真を読み込めませんでした。写真を失わないよう、保存・登録を止めています。ページを再読み込みしてください
+                </p>
+              )}
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isLoading || isPreparingImages}
+                disabled={
+                  isLoading ||
+                  isPreparingImages ||
+                  clothingDraft.isSavingDraft ||
+                  isDraftBlocking
+                }
               >
                 {isPreparingImages && !isLoading
                   ? "画像を準備中..."
@@ -730,6 +885,37 @@ export function ClothingItemForm({
                     ? "保存する"
                     : "登録する"}
               </Button>
+              {!isEdit && (
+                <div className="flex flex-col gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={clothingDraft.saveDraft}
+                    disabled={
+                      isLoading ||
+                      isPreparingImages ||
+                      clothingDraft.isSavingDraft ||
+                      isDraftBlocking
+                    }
+                  >
+                    {clothingDraft.isSavingDraft
+                      ? "下書きを保存中..."
+                      : "下書きとして保存"}
+                  </Button>
+                  {clothingDraft.draftMessage && (
+                    <p
+                      className={
+                        clothingDraft.draftMessage.tone === "error"
+                          ? "text-sm text-red-500"
+                          : "text-sm text-muted-foreground"
+                      }
+                    >
+                      {clothingDraft.draftMessage.text}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </form>
         </CardContent>
