@@ -8,8 +8,8 @@ import { CATEGORY_OPTIONS, SEASON_OPTIONS } from "@/lib/clothing-options";
 //   不正値・未指定は「すべて」（null）として扱う。
 // - favorite / status は Todayのクローゼットサマリー（お気に入り・手放し候補）
 //   から同じ条件の一覧を開くためのもの。statusは手放し候補だけを受け付ける。
-// - seasonは選んだ値と完全一致で絞り込む（天気提案と違い、"all"を含める
-//   といった拡張はしない）。
+// - seasonは「その季節を含む服」で絞り込む（seasons配列、migration 012）。
+//   "all"（オールシーズン）は4季節すべてを含む服。
 // ============================================================
 
 export const CLOSET_FILTER_PATH = "/protected/items";

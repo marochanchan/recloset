@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getCategoryLabel, getSeasonLabel } from "@/lib/clothing-options";
+import { formatSeasons, getCategoryLabel } from "@/lib/clothing-options";
 import { getMyLoopItemStates } from "@/lib/loop-likes";
 import { getMarketplaceLinks } from "@/lib/marketplace-urls";
 import { buildLoginHrefForDiscoverItem } from "@/lib/safe-redirect";
@@ -32,7 +32,8 @@ type PublicClothingItemDetailRow = {
   title: string;
   brand: string | null;
   category: string;
-  season: string | null;
+  /** migration 012 で追加。旧 season は互換用に返るが使わない */
+  seasons: string[] | null;
   published_at: string;
   owner_display_name: string | null;
   image_paths: string[];
@@ -170,8 +171,8 @@ async function PublicClothingItemDetail({
             <Badge variant="secondary">
               {getCategoryLabel(item.category)}
             </Badge>
-            {item.season && (
-              <Badge variant="secondary">{getSeasonLabel(item.season)}</Badge>
+            {formatSeasons(item.seasons) && (
+              <Badge variant="secondary">{formatSeasons(item.seasons)}</Badge>
             )}
           </div>
 

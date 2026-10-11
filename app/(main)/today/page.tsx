@@ -62,7 +62,7 @@ async function TodayContent() {
       supabase
         .from("clothing_items")
         .select(
-          "id, title, brand, category, season, status, favorite, last_worn_at, clothing_images(image_path, sort_order)",
+          "id, title, brand, category, seasons, status, favorite, last_worn_at, clothing_images(image_path, sort_order)",
         )
         .in("status", ["closet", "candidate"])
         .in("category", ["tops", "bottoms", "dress", "outer"])
@@ -90,7 +90,7 @@ async function TodayContent() {
         title: item.title,
         brand: item.brand,
         category: item.category,
-        season: item.season,
+        seasons: item.seasons ?? [],
         status: item.status,
         favorite: item.favorite,
         daysSinceLastWorn: getDaysSinceLastWorn(item.last_worn_at, now),

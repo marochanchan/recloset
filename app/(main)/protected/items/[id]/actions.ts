@@ -9,7 +9,7 @@ import {
   validateFeelingInput,
 } from "@/lib/ai-diagnosis";
 import { GEMINI_ELABORATION_MODEL, runGeminiElaboration } from "@/lib/ai-elaboration";
-import { STATUS_OPTIONS } from "@/lib/clothing-options";
+import { normalizeSeasons, STATUS_OPTIONS } from "@/lib/clothing-options";
 import { buildDecisionHints } from "@/lib/decision-hints";
 import { isUsableDisplayName } from "@/lib/display-name";
 import { type NextAction, buildNextAction } from "@/lib/next-action";
@@ -404,7 +404,7 @@ export async function runAiDiagnosis(
   // status は過去のユーザー判断であり客観的な利用実績ではないため取得しない。
   const { data: item, error: itemError } = await supabase
     .from("clothing_items")
-    .select("wear_count, favorite, category, season, purchase_date, last_worn_at")
+    .select("wear_count, favorite, category, seasons, purchase_date, last_worn_at")
     .eq("id", itemId)
     .maybeSingle();
 
@@ -455,7 +455,7 @@ export async function runAiDiagnosis(
     days_since_purchase: getDaysSincePurchase(item.purchase_date),
     favorite: item.favorite,
     category: item.category,
-    season: item.season,
+    seasons: normalizeSeasons(item.seasons),
     current_season: getCurrentSeasonJst(),
   };
 

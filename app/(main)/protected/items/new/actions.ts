@@ -1,7 +1,11 @@
 "use server";
 
 import { analyzeClothingImage } from "@/lib/clothing-image-analysis";
-import { CATEGORY_OPTIONS } from "@/lib/clothing-options";
+import {
+  CATEGORY_OPTIONS,
+  normalizeSeasons,
+  type SeasonValue,
+} from "@/lib/clothing-options";
 import { createClient } from "@/lib/supabase/server";
 
 // 登録フォームから送るAI用画像（lib/image-processing.ts の
@@ -45,11 +49,15 @@ export type ClothingImageAutofillResult =
       isClothing: boolean;
       title: string | null;
       category: CategoryValue | null;
+      /** 着られる季節の候補。判定できなかった場合はnull（未設定のままにする） */
+      seasons: SeasonValue[] | null;
+      /** 季節は写真だけでは判断しにくいため、確認を促す場合にtrue */
+      seasonsNeedsCheck: boolean;
     }
   | { ok: false; error: string };
 
 /**
- * 登録フォームの代表画像1枚をAIで解析し、タイトルとカテゴリーの候補を返す。
+ * 登録フォームの代表画像1枚をAIで解析し、タイトル・カテゴリー・季節の候補を返す。
  * - 認証済みユーザーだけが使える（user_idはクライアントから受け取らない）
  * - 画像・解析結果はStorageにもDBにも保存しない
  * - 失敗してもフォームの通常の登録は続けられるよう、短い案内文だけを返す
@@ -88,7 +96,14 @@ export async function analyzeClothingImageForAutofill(
   try {
     const analysis = await analyzeClothingImage(bytes);
     if (!analysis.is_clothing) {
-      return { ok: true, isClothing: false, title: null, category: null };
+      return {
+        ok: true,
+        isClothing: false,
+        title: null,
+        category: null,
+        seasons: null,
+        seasonsNeedsCheck: false,
+      };
     }
 
     // カテゴリーはアプリの選択肢と完全一致するものだけを採用する
@@ -98,7 +113,20 @@ export async function analyzeClothingImageForAutofill(
     const title =
       analysis.suggested_title?.trim().slice(0, MAX_TITLE_LENGTH) || null;
 
-    return { ok: true, isClothing: true, title, category };
+    const seasons = normalizeSeasons(analysis.suggested_seasons);
+    const seasonsNeedsCheck =
+      seasons.length > 0 &&
+      (analysis.confidence.seasons === "low" ||
+        analysis.needs_user_check.includes("seasons"));
+
+    return {
+      ok: true,
+      isClothing: true,
+      title,
+      category,
+      seasons: seasons.length > 0 ? seasons : null,
+      seasonsNeedsCheck,
+    };
   } catch (error) {
     // 画像やAPIキーはログに出さない（エラーの種類だけを残す）
     console.error(

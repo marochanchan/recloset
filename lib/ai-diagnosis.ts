@@ -137,7 +137,12 @@ export type DiagnosisFact = {
   days_since_purchase: number | null;
   favorite: boolean;
   category: string;
-  season: string | null;
+  /**
+   * 着られる季節（migration 012。空配列は未設定、4つすべてはオールシーズン）。
+   * 012より前に ai_diagnoses.fact へ保存された履歴は season（単一値）を持つため、
+   * 履歴を読む側は旧形式にも対応すること（lib/ai-elaboration.ts）。
+   */
+  seasons: string[];
   current_season: "spring" | "summer" | "autumn" | "winter";
 };
 
@@ -211,7 +216,7 @@ export async function runJevDiagnosis(
     days_since_purchase: fact.days_since_purchase,
     favorite: fact.favorite,
     category: fact.category,
-    season: fact.season,
+    seasons: fact.seasons,
     current_season: fact.current_season,
     current_feeling: feeling.currentFeeling,
     want_to_wear_again: feeling.wantToWearAgain,

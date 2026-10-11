@@ -5,7 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getCategoryLabel, getSeasonLabel } from "@/lib/clothing-options";
+import { formatSeasons, getCategoryLabel } from "@/lib/clothing-options";
 import Image from "next/image";
 
 // 一般公開ページ用のカード。本人用のClothingItemCardとは分け、
@@ -14,7 +14,7 @@ type PublicClothingItemCardProps = {
   title: string;
   brand: string | null;
   category: string;
-  season: string | null;
+  seasons: string[];
   ownerDisplayName: string;
   imageUrl: string | null;
 };
@@ -23,7 +23,7 @@ export function PublicClothingItemCard({
   title,
   brand,
   category,
-  season,
+  seasons,
   ownerDisplayName,
   imageUrl,
 }: PublicClothingItemCardProps) {
@@ -59,9 +59,9 @@ export function PublicClothingItemCard({
       <CardContent className="mt-auto flex flex-col gap-2 p-3 pt-0 sm:gap-3 sm:p-6 sm:pt-0">
         <div className="flex flex-wrap gap-1.5 sm:gap-2">
           <Badge variant="secondary">{getCategoryLabel(category)}</Badge>
-          {season && (
+          {formatSeasons(seasons) && (
             <Badge variant="secondary" className="hidden sm:inline-flex">
-              {getSeasonLabel(season)}
+              {formatSeasons(seasons)}
             </Badge>
           )}
         </div>

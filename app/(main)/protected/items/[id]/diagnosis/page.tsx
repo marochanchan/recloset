@@ -1,5 +1,5 @@
 import { AiDiagnosisFlow } from "@/components/ai-diagnosis-flow";
-import { getCategoryLabel, getSeasonLabel } from "@/lib/clothing-options";
+import { formatSeasons, getCategoryLabel } from "@/lib/clothing-options";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -23,7 +23,7 @@ async function AiDiagnosisContent({
   const { data: item, error } = await supabase
     .from("clothing_items")
     .select(
-      "id, title, brand, category, season, favorite, status",
+      "id, title, brand, category, seasons, favorite, status",
     )
     .eq("id", id)
     .maybeSingle();
@@ -50,7 +50,7 @@ async function AiDiagnosisContent({
         title={item.title}
         brand={item.brand}
         categoryLabel={getCategoryLabel(item.category)}
-        seasonLabel={item.season ? getSeasonLabel(item.season) : null}
+        seasonLabel={formatSeasons(item.seasons)}
         favorite={item.favorite}
         currentStatus={item.status}
       />

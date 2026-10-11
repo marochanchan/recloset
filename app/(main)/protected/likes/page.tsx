@@ -19,7 +19,8 @@ type LikedPublicClothingItemRow = {
   title: string;
   brand: string | null;
   category: string;
-  season: string | null;
+  /** migration 012 で追加。旧 season は互換用に返るが使わない */
+  seasons: string[] | null;
   published_at: string;
   owner_display_name: string | null;
   cover_image_path: string | null;
@@ -94,7 +95,7 @@ async function LikedClothingItemsList() {
               title={item.title}
               brand={item.brand}
               category={item.category}
-              season={item.season}
+              seasons={item.seasons ?? []}
               ownerDisplayName={item.owner_display_name ?? "Re:Closetユーザー"}
               imageUrl={imageUrl}
             />

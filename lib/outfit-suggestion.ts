@@ -1,9 +1,13 @@
-import { getSeasonLabel } from "@/lib/clothing-options";
+import {
+  getSeasonLabel,
+  isAllSeasons,
+  normalizeSeasons,
+} from "@/lib/clothing-options";
 
 // ============================================================
 // 今日のコーデ候補（完全ルールベース・純粋関数）
 //
-// 天気（今日の最高/最低気温）と、自分の服のseason・status・着用履歴から、
+// 天気（今日の最高/最低気温）と、自分の服のseasons・status・着用履歴から、
 // トップス（またはワンピース）・ボトムス・必要な日だけアウターを1着ずつ選ぶ。
 // 色や形の相性を判断するものではなく、「今日着る服をクローゼットから
 // 再発見する候補」として、選んだ理由を実データから説明できる形で返す。
@@ -18,7 +22,8 @@ export type OutfitItemInput = {
   title: string;
   brand: string | null;
   category: string;
-  season: string | null;
+  /** 着られる季節（migration 012）。空配列は未設定、4つすべてはオールシーズン */
+  seasons: string[];
   status: string;
   favorite: boolean;
   /** 最後の着用からの日数（JST。0=今日、1=昨日）。記録なしはnull */
@@ -49,9 +54,9 @@ const MAIN_CATEGORIES = ["tops", "dress"];
 const MAX_REASONS = 2;
 
 /**
- * 今日の最高気温に合うseason。seasonは1着につき1つしか登録できないため、
- * 春と秋は近いグループとして扱い、境界の気温帯では隣の季節も含める。
- * "all"（オールシーズン）は常に対象（ここでは返さず別扱い）。
+ * 今日の最高気温に合う季節。春と秋は近いグループとして扱い、
+ * 境界の気温帯では隣の季節も含める。
+ * オールシーズン（4季節すべて）の服は常に対象（ここでは返さず別扱い）。
  */
 export function getSuitableSeasonsForTemp(maxTemp: number): Season[] {
   if (maxTemp >= 25) return ["summer"];
@@ -92,10 +97,14 @@ function stableHash(text: string): number {
 
 type SeasonFit = "match" | "all" | "unknown" | "mismatch";
 
-function getSeasonFit(season: string | null, suitable: Season[]): SeasonFit {
-  if (season === null) return "unknown";
-  if (season === "all") return "all";
-  return (suitable as string[]).includes(season) ? "match" : "mismatch";
+// 服の季節（複数）と、今日に合う季節が1つでも重なれば「合う」
+function getSeasonFit(seasons: string[], suitable: Season[]): SeasonFit {
+  const normalized = normalizeSeasons(seasons);
+  if (normalized.length === 0) return "unknown";
+  if (isAllSeasons(normalized)) return "all";
+  return normalized.some((season) => (suitable as string[]).includes(season))
+    ? "match"
+    : "mismatch";
 }
 
 /**
@@ -120,12 +129,17 @@ function buildReasons(
   item: OutfitItemInput,
   fit: SeasonFit,
   basis: OutfitSuggestion["basis"],
+  suitable: Season[],
 ): string[] {
   // 季節一致は具体的な理由として先頭に、オールシーズンは情報量が少ないため
-  // 他に理由がない場合の補足として最後に置く
+  // 他に理由がない場合の補足として最後に置く。
+  // 複数季節の服は、今日に合う季節だけを理由に書く（例: 「春・秋物」）
+  const matchedSeasons = normalizeSeasons(item.seasons).filter((season) =>
+    (suitable as string[]).includes(season),
+  );
   const seasonMatchReason =
-    fit === "match" && item.season
-      ? `${basis === "weather" ? "今日の気温" : "今の季節"}に合う${getSeasonLabel(item.season)}物`
+    fit === "match" && matchedSeasons.length > 0
+      ? `${basis === "weather" ? "今日の気温" : "今の季節"}に合う${matchedSeasons.map(getSeasonLabel).join("・")}物`
       : null;
 
   return [
@@ -156,7 +170,7 @@ function scoreItems(
 ): ScoredItem[] {
   return items
     .map((item) => {
-      const fit = getSeasonFit(item.season, suitable);
+      const fit = getSeasonFit(item.seasons, suitable);
       return {
         item,
         fit,
@@ -233,7 +247,7 @@ export function suggestTodayOutfit({
     return {
       slot,
       item: best.item,
-      reasons: buildReasons(best.item, best.fit, basis),
+      reasons: buildReasons(best.item, best.fit, basis, suitable),
       wornToday: false,
     };
   };

@@ -13,6 +13,7 @@ import {
 import { ClothingImageSection } from "@/components/clothing-image-section";
 import { FavoriteToggle } from "@/components/favorite-toggle";
 import { ImageAutofillStatus } from "@/components/image-autofill-status";
+import { SeasonSelector } from "@/components/season-selector";
 import { useImageAutofill } from "@/components/use-image-autofill";
 import {
   MAX_IMAGE_COUNT,
@@ -23,7 +24,12 @@ import {
 } from "@/components/use-clothing-images";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CATEGORY_OPTIONS, SEASON_OPTIONS } from "@/lib/clothing-options";
+import {
+  CATEGORY_OPTIONS,
+  normalizeSeasons,
+  toLegacySeason,
+  type SeasonValue,
+} from "@/lib/clothing-options";
 import {
   MARKETPLACE_SERVICES,
   MARKETPLACES,
@@ -59,7 +65,8 @@ export type ClothingItemFormInitialValues = {
   title: string;
   brand: string | null;
   category: string;
-  season: string | null;
+  /** 着られる季節（migration 012）。空配列は未設定 */
+  seasons: string[];
   purchaseDate: string | null;
   purchasePrice: number | null;
   favorite: boolean;
@@ -88,7 +95,9 @@ export function ClothingItemForm({
   const [title, setTitle] = useState(initialValues?.title ?? "");
   const [brand, setBrand] = useState(initialValues?.brand ?? "");
   const [category, setCategory] = useState(initialValues?.category ?? "");
-  const [season, setSeason] = useState(initialValues?.season ?? "");
+  const [seasons, setSeasons] = useState<SeasonValue[]>(() =>
+    normalizeSeasons(initialValues?.seasons),
+  );
   const [purchaseDate, setPurchaseDate] = useState(
     initialValues?.purchaseDate ?? "",
   );
@@ -143,17 +152,18 @@ export function ClothingItemForm({
             sourceFile: representativeImage.sourceFile,
           }
         : null,
-    title,
-    category,
-    setTitle,
-    setCategory,
+    fields: {
+      title: { value: title, set: setTitle },
+      category: { value: category, set: setCategory },
+      seasons: { value: seasons, set: setSeasons },
+    },
   });
 
   const resetForm = () => {
     setTitle("");
     setBrand("");
     setCategory("");
-    setSeason("");
+    setSeasons([]);
     setPurchaseDate("");
     setPurchasePrice("");
     setFavorite(false);
@@ -229,7 +239,9 @@ export function ClothingItemForm({
         title,
         brand: brand || null,
         category,
-        season: season || null,
+        seasons,
+        // 旧season列（互換用）: 4季節→'all'、1季節→その値、それ以外→null
+        season: toLegacySeason(seasons),
         purchase_date: purchaseDate || null,
         purchase_price: purchasePrice === "" ? null : Number(purchasePrice),
         favorite,
@@ -474,7 +486,7 @@ export function ClothingItemForm({
               <div className="grid gap-2">
                 <Label htmlFor="title" className="flex items-center gap-2">
                   タイトル *
-                  {autofill.isAiValue("title", title) && <AiBadge />}
+                  {autofill.isAiValue("title") && <AiBadge />}
                 </Label>
                 <Input
                   id="title"
@@ -488,7 +500,7 @@ export function ClothingItemForm({
               <div className="grid gap-2">
                 <Label htmlFor="category" className="flex items-center gap-2">
                   カテゴリー *
-                  {autofill.isAiValue("category", category) && <AiBadge />}
+                  {autofill.isAiValue("category") && <AiBadge />}
                 </Label>
                 <select
                   id="category"
@@ -519,20 +531,21 @@ export function ClothingItemForm({
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="season">シーズン</Label>
-                <select
-                  id="season"
-                  className={selectClassName}
-                  value={season}
-                  onChange={(e) => setSeason(e.target.value)}
-                >
-                  <option value="">未選択</option>
-                  {SEASON_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                <Label id="seasons-label" className="flex items-center gap-2">
+                  シーズン
+                  {autofill.isAiValue("seasons") && <AiBadge />}
+                </Label>
+                <SeasonSelector
+                  value={seasons}
+                  onChange={setSeasons}
+                  labelId="seasons-label"
+                  describedBy="seasons-description"
+                />
+                <p id="seasons-description" className="text-sm text-muted-foreground">
+                  {autofill.needsCheck("seasons")
+                    ? "季節は写真だけでは判断しにくいため、確認してください"
+                    : "着られる季節をすべて選べます（未選択でも登録できます）"}
+                </p>
               </div>
 
               <FavoriteToggle checked={favorite} onCheckedChange={setFavorite} />

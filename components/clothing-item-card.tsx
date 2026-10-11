@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/card";
 import {
   getCategoryLabel,
-  getSeasonLabel,
+  formatSeasons,
   getStatusLabel,
 } from "@/lib/clothing-options";
 import { getWearRecencyLabel } from "@/lib/wear-logs";
@@ -17,7 +17,7 @@ type ClothingItemCardProps = {
   title: string;
   brand: string | null;
   category: string;
-  season: string | null;
+  seasons: string[];
   favorite: boolean;
   status: string;
   lastWornAt: string | null;
@@ -29,7 +29,7 @@ export function ClothingItemCard({
   title,
   brand,
   category,
-  season,
+  seasons,
   favorite,
   status,
   lastWornAt,
@@ -75,8 +75,8 @@ export function ClothingItemCard({
       </CardHeader>
       <CardContent className="mt-auto flex flex-wrap gap-2">
         <Badge variant="secondary">{getCategoryLabel(category)}</Badge>
-        {season && (
-          <Badge variant="secondary">{getSeasonLabel(season)}</Badge>
+        {formatSeasons(seasons) && (
+          <Badge variant="secondary">{formatSeasons(seasons)}</Badge>
         )}
         <Badge variant="outline">{getStatusLabel(status)}</Badge>
         <Badge variant="secondary">{getWearRecencyLabel(lastWornAt)}</Badge>

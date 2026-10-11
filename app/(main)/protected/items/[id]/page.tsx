@@ -15,7 +15,7 @@ import { PublishToggle } from "@/components/publish-toggle";
 import { WearTodayButton } from "@/components/wear-today-button";
 import {
   getCategoryLabel,
-  getSeasonLabel,
+  formatSeasons,
   getStatusLabel,
 } from "@/lib/clothing-options";
 import { getMarketplaceLinks } from "@/lib/marketplace-urls";
@@ -44,7 +44,7 @@ async function ClothingItemDetail({
   const { data: item, error } = await supabase
     .from("clothing_items")
     .select(
-      "id, title, brand, category, season, purchase_date, purchase_price, favorite, status, wear_count, last_worn_at, is_public, published_at, mercari_url, rakuma_url, yahoo_furima_url, clothing_images(image_path, sort_order)",
+      "id, title, brand, category, seasons, purchase_date, purchase_price, favorite, status, wear_count, last_worn_at, is_public, published_at, mercari_url, rakuma_url, yahoo_furima_url, clothing_images(image_path, sort_order)",
     )
     .eq("id", id)
     .order("sort_order", { referencedTable: "clothing_images" })
@@ -128,8 +128,8 @@ async function ClothingItemDetail({
             <Badge variant="secondary">
               {getCategoryLabel(item.category)}
             </Badge>
-            {item.season && (
-              <Badge variant="secondary">{getSeasonLabel(item.season)}</Badge>
+            {formatSeasons(item.seasons) && (
+              <Badge variant="secondary">{formatSeasons(item.seasons)}</Badge>
             )}
             <Badge variant="outline">{getStatusLabel(item.status)}</Badge>
           </div>

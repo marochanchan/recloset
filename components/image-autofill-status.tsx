@@ -1,10 +1,17 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import type { AutofillStatus } from "@/components/use-image-autofill";
+import type {
+  AutofillField,
+  AutofillStatus,
+} from "@/components/use-image-autofill";
 import { Loader2, Sparkles } from "lucide-react";
 
-const FIELD_LABELS = { title: "タイトル", category: "カテゴリー" } as const;
+const FIELD_LABELS: Record<AutofillField, string> = {
+  title: "タイトル",
+  category: "カテゴリー",
+  seasons: "季節",
+};
 
 // 写真からの自動入力の状況（画像欄の下に小さく表示する）
 export function ImageAutofillStatus({
@@ -21,12 +28,12 @@ export function ImageAutofillStatus({
 
   switch (status.kind) {
     case "analyzing":
-      message = "写真からタイトルとカテゴリーを読み取っています…";
+      message = "写真から読み取っています…";
       break;
     case "filled":
       message = `写真から${status.fields
         .map((field) => FIELD_LABELS[field])
-        .join("と")}を入力しました。必要に応じて修正してください`;
+        .join("・")}を入力しました。必要に応じて修正してください`;
       break;
     case "nothing_to_fill":
       message = "写真を読み取りました（入力済みの項目はそのままにしています）";

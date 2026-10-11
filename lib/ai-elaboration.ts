@@ -8,7 +8,11 @@ import {
   type DiagnosisFact,
   type DiagnosisFeelingInput,
 } from "@/lib/ai-diagnosis";
-import { getCategoryLabel, getSeasonLabel } from "@/lib/clothing-options";
+import {
+  formatSeasons,
+  getCategoryLabel,
+  getSeasonLabel,
+} from "@/lib/clothing-options";
 import { DIAGNOSIS_TYPE_LABELS, LAST_WORN_LABELS } from "@/lib/decision-hints";
 import { getRecentWornBucket, type NextAction } from "@/lib/next-action";
 
@@ -94,6 +98,17 @@ export type ElaborationSnapshot = {
   nextAction: Pick<NextAction, "title">;
 };
 
+// 季節の表示。migration 012より前に保存された診断履歴は fact.season（単一値）を
+// 持つため、seasons がない場合はそちらを使う（履歴データは書き換えない）。
+function getFactSeasonsLabel(
+  fact: DiagnosisFact & { season?: string | null },
+): string {
+  if (Array.isArray(fact.seasons)) {
+    return formatSeasons(fact.seasons) ?? "未登録";
+  }
+  return fact.season ? getSeasonLabel(fact.season) : "未登録";
+}
+
 function findLabel<T extends string>(
   options: readonly { value: T; label: string }[],
   value: T,
@@ -144,7 +159,7 @@ export function buildElaborationPrompt(snapshot: ElaborationSnapshot): string {
     "",
     "【服の情報】",
     `カテゴリー: ${getCategoryLabel(fact.category)}`,
-    `シーズン: ${fact.season ? getSeasonLabel(fact.season) : "未登録"}`,
+    `シーズン: ${getFactSeasonsLabel(fact)}`,
     `現在の季節: ${CURRENT_SEASON_LABELS[fact.current_season]}`,
     `お気に入り登録: ${fact.favorite ? "あり" : "なし"}`,
     "",

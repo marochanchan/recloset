@@ -9,7 +9,11 @@ import {
   type ClosetFilters,
   type RawSearchParams,
 } from "@/lib/closet-filters";
-import { CATEGORY_OPTIONS, SEASON_OPTIONS } from "@/lib/clothing-options";
+import {
+  CATEGORY_OPTIONS,
+  SEASON_OPTIONS,
+  SEASON_VALUES,
+} from "@/lib/clothing-options";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -136,10 +140,16 @@ async function ClothingItemsList({
   let query = supabase
     .from("clothing_items")
     .select(
-      "id, title, brand, category, season, favorite, status, last_worn_at, is_public, clothing_images(image_path, sort_order)",
+      "id, title, brand, category, seasons, favorite, status, last_worn_at, is_public, clothing_images(image_path, sort_order)",
     );
   if (filters.category) query = query.eq("category", filters.category);
-  if (filters.season) query = query.eq("season", filters.season);
+  // 季節は「その季節を含む服」で絞り込む。オールシーズンは4季節すべてを含む服
+  if (filters.season) {
+    query = query.contains(
+      "seasons",
+      filters.season === "all" ? [...SEASON_VALUES] : [filters.season],
+    );
+  }
   if (filters.favorite) query = query.eq("favorite", true);
   if (filters.status) query = query.eq("status", filters.status);
 
@@ -229,7 +239,7 @@ async function ClothingItemsList({
               title={item.title}
               brand={item.brand}
               category={item.category}
-              season={item.season}
+              seasons={item.seasons ?? []}
               favorite={item.favorite}
               status={item.status}
               lastWornAt={item.last_worn_at}
