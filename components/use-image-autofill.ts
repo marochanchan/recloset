@@ -1,12 +1,16 @@
 "use client";
 
 import { analyzeClothingImageForAutofill } from "@/app/(main)/protected/items/new/actions";
-import { isSameSeasons, type SeasonValue } from "@/lib/clothing-options";
+import {
+  isSameSeasons,
+  isSubcategoryForCategory,
+  type SeasonValue,
+} from "@/lib/clothing-options";
 import { processImageForAnalysis, type ImageRotation } from "@/lib/image-processing";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // ============================================================
-// 登録フォームの「写真から自動入力」（タイトル・カテゴリー・季節）。
+// 登録フォームの「写真から自動入力」（タイトル・カテゴリー・種類・メインカラー・季節）。
 //
 // - 代表画像（並び順の先頭）1枚だけを解析する
 // - 解析対象は「画像のkey＋回転」で識別し、今の対象と違う結果は反映しない
@@ -15,13 +19,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // - 解析に成功した対象はもう一度送らない（同じ画像で無駄なリクエストをしない）
 // - 入力するのは「空」か「前回AIが入れた値のまま」の項目だけ。
 //   ユーザーが入力・修正した値は上書きしない
-// - 項目は AutofillValues に定義する（Step 4b の種類・色はここへ追加する）
+// - 項目は AutofillValues に定義する
+// - 種類は、カテゴリーを入れた後の値に属する場合だけ入れる（矛盾させない）
 // ============================================================
 
 /** 自動入力できる項目と、その値の型 */
 export type AutofillValues = {
   title: string;
   category: string;
+  /** 種類（空文字は未設定） */
+  subcategory: string;
+  /** メインカラー（空文字は未設定） */
+  mainColor: string;
   seasons: SeasonValue[];
 };
 
@@ -35,7 +44,8 @@ export type AutofillFieldBindings = {
   };
 };
 
-// 項目ごとの「空」と「同じ値」の判定
+// 項目ごとの「空」と「同じ値」の判定。並び順が入力する順番
+// （種類はカテゴリーの値を見て判定するため、カテゴリーより後に置く）
 const FIELD_RULES: {
   [K in AutofillField]: {
     isEmpty: (value: AutofillValues[K]) => boolean;
@@ -44,6 +54,8 @@ const FIELD_RULES: {
 } = {
   title: { isEmpty: (v) => v.trim() === "", isSame: (a, b) => a === b },
   category: { isEmpty: (v) => v === "", isSame: (a, b) => a === b },
+  subcategory: { isEmpty: (v) => v === "", isSame: (a, b) => a === b },
+  mainColor: { isEmpty: (v) => v === "", isSame: (a, b) => a === b },
   seasons: { isEmpty: (v) => v.length === 0, isSame: isSameSeasons },
 };
 
@@ -137,6 +149,8 @@ export function useImageAutofill({
       const suggestions: Partial<AutofillValues> = {};
       if (result.title) suggestions.title = result.title;
       if (result.category) suggestions.category = result.category;
+      if (result.subcategory) suggestions.subcategory = result.subcategory;
+      if (result.mainColor) suggestions.mainColor = result.mainColor;
       if (result.seasons && result.seasons.length > 0) {
         suggestions.seasons = result.seasons;
       }
@@ -144,6 +158,8 @@ export function useImageAutofill({
       const current = latest.current;
       const filled: AutofillField[] = [];
       const nextAiValues: Partial<AutofillValues> = { ...current.aiValues };
+      // 種類の判定に使う「入力後のカテゴリー」
+      let effectiveCategory = current.fields.category.value;
 
       const fillField = <K extends AutofillField>(field: K) => {
         const suggestion = suggestions[field] as AutofillValues[K] | undefined;
@@ -158,14 +174,22 @@ export function useImageAutofill({
           (previousAiValue !== undefined &&
             rules.isSame(binding.value, previousAiValue));
         if (!canFill) return;
+        // ユーザーが選んだカテゴリーに属さない種類は入れない
+        if (
+          field === "subcategory" &&
+          !isSubcategoryForCategory(effectiveCategory, suggestion)
+        ) {
+          return;
+        }
         binding.set(suggestion);
         nextAiValues[field] = suggestion;
         filled.push(field);
+        if (field === "category") effectiveCategory = suggestion as string;
       };
       for (const field of AUTOFILL_FIELDS) fillField(field);
 
       setAiValues(nextAiValues);
-      setNeedsCheckFields(result.seasonsNeedsCheck ? ["seasons"] : []);
+      setNeedsCheckFields(result.needsCheck);
       setStatus(
         filled.length > 0
           ? { kind: "filled", fields: filled }

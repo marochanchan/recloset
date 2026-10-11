@@ -10,6 +10,8 @@ import { Loader2, Sparkles } from "lucide-react";
 const FIELD_LABELS: Record<AutofillField, string> = {
   title: "タイトル",
   category: "カテゴリー",
+  subcategory: "種類",
+  mainColor: "メインカラー",
   seasons: "季節",
 };
 

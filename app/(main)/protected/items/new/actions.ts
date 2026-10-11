@@ -3,8 +3,12 @@
 import { analyzeClothingImage } from "@/lib/clothing-image-analysis";
 import {
   CATEGORY_OPTIONS,
+  isColorValue,
+  isSubcategoryForCategory,
   normalizeSeasons,
+  type ColorValue,
   type SeasonValue,
+  type SubcategoryValue,
 } from "@/lib/clothing-options";
 import { createClient } from "@/lib/supabase/server";
 
@@ -43,21 +47,29 @@ function isJpeg(bytes: Uint8Array): boolean {
 
 type CategoryValue = (typeof CATEGORY_OPTIONS)[number]["value"];
 
+/** 写真だけでは判断しにくく、ユーザーに確認を促す項目 */
+export type AutofillNeedsCheckField = "seasons" | "subcategory" | "mainColor";
+
 export type ClothingImageAutofillResult =
   | {
       ok: true;
       isClothing: boolean;
       title: string | null;
       category: CategoryValue | null;
+      /** 種類の候補。category に属さない値・判定できなかった場合はnull */
+      subcategory: SubcategoryValue | null;
+      /** メインカラーの候補。判定できなかった場合はnull */
+      mainColor: ColorValue | null;
       /** 着られる季節の候補。判定できなかった場合はnull（未設定のままにする） */
       seasons: SeasonValue[] | null;
-      /** 季節は写真だけでは判断しにくいため、確認を促す場合にtrue */
-      seasonsNeedsCheck: boolean;
+      /** 確信度が低いなど、確認を促す項目（値を返した項目だけ） */
+      needsCheck: AutofillNeedsCheckField[];
     }
   | { ok: false; error: string };
 
 /**
- * 登録フォームの代表画像1枚をAIで解析し、タイトル・カテゴリー・季節の候補を返す。
+ * 登録フォームの代表画像1枚をAIで解析し、タイトル・カテゴリー・種類・
+ * メインカラー・季節の候補を返す（解析は1回）。
  * - 認証済みユーザーだけが使える（user_idはクライアントから受け取らない）
  * - 画像・解析結果はStorageにもDBにも保存しない
  * - 失敗してもフォームの通常の登録は続けられるよう、短い案内文だけを返す
@@ -101,8 +113,10 @@ export async function analyzeClothingImageForAutofill(
         isClothing: false,
         title: null,
         category: null,
+        subcategory: null,
+        mainColor: null,
         seasons: null,
-        seasonsNeedsCheck: false,
+        needsCheck: [],
       };
     }
 
@@ -113,19 +127,49 @@ export async function analyzeClothingImageForAutofill(
     const title =
       analysis.suggested_title?.trim().slice(0, MAX_TITLE_LENGTH) || null;
 
+    // 種類はカテゴリーに属するものだけ（例: outer なのにカーディガン、は捨てる）
+    const subcategory =
+      category && isSubcategoryForCategory(category, analysis.subcategory)
+        ? analysis.subcategory
+        : null;
+    const mainColor = isColorValue(analysis.main_color)
+      ? analysis.main_color
+      : null;
     const seasons = normalizeSeasons(analysis.suggested_seasons);
-    const seasonsNeedsCheck =
+
+    // 確信度が low、またはAIが確認を求めた項目（値を返した項目だけ）
+    const needsCheck: AutofillNeedsCheckField[] = [];
+    if (
       seasons.length > 0 &&
       (analysis.confidence.seasons === "low" ||
-        analysis.needs_user_check.includes("seasons"));
+        analysis.needs_user_check.includes("seasons"))
+    ) {
+      needsCheck.push("seasons");
+    }
+    if (
+      subcategory &&
+      (analysis.confidence.subcategory === "low" ||
+        analysis.needs_user_check.includes("subcategory"))
+    ) {
+      needsCheck.push("subcategory");
+    }
+    if (
+      mainColor &&
+      (analysis.confidence.color === "low" ||
+        analysis.needs_user_check.includes("color"))
+    ) {
+      needsCheck.push("mainColor");
+    }
 
     return {
       ok: true,
       isClothing: true,
       title,
       category,
+      subcategory,
+      mainColor,
       seasons: seasons.length > 0 ? seasons : null,
-      seasonsNeedsCheck,
+      needsCheck,
     };
   } catch (error) {
     // 画像やAPIキーはログに出さない（エラーの種類だけを残す）

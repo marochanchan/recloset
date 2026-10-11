@@ -26,6 +26,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   CATEGORY_OPTIONS,
+  COLOR_OPTIONS,
+  getSubcategoryOptions,
+  isColorValue,
+  isSubcategoryForCategory,
   normalizeSeasons,
   toLegacySeason,
   type SeasonValue,
@@ -65,6 +69,10 @@ export type ClothingItemFormInitialValues = {
   title: string;
   brand: string | null;
   category: string;
+  /** 種類（migration 013）。nullは未設定 */
+  subcategory: string | null;
+  /** メインカラー（migration 013）。nullは未設定 */
+  mainColor: string | null;
   /** 着られる季節（migration 012）。空配列は未設定 */
   seasons: string[];
   purchaseDate: string | null;
@@ -95,6 +103,25 @@ export function ClothingItemForm({
   const [title, setTitle] = useState(initialValues?.title ?? "");
   const [brand, setBrand] = useState(initialValues?.brand ?? "");
   const [category, setCategory] = useState(initialValues?.category ?? "");
+  // 種類・メインカラー（空文字は未設定）。種類はカテゴリーに属する値だけを持つ
+  const [subcategory, setSubcategory] = useState(() =>
+    isSubcategoryForCategory(
+      initialValues?.category ?? "",
+      initialValues?.subcategory,
+    )
+      ? (initialValues?.subcategory ?? "")
+      : "",
+  );
+  const [mainColor, setMainColor] = useState(() =>
+    isColorValue(initialValues?.mainColor) ? (initialValues?.mainColor ?? "") : "",
+  );
+  // カテゴリーを変えたとき（手動・AIどちらでも）、合わなくなった種類は空に戻す
+  const changeCategory = (value: string) => {
+    setCategory(value);
+    setSubcategory((current) =>
+      isSubcategoryForCategory(value, current) ? current : "",
+    );
+  };
   const [seasons, setSeasons] = useState<SeasonValue[]>(() =>
     normalizeSeasons(initialValues?.seasons),
   );
@@ -154,7 +181,9 @@ export function ClothingItemForm({
         : null,
     fields: {
       title: { value: title, set: setTitle },
-      category: { value: category, set: setCategory },
+      category: { value: category, set: changeCategory },
+      subcategory: { value: subcategory, set: setSubcategory },
+      mainColor: { value: mainColor, set: setMainColor },
       seasons: { value: seasons, set: setSeasons },
     },
   });
@@ -163,6 +192,8 @@ export function ClothingItemForm({
     setTitle("");
     setBrand("");
     setCategory("");
+    setSubcategory("");
+    setMainColor("");
     setSeasons([]);
     setPurchaseDate("");
     setPurchasePrice("");
@@ -239,6 +270,11 @@ export function ClothingItemForm({
         title,
         brand: brand || null,
         category,
+        // 種類はカテゴリーに属する値、メインカラーは選択肢にある値だけを保存する
+        subcategory: isSubcategoryForCategory(category, subcategory)
+          ? subcategory
+          : null,
+        main_color: isColorValue(mainColor) ? mainColor : null,
         seasons,
         // 旧season列（互換用）: 4季節→'all'、1季節→その値、それ以外→null
         season: toLegacySeason(seasons),
@@ -507,7 +543,7 @@ export function ClothingItemForm({
                   required
                   className={selectClassName}
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => changeCategory(e.target.value)}
                 >
                   <option value="" disabled>
                     選択してください
@@ -518,6 +554,51 @@ export function ClothingItemForm({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* 種類はカテゴリーごとに選択肢が変わる（シューズ・バッグ・その他にはない） */}
+              {getSubcategoryOptions(category).length > 0 && (
+                <div className="grid gap-2">
+                  <Label htmlFor="subcategory" className="flex items-center gap-2">
+                    種類
+                    {autofill.isAiValue("subcategory") && <AiBadge />}
+                  </Label>
+                  <select
+                    id="subcategory"
+                    className={selectClassName}
+                    value={subcategory}
+                    onChange={(e) => setSubcategory(e.target.value)}
+                  >
+                    <option value="">未選択</option>
+                    {getSubcategoryOptions(category).map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {autofill.needsCheck("subcategory") && <NeedsCheckNote />}
+                </div>
+              )}
+
+              <div className="grid gap-2">
+                <Label htmlFor="main-color" className="flex items-center gap-2">
+                  メインカラー
+                  {autofill.isAiValue("mainColor") && <AiBadge />}
+                </Label>
+                <select
+                  id="main-color"
+                  className={selectClassName}
+                  value={mainColor}
+                  onChange={(e) => setMainColor(e.target.value)}
+                >
+                  <option value="">未選択</option>
+                  {COLOR_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {autofill.needsCheck("mainColor") && <NeedsCheckNote />}
               </div>
 
               <div className="grid gap-2">
@@ -663,5 +744,14 @@ function AiBadge() {
     <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
       写真から入力
     </span>
+  );
+}
+
+// AIの確信度が低い項目に添える注意書き
+function NeedsCheckNote() {
+  return (
+    <p className="text-sm text-muted-foreground">
+      写真だけでは判断しにくいため、確認してください
+    </p>
   );
 }
