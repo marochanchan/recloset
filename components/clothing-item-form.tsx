@@ -12,7 +12,9 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ClothingImageThumbnail } from "@/components/clothing-image-thumbnail";
+import { ImageAutofillStatus } from "@/components/image-autofill-status";
 import { ImageLightbox } from "@/components/image-lightbox";
+import { useImageAutofill } from "@/components/use-image-autofill";
 import {
   MAX_IMAGE_COUNT,
   useClothingImages,
@@ -143,6 +145,25 @@ export function ClothingItemForm({
     resetImages,
   } = useClothingImages({ initialImages, onError: setError });
 
+  // 新規登録では、代表画像（先頭）からタイトル・カテゴリーを自動入力する
+  const representativeImage = activeImages[0];
+  const autofill = useImageAutofill({
+    enabled: !isEdit,
+    target:
+      representativeImage?.kind === "new" &&
+      representativeImage.processed &&
+      !representativeImage.isProcessing
+        ? {
+            key: representativeImage.key,
+            rotation: representativeImage.rotation,
+            sourceFile: representativeImage.sourceFile,
+          }
+        : null,
+    title,
+    category,
+    setTitle,
+    setCategory,
+  });
 
   const resetForm = () => {
     setTitle("");
@@ -442,7 +463,10 @@ export function ClothingItemForm({
           <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
-                <Label htmlFor="title">タイトル *</Label>
+                <Label htmlFor="title" className="flex items-center gap-2">
+                  タイトル *
+                  {autofill.isAiValue("title", title) && <AiBadge />}
+                </Label>
                 <Input
                   id="title"
                   type="text"
@@ -463,7 +487,10 @@ export function ClothingItemForm({
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="category">カテゴリー *</Label>
+                <Label htmlFor="category" className="flex items-center gap-2">
+                  カテゴリー *
+                  {autofill.isAiValue("category", category) && <AiBadge />}
+                </Label>
                 <select
                   id="category"
                   required
@@ -613,6 +640,13 @@ export function ClothingItemForm({
                   )}
                   枚まで追加できます。画像を押すと拡大・回転できます
                 </p>
+                {!isEdit && (
+                  <ImageAutofillStatus
+                    status={autofill.status}
+                    canAnalyze={autofill.canAnalyze}
+                    onAnalyze={autofill.analyzeNow}
+                  />
+                )}
                 <ImageLightbox
                   src={
                     lightboxImage === null
@@ -708,5 +742,14 @@ export function ClothingItemForm({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// 写真からAIが入力した値の目印（ユーザーが修正すると消える）
+function AiBadge() {
+  return (
+    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+      写真から入力
+    </span>
   );
 }
