@@ -11,6 +11,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ClothingImageThumbnail } from "@/components/clothing-image-thumbnail";
+import { ImageLightbox } from "@/components/image-lightbox";
+import {
+  MAX_IMAGE_COUNT,
+  useClothingImages,
+  type ExistingClothingImage,
+  type ExistingImageItem,
+  type NewImageItem,
+} from "@/components/use-clothing-images";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CATEGORY_OPTIONS, SEASON_OPTIONS } from "@/lib/clothing-options";
@@ -20,24 +29,16 @@ import {
   validateMarketplaceUrl,
   type MarketplaceService,
 } from "@/lib/marketplace-urls";
-import { GripVertical } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 const selectClassName = cn(
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
 );
 
-const MAX_IMAGE_COUNT = 5;
+// 保存する（縮小・再エンコード後の）画像の上限。Storageバケットの上限と同じ
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
-const MIME_TO_EXTENSION: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
 
 // (clothing_item_id, sort_order) のUNIQUE制約と衝突しないよう、
 // 既存画像の並び替え中だけ一時的に使う退避用オフセット。
@@ -50,12 +51,8 @@ type SavedItemState = {
   failedImages: number;
 };
 
-export type ExistingClothingImage = {
-  id: string;
-  imagePath: string;
-  sortOrder: number;
-  url: string;
-};
+// 既存の呼び出し側（編集画面など）向けに、画像の型をここからも参照できるようにする
+export type { ExistingClothingImage };
 
 export type ClothingItemFormInitialValues = {
   title: string;
@@ -68,24 +65,6 @@ export type ClothingItemFormInitialValues = {
   marketplaceUrls: Record<MarketplaceService, string | null>;
 };
 
-// 既存画像・新規選択画像を1つの並び順として扱うための統合表現。
-type ExistingImageItem = {
-  kind: "existing";
-  key: string;
-  id: string;
-  imagePath: string;
-  url: string;
-  pendingDelete: boolean;
-};
-
-type NewImageItem = {
-  kind: "new";
-  key: string;
-  file: File;
-  previewUrl: string;
-};
-
-type ImageItem = ExistingImageItem | NewImageItem;
 
 type ClothingItemFormProps = {
   mode?: "create" | "edit";
@@ -135,188 +114,35 @@ export function ClothingItemForm({
     ),
   );
 
-  // 既存画像＋新規選択画像を、画面に表示している順番そのままで保持する。
-  // 「削除」は既存画像をpendingDelete:trueにするだけで、保存するまでは
-  // DB・Storageへは一切アクセスしない。
-  const [images, setImages] = useState<ImageItem[]>(() =>
-    initialImages.map((img) => ({
-      kind: "existing" as const,
-      key: img.id,
-      id: img.id,
-      imagePath: img.imagePath,
-      url: img.url,
-      pendingDelete: false,
-    })),
-  );
-  const [confirmingKey, setConfirmingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [savedItem, setSavedItem] = useState<SavedItemState | null>(null);
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const {
+    images,
+    activeImages,
+    isPreparingImages,
+    fileInputRef,
+    confirmingKey,
+    setConfirmingKey,
+    lightboxImage,
+    setLightboxKey,
+    draggingKey,
+    dragOverKey,
+    isDraggableImage,
+    registerItemRef,
+    handleImagesChange,
+    handleRotateNewImage,
+    handleRemoveNewImage,
+    handleMarkImageForDeletion,
+    handleRestoreImage,
+    handleCancelDeleteImage,
+    handleDragHandlePointerDown,
+    handleDragHandlePointerMove,
+    handleDragHandlePointerUp,
+    resetImages,
+  } = useClothingImages({ initialImages, onError: setError });
 
-  // 新規画像のローカルプレビュー用object URL。削除時・アンマウント時に
-  // 必ずrevokeし、不要なURLを残さない。
-  const objectUrlsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    // objectUrlsRef.current は再代入されず、常に同じSetを変更し続けるため、
-    // ここで捕まえた参照はアンマウント時点の最新の内容を指す。
-    const urls = objectUrlsRef.current;
-    return () => {
-      urls.forEach((url) => URL.revokeObjectURL(url));
-      urls.clear();
-    };
-  }, []);
-
-  const activeImages = images.filter(
-    (img) => !(img.kind === "existing" && img.pendingDelete),
-  );
-
-  const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files ? Array.from(e.target.files) : [];
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-    if (files.length === 0) return;
-
-    const activeCount = images.filter(
-      (img) => !(img.kind === "existing" && img.pendingDelete),
-    ).length;
-    const remainingSlots = MAX_IMAGE_COUNT - activeCount;
-
-    if (files.length > remainingSlots) {
-      setError(
-        `画像は合計${MAX_IMAGE_COUNT}枚までです（追加できるのは残り${Math.max(remainingSlots, 0)}枚です）`,
-      );
-      return;
-    }
-
-    setError(null);
-    const newItems: NewImageItem[] = files.map((file) => {
-      const previewUrl = URL.createObjectURL(file);
-      objectUrlsRef.current.add(previewUrl);
-      return { kind: "new", key: crypto.randomUUID(), file, previewUrl };
-    });
-    setImages((prev) => [...prev, ...newItems]);
-  };
-
-  // ドラッグ＆ドロップ（PC）／タッチ操作（スマホ）での並び替え。
-  // Pointer Eventsはマウス・タッチ・ペンを同じイベントで扱えるため、
-  // 新しいライブラリを追加せずにPC/スマホ両対応の並び替えを実装している。
-  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const [draggingKey, setDraggingKey] = useState<string | null>(null);
-  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-
-  const isDraggableImage = (img: ImageItem) =>
-    !(img.kind === "existing" && img.pendingDelete);
-
-  const registerItemRef = (key: string) => (el: HTMLDivElement | null) => {
-    if (el) {
-      itemRefs.current.set(key, el);
-    } else {
-      itemRefs.current.delete(key);
-    }
-  };
-
-  const moveImageToTarget = (draggedKey: string, targetKey: string) => {
-    if (draggedKey === targetKey) return;
-    setImages((prev) => {
-      const fromIndex = prev.findIndex((img) => img.key === draggedKey);
-      const toIndex = prev.findIndex((img) => img.key === targetKey);
-      if (fromIndex === -1 || toIndex === -1) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
-  };
-
-  const handleDragHandlePointerDown = (
-    e: React.PointerEvent<HTMLDivElement>,
-    key: string,
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setDraggingKey(key);
-    setDragOverKey(key);
-  };
-
-  // setPointerCaptureにより、ドラッグ開始後のpointermove/pointerupは
-  // ポインタの実際の位置に関わらず常にこのハンドル要素に届く。
-  // そのうえで、他の画像要素の中心との距離を比較して最も近いものを
-  // ドロップ先として判定する（flex-wrapで複数行になっても機能する）。
-  const handleDragHandlePointerMove = (
-    e: React.PointerEvent<HTMLDivElement>,
-  ) => {
-    if (!draggingKey) return;
-
-    let nearestKey: string | null = null;
-    let nearestDistance = Infinity;
-
-    itemRefs.current.forEach((el, key) => {
-      if (key === draggingKey) return;
-      const target = images.find((img) => img.key === key);
-      if (!target || !isDraggableImage(target)) return;
-
-      const rect = el.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const distance = Math.hypot(e.clientX - centerX, e.clientY - centerY);
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestKey = key;
-      }
-    });
-
-    setDragOverKey(nearestKey ?? draggingKey);
-  };
-
-  const handleDragHandlePointerUp = () => {
-    if (draggingKey && dragOverKey && draggingKey !== dragOverKey) {
-      moveImageToTarget(draggingKey, dragOverKey);
-    }
-    setDraggingKey(null);
-    setDragOverKey(null);
-  };
-
-  const handleRemoveNewImage = (item: NewImageItem) => {
-    URL.revokeObjectURL(item.previewUrl);
-    objectUrlsRef.current.delete(item.previewUrl);
-    setImages((prev) => prev.filter((img) => img.key !== item.key));
-  };
-
-  /**
-   * 「この画像を削除しますか？」の確認後、削除予定stateに切り替えるだけの処理。
-   * ここではDB・Storageへは一切アクセスしない
-   * （保存するボタンを押すまで実際の削除は確定しない）。
-   */
-  const handleMarkImageForDeletion = (item: ExistingImageItem) => {
-    setImages((prev) =>
-      prev.map((img) =>
-        img.key === item.key && img.kind === "existing"
-          ? { ...img, pendingDelete: true }
-          : img,
-      ),
-    );
-    setConfirmingKey(null);
-  };
-
-  /** 削除予定を取り消し、通常の既存画像として復帰させる。 */
-  const handleRestoreImage = (item: ExistingImageItem) => {
-    setImages((prev) =>
-      prev.map((img) =>
-        img.key === item.key && img.kind === "existing"
-          ? { ...img, pendingDelete: false }
-          : img,
-      ),
-    );
-  };
-
-  /** 確認段階をキャンセルする。DB・Storageには一切変更を加えない。 */
-  const handleCancelDeleteImage = () => {
-    setConfirmingKey(null);
-  };
 
   const resetForm = () => {
     setTitle("");
@@ -328,17 +154,8 @@ export function ClothingItemForm({
     setFavorite(false);
     setMarketplaceUrls({ mercari: "", rakuma: "", yahooFurima: "" });
     setMarketplaceUrlErrors({});
-    images.forEach((img) => {
-      if (img.kind === "new") {
-        URL.revokeObjectURL(img.previewUrl);
-        objectUrlsRef.current.delete(img.previewUrl);
-      }
-    });
-    setImages([]);
+    resetImages();
     setError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -375,18 +192,12 @@ export function ClothingItemForm({
       setError(`画像は合計${MAX_IMAGE_COUNT}枚までです`);
       return;
     }
-    if (
-      newImages.some(
-        (img) =>
-          !ALLOWED_IMAGE_TYPES.includes(
-            img.file.type as (typeof ALLOWED_IMAGE_TYPES)[number],
-          ),
-      )
-    ) {
-      setError("対応していない画像形式が含まれています（JPEG/PNG/WebPのみ）");
+    // 新しい画像は、縮小・再エンコードが終わったものだけを保存する
+    if (newImages.some((img) => img.isProcessing || !img.processed)) {
+      setError("画像を準備しています。少し待ってから保存してください");
       return;
     }
-    if (newImages.some((img) => img.file.size > MAX_IMAGE_SIZE)) {
+    if (newImages.some((img) => (img.processed?.size ?? 0) > MAX_IMAGE_SIZE)) {
       setError("10MBを超える画像が含まれています");
       return;
     }
@@ -482,14 +293,15 @@ export function ClothingItemForm({
       let failedImages = 0;
       for (let i = 0; i < orderedActiveImages.length; i++) {
         const image = orderedActiveImages[i];
-        if (image.kind !== "new") continue;
+        if (image.kind !== "new" || !image.processed) continue;
         try {
-          const ext = MIME_TO_EXTENSION[image.file.type];
-          const path = `${user.id}/${targetItemId}/${crypto.randomUUID()}.${ext}`;
+          // 保存するのは元のファイルではなく、向き補正・回転・縮小した
+          // JPEG（EXIF・位置情報等を含まない）
+          const path = `${user.id}/${targetItemId}/${crypto.randomUUID()}.jpg`;
 
           const { error: uploadError } = await supabase.storage
             .from("clothing-images")
-            .upload(path, image.file, { contentType: image.file.type });
+            .upload(path, image.processed, { contentType: "image/jpeg" });
           if (uploadError) throw uploadError;
 
           const { error: imageInsertError } = await supabase
@@ -727,123 +539,57 @@ export function ClothingItemForm({
                       {images.map((image) => {
                         const isPendingDelete =
                           image.kind === "existing" && image.pendingDelete;
-                        const isConfirming = confirmingKey === image.key;
-                        const canDrag = isDraggableImage(image);
-                        const isDragging = draggingKey === image.key;
-                        const isDragOverTarget =
-                          draggingKey !== null &&
-                          draggingKey !== image.key &&
-                          dragOverKey === image.key;
-                        const previewSrc =
-                          image.kind === "existing"
-                            ? image.url
-                            : image.previewUrl;
 
                         return (
-                          <div
+                          <ClothingImageThumbnail
                             key={image.key}
-                            ref={registerItemRef(image.key)}
-                            className={cn(
-                              "flex w-28 flex-col items-center gap-1",
-                              isDragging && "opacity-50",
-                            )}
-                          >
-                            <div
-                              className={cn(
-                                "relative h-28 w-28 overflow-hidden rounded-md border bg-muted",
-                                isPendingDelete && "opacity-40",
-                                isDragOverTarget && "ring-2 ring-primary",
-                              )}
-                            >
-                              <Image
-                                src={previewSrc}
-                                alt=""
-                                fill
-                                sizes="112px"
-                                className="object-contain"
-                                style={{ objectFit: "contain" }}
-                                unoptimized={image.kind === "new"}
-                              />
-
-                              {canDrag && !isConfirming && (
-                                <div
-                                  role="button"
-                                  aria-label="ドラッグして並び替え"
-                                  title="ドラッグして並び替え"
-                                  className="absolute right-1 top-1 flex h-6 w-6 touch-none cursor-grab items-center justify-center rounded-md bg-background/80 text-muted-foreground active:cursor-grabbing"
-                                  onPointerDown={(e) =>
-                                    handleDragHandlePointerDown(
-                                      e,
-                                      image.key,
-                                    )
-                                  }
-                                  onPointerMove={handleDragHandlePointerMove}
-                                  onPointerUp={handleDragHandlePointerUp}
-                                  onPointerCancel={handleDragHandlePointerUp}
-                                >
-                                  <GripVertical className="h-4 w-4" />
-                                </div>
-                              )}
-                            </div>
-
-                            {image.kind === "existing" &&
-                            image.pendingDelete ? (
-                              <>
-                                <p className="text-xs text-destructive">
-                                  削除予定
-                                </p>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 w-full px-1 text-xs"
-                                  onClick={() => handleRestoreImage(image)}
-                                >
-                                  元に戻す
-                                </Button>
-                              </>
-                            ) : image.kind === "existing" && isConfirming ? (
-                              <div className="flex w-full flex-col gap-1 rounded-md border border-destructive/50 p-1.5">
-                                <p className="text-center text-[11px] text-destructive">
-                                  この画像を削除しますか？
-                                </p>
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="sm"
-                                  className="h-7 w-full px-1 text-[11px]"
-                                  onClick={() =>
-                                    handleMarkImageForDeletion(image)
-                                  }
-                                >
-                                  画像を削除する
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 w-full px-1 text-[11px]"
-                                  onClick={handleCancelDeleteImage}
-                                >
-                                  キャンセル
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-7 w-full px-1 text-xs"
-                                onClick={() =>
-                                  image.kind === "existing"
-                                    ? setConfirmingKey(image.key)
-                                    : handleRemoveNewImage(image)
-                                }
-                              >
-                                削除
-                              </Button>
-                            )}
-                          </div>
+                            src={
+                              image.kind === "existing"
+                                ? image.url
+                                : image.previewUrl
+                            }
+                            kind={image.kind}
+                            isProcessing={
+                              image.kind === "new" && image.isProcessing
+                            }
+                            isPendingDelete={isPendingDelete}
+                            isConfirmingDelete={confirmingKey === image.key}
+                            canDrag={isDraggableImage(image)}
+                            isDragging={draggingKey === image.key}
+                            isDragOverTarget={
+                              draggingKey !== null &&
+                              draggingKey !== image.key &&
+                              dragOverKey === image.key
+                            }
+                            itemRef={registerItemRef(image.key)}
+                            onOpen={() => setLightboxKey(image.key)}
+                            onRotate={() => {
+                              if (image.kind === "new") {
+                                handleRotateNewImage(image);
+                              }
+                            }}
+                            onDelete={() =>
+                              image.kind === "existing"
+                                ? setConfirmingKey(image.key)
+                                : handleRemoveNewImage(image)
+                            }
+                            onConfirmDelete={() => {
+                              if (image.kind === "existing") {
+                                handleMarkImageForDeletion(image);
+                              }
+                            }}
+                            onCancelDelete={handleCancelDeleteImage}
+                            onRestore={() => {
+                              if (image.kind === "existing") {
+                                handleRestoreImage(image);
+                              }
+                            }}
+                            onDragPointerDown={(e) =>
+                              handleDragHandlePointerDown(e, image.key)
+                            }
+                            onDragPointerMove={handleDragHandlePointerMove}
+                            onDragPointerUp={handleDragHandlePointerUp}
+                          />
                         );
                       })}
                     </div>
@@ -855,7 +601,7 @@ export function ClothingItemForm({
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept="image/jpeg,image/png,image/webp"
+                  accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
                   onChange={handleImagesChange}
                   className={selectClassName}
                 />
@@ -865,8 +611,27 @@ export function ClothingItemForm({
                     MAX_IMAGE_COUNT - activeImages.length,
                     0,
                   )}
-                  枚まで追加できます
+                  枚まで追加できます。画像を押すと拡大・回転できます
                 </p>
+                <ImageLightbox
+                  src={
+                    lightboxImage === null
+                      ? null
+                      : lightboxImage.kind === "existing"
+                        ? lightboxImage.url
+                        : lightboxImage.previewUrl
+                  }
+                  alt="選択した画像"
+                  onClose={() => setLightboxKey(null)}
+                  onRotate={
+                    lightboxImage?.kind === "new"
+                      ? () => handleRotateNewImage(lightboxImage)
+                      : undefined
+                  }
+                  isProcessing={
+                    lightboxImage?.kind === "new" && lightboxImage.isProcessing
+                  }
+                />
               </div>
 
               <div className="flex items-center gap-2">
@@ -923,8 +688,14 @@ export function ClothingItemForm({
               </details>
 
               {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isLoading || isPreparingImages}
+              >
+                {isPreparingImages && !isLoading
+                  ? "画像を準備中..."
+                  : isLoading
                   ? isEdit
                     ? "保存中..."
                     : "登録中..."
