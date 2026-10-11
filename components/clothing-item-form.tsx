@@ -10,10 +10,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ClothingImageThumbnail } from "@/components/clothing-image-thumbnail";
+import { ClothingImageSection } from "@/components/clothing-image-section";
+import { FavoriteToggle } from "@/components/favorite-toggle";
 import { ImageAutofillStatus } from "@/components/image-autofill-status";
-import { ImageLightbox } from "@/components/image-lightbox";
 import { useImageAutofill } from "@/components/use-image-autofill";
 import {
   MAX_IMAGE_COUNT,
@@ -116,34 +115,19 @@ export function ClothingItemForm({
     ),
   );
 
+  // 購入日・購入価格は「詳しく入力」に折りたたむ（編集時に値があれば開いておく）
+  const [isDetailsOpen, setIsDetailsOpen] = useState(
+    () =>
+      Boolean(initialValues?.purchaseDate) ||
+      initialValues?.purchasePrice != null,
+  );
+
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [savedItem, setSavedItem] = useState<SavedItemState | null>(null);
   const router = useRouter();
-  const {
-    images,
-    activeImages,
-    isPreparingImages,
-    fileInputRef,
-    confirmingKey,
-    setConfirmingKey,
-    lightboxImage,
-    setLightboxKey,
-    draggingKey,
-    dragOverKey,
-    isDraggableImage,
-    registerItemRef,
-    handleImagesChange,
-    handleRotateNewImage,
-    handleRemoveNewImage,
-    handleMarkImageForDeletion,
-    handleRestoreImage,
-    handleCancelDeleteImage,
-    handleDragHandlePointerDown,
-    handleDragHandlePointerMove,
-    handleDragHandlePointerUp,
-    resetImages,
-  } = useClothingImages({ initialImages, onError: setError });
+  const imageState = useClothingImages({ initialImages, onError: setError });
+  const { images, activeImages, isPreparingImages, resetImages } = imageState;
 
   // 新規登録では、代表画像（先頭）からタイトル・カテゴリーを自動入力する
   const representativeImage = activeImages[0];
@@ -460,8 +444,33 @@ export function ClothingItemForm({
         </CardHeader>
         <CardContent>
           <p className="mb-4 text-xs text-muted-foreground">* 必須項目</p>
-          <form onSubmit={handleSubmit}>
+          <form
+            onSubmit={handleSubmit}
+            onInvalidCapture={(e) => {
+              // 閉じた折りたたみの中の入力が不正な場合は、開いて見えるようにする
+              const details = (e.target as HTMLElement).closest("details");
+              if (details && !details.open) details.open = true;
+            }}
+          >
             <div className="flex flex-col gap-6">
+              <ClothingImageSection
+                imageState={imageState}
+                description={
+                  isEdit
+                    ? "写真を追加・並べ替え・削除できます"
+                    : "写真からタイトルとカテゴリーを自動入力できます。写真なしでも登録できます"
+                }
+                autofillStatus={
+                  isEdit ? undefined : (
+                    <ImageAutofillStatus
+                      status={autofill.status}
+                      canAnalyze={autofill.canAnalyze}
+                      onAnalyze={autofill.analyzeNow}
+                    />
+                  )
+                }
+              />
+
               <div className="grid gap-2">
                 <Label htmlFor="title" className="flex items-center gap-2">
                   タイトル *
@@ -473,16 +482,6 @@ export function ClothingItemForm({
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="brand">ブランド</Label>
-                <Input
-                  id="brand"
-                  type="text"
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
                 />
               </div>
 
@@ -510,6 +509,16 @@ export function ClothingItemForm({
               </div>
 
               <div className="grid gap-2">
+                <Label htmlFor="brand">ブランド</Label>
+                <Input
+                  id="brand"
+                  type="text"
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                />
+              </div>
+
+              <div className="grid gap-2">
                 <Label htmlFor="season">シーズン</Label>
                 <select
                   id="season"
@@ -526,156 +535,46 @@ export function ClothingItemForm({
                 </select>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="purchase-date">購入日（任意）</Label>
-                <Input
-                  id="purchase-date"
-                  type="date"
-                  value={purchaseDate}
-                  onChange={(e) => setPurchaseDate(e.target.value)}
-                />
-                <p className="text-sm text-muted-foreground">
-                  わからない場合は空欄でOKです
-                </p>
-              </div>
+              <FavoriteToggle checked={favorite} onCheckedChange={setFavorite} />
 
-              <div className="grid gap-2">
-                <Label htmlFor="purchase-price">購入価格（税込・任意）</Label>
-                <Input
-                  id="purchase-price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={purchasePrice}
-                  onChange={(e) => setPurchasePrice(e.target.value)}
-                />
-                <p className="text-sm text-muted-foreground">
-                  税込価格。わからない場合は空欄でOKです
-                </p>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="images">画像（任意・最大{MAX_IMAGE_COUNT}枚）</Label>
-
-                {images.length > 0 && (
-                  <>
+              <details
+                className="rounded-md border px-3 py-2"
+                open={isDetailsOpen}
+                onToggle={(e) => setIsDetailsOpen(e.currentTarget.open)}
+              >
+                <summary className="cursor-pointer text-sm font-medium">
+                  詳しく入力（任意）
+                </summary>
+                <div className="flex flex-col gap-6 pb-1 pt-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="purchase-date">購入日（任意）</Label>
+                    <Input
+                      id="purchase-date"
+                      type="date"
+                      value={purchaseDate}
+                      onChange={(e) => setPurchaseDate(e.target.value)}
+                    />
                     <p className="text-sm text-muted-foreground">
-                      最大{MAX_IMAGE_COUNT}枚・先頭がメイン画像になります
+                      わからない場合は空欄でOKです
                     </p>
-                    <div className="flex flex-wrap gap-3">
-                      {images.map((image) => {
-                        const isPendingDelete =
-                          image.kind === "existing" && image.pendingDelete;
+                  </div>
 
-                        return (
-                          <ClothingImageThumbnail
-                            key={image.key}
-                            src={
-                              image.kind === "existing"
-                                ? image.url
-                                : image.previewUrl
-                            }
-                            kind={image.kind}
-                            isProcessing={
-                              image.kind === "new" && image.isProcessing
-                            }
-                            isPendingDelete={isPendingDelete}
-                            isConfirmingDelete={confirmingKey === image.key}
-                            canDrag={isDraggableImage(image)}
-                            isDragging={draggingKey === image.key}
-                            isDragOverTarget={
-                              draggingKey !== null &&
-                              draggingKey !== image.key &&
-                              dragOverKey === image.key
-                            }
-                            itemRef={registerItemRef(image.key)}
-                            onOpen={() => setLightboxKey(image.key)}
-                            onRotate={() => {
-                              if (image.kind === "new") {
-                                handleRotateNewImage(image);
-                              }
-                            }}
-                            onDelete={() =>
-                              image.kind === "existing"
-                                ? setConfirmingKey(image.key)
-                                : handleRemoveNewImage(image)
-                            }
-                            onConfirmDelete={() => {
-                              if (image.kind === "existing") {
-                                handleMarkImageForDeletion(image);
-                              }
-                            }}
-                            onCancelDelete={handleCancelDeleteImage}
-                            onRestore={() => {
-                              if (image.kind === "existing") {
-                                handleRestoreImage(image);
-                              }
-                            }}
-                            onDragPointerDown={(e) =>
-                              handleDragHandlePointerDown(e, image.key)
-                            }
-                            onDragPointerMove={handleDragHandlePointerMove}
-                            onDragPointerUp={handleDragHandlePointerUp}
-                          />
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-
-                <input
-                  id="images"
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-                  onChange={handleImagesChange}
-                  className={selectClassName}
-                />
-                <p className="text-sm text-muted-foreground">
-                  残り
-                  {Math.max(
-                    MAX_IMAGE_COUNT - activeImages.length,
-                    0,
-                  )}
-                  枚まで追加できます。画像を押すと拡大・回転できます
-                </p>
-                {!isEdit && (
-                  <ImageAutofillStatus
-                    status={autofill.status}
-                    canAnalyze={autofill.canAnalyze}
-                    onAnalyze={autofill.analyzeNow}
-                  />
-                )}
-                <ImageLightbox
-                  src={
-                    lightboxImage === null
-                      ? null
-                      : lightboxImage.kind === "existing"
-                        ? lightboxImage.url
-                        : lightboxImage.previewUrl
-                  }
-                  alt="選択した画像"
-                  onClose={() => setLightboxKey(null)}
-                  onRotate={
-                    lightboxImage?.kind === "new"
-                      ? () => handleRotateNewImage(lightboxImage)
-                      : undefined
-                  }
-                  isProcessing={
-                    lightboxImage?.kind === "new" && lightboxImage.isProcessing
-                  }
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="favorite"
-                  checked={favorite}
-                  onCheckedChange={(checked) => setFavorite(checked === true)}
-                />
-                <Label htmlFor="favorite">お気に入りに登録する</Label>
-              </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="purchase-price">購入価格（税込・任意）</Label>
+                    <Input
+                      id="purchase-price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={purchasePrice}
+                      onChange={(e) => setPurchasePrice(e.target.value)}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      税込価格。わからない場合は空欄でOKです
+                    </p>
+                  </div>
+                </div>
+              </details>
 
               <details
                 className="rounded-md border px-3 py-2"
