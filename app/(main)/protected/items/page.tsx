@@ -1,6 +1,12 @@
 import { ClothingItemCard } from "@/components/clothing-item-card";
+import { DraftSavedNotice } from "@/components/draft-saved-notice";
 import { ReviewSuggestionsCard } from "@/components/review-suggestions-card";
-import { ItemGridSkeleton } from "@/components/loading-skeletons";
+import {
+  ClosetFilterBarSkeleton,
+  ItemGridSkeleton,
+  ReviewSuggestionsSkeleton,
+} from "@/components/loading-skeletons";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   CLOSET_FILTER_PATH,
@@ -261,8 +267,6 @@ async function ClothingItemsList({
   );
 }
 
-// 下書きがあるときだけ「下書き N件」へのリンクを出す。
-// 件数を取得できない場合（下書きテーブルの適用前など）は何も出さない
 // 候補を選ぶために読む服の上限（画像は読まず、必要な列だけ）。
 // 超える場合は登録の古い順に1000着までを対象にする
 const REVIEW_ITEMS_LIMIT = 1000;
@@ -270,7 +274,8 @@ const REVIEW_DIAGNOSES_LIMIT = 2000;
 
 // 「今日見直す3着」。絞り込み中は案内も含めて出さない。
 // 取得に失敗した場合はカードごと出さない（Closet一覧はそのまま使える）
-async function ReviewSuggestions({
+// 絞り込み中は、読み込み中のスケルトンも含めて出さない
+async function ReviewSuggestionsSection({
   searchParams,
 }: {
   searchParams: SearchParamsPromise;
@@ -278,7 +283,14 @@ async function ReviewSuggestions({
   if (hasActiveClosetFilters(parseClosetFilters(await searchParams))) {
     return null;
   }
+  return (
+    <Suspense fallback={<ReviewSuggestionsSkeleton />}>
+      <ReviewSuggestions />
+    </Suspense>
+  );
+}
 
+async function ReviewSuggestions() {
   const supabase = await createClient();
   const [totalResult, itemsResult, diagnosesResult] = await Promise.all([
     supabase
@@ -389,19 +401,24 @@ async function ReviewSuggestions({
   );
 }
 
-async function DraftsLink() {
+// 下書きがあるときだけ、見出し行に「下書き N」ボタンを出す。
+// 件数を取得できない場合（下書きテーブルの適用前など）は何も出さない。
+// 見出し行の横に出すため、読み込み後に下の内容を押し下げない
+async function DraftsButton() {
   const supabase = await createClient();
   const { count, error } = await supabase
     .from("clothing_item_drafts")
     .select("*", { count: "exact", head: true });
   if (error || !count) return null;
   return (
-    <Link
-      href="/protected/items/drafts"
-      className="w-fit text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-    >
-      下書き {count}件 →
-    </Link>
+    <Button asChild variant="outline">
+      <Link href="/protected/items/drafts">
+        下書き
+        <Badge variant="secondary" className="px-1.5">
+          {count}
+        </Badge>
+      </Link>
+    </Button>
   );
 }
 
@@ -412,22 +429,26 @@ export default function ClothingItemsPage({
 }) {
   return (
     <div className="w-full flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      {/* 狭い画面ではボタンが見出しの下へ折り返す */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">クローゼット一覧</h1>
-        <Button asChild>
-          <Link href="/protected/items/new">服を登録</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Suspense fallback={null}>
+            <DraftsButton />
+          </Suspense>
+          <Button asChild>
+            <Link href="/protected/items/new">服を登録</Link>
+          </Button>
+        </div>
       </div>
 
-      <Suspense fallback={null}>
-        <DraftsLink />
-      </Suspense>
+      <DraftSavedNotice />
 
       <Suspense fallback={null}>
-        <ReviewSuggestions searchParams={searchParams} />
+        <ReviewSuggestionsSection searchParams={searchParams} />
       </Suspense>
 
-      <Suspense fallback={null}>
+      <Suspense fallback={<ClosetFilterBarSkeleton />}>
         <ClosetFilterBar searchParams={searchParams} />
       </Suspense>
 

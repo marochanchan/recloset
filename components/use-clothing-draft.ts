@@ -7,13 +7,15 @@ import {
   type DraftFields,
 } from "@/lib/clothing-drafts";
 import { createClient } from "@/lib/supabase/client";
-import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 // ============================================================
 // 服登録フォームの下書き（保存・再開・登録完了後の片付け・離脱確認）。
 // - 保存は手動（「下書きとして保存」）。自動保存はしない
-// - 未保存の変更があるときだけ、ページの再読み込み・タブを閉じる操作と、
-//   アプリ内のリンクの移動で確認を出す
+// - 未保存の変更があるときだけ、ページの再読み込み・タブを閉じる操作
+//   （ブラウザ標準の警告）と、アプリ内のリンクの移動（ページ内の確認ダイアログ）
+//   で確認を出す
 //   （ブラウザの「戻る」ボタンは対象外。App Routerに遷移を止める仕組みがないため）
 // ============================================================
 
@@ -31,9 +33,6 @@ export type DraftImageState = {
   isProcessing: boolean;
   draftPath: string | null;
 };
-
-const LEAVE_CONFIRM_MESSAGE =
-  "保存していない入力があります。このページを離れますか？\n（「下書きとして保存」で続きを残せます）";
 
 // 変更の有無の判定用（値と、写真の並び・保存状態）
 function toSnapshot(fields: DraftFields, imageIds: string[]): string {
@@ -82,6 +81,28 @@ export function useClothingDraft({
     text: string;
   } | null>(null);
   const leaveAllowedRef = useRef(false);
+  // 離脱の確認中に押されたリンク（「保存せず移動」でそのリンクをもう一度押す）
+  const pendingLeaveRef = useRef<{ anchor: HTMLAnchorElement; href: string } | null>(
+    null,
+  );
+  const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
+  const router = useRouter();
+  // 二重保存の防止。stateは次の描画まで反映されないため、連続クリックを
+  // 同期的に止めるrefを併用する（保存に成功したら、画面を離れるまで戻さない）
+  const savingRef = useRef(false);
+
+  // 保存に成功して画面を移動した後、ブラウザの「戻る」でこのフォームが
+  // 再表示されたとき（cacheComponents の <Activity> で状態が残る）に、
+  // ボタンが「保存中」のまま押せなくならないよう、隠れるときに戻す
+  useLayoutEffect(() => {
+    return () => {
+      savingRef.current = false;
+      setIsSavingDraft(false);
+      leaveAllowedRef.current = false;
+      pendingLeaveRef.current = null;
+      setIsLeaveConfirmOpen(false);
+    };
+  }, []);
 
   // 再開: 下書きの写真をStorageから読み込み、新しく選んだ画像として並べる。
   // 1枚でも読み込めなければ、保存・登録を止める（読み込めなかった写真を
@@ -130,7 +151,7 @@ export function useClothingDraft({
     };
 
     // アプリ内のリンク（ヘッダー・ボトムナビなど）。Next.jsのLinkより先に
-    // キャプチャ段階で受け取り、キャンセルされたら移動を止める
+    // キャプチャ段階で受け取って移動を止め、確認ダイアログを出す
     const handleLinkClick = (event: MouseEvent) => {
       if (leaveAllowedRef.current || event.defaultPrevented) return;
       if (
@@ -153,10 +174,13 @@ export function useClothingDraft({
       ) {
         return;
       }
-      if (!window.confirm(LEAVE_CONFIRM_MESSAGE)) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
+      event.preventDefault();
+      event.stopPropagation();
+      pendingLeaveRef.current = {
+        anchor,
+        href: `${url.pathname}${url.search}${url.hash}`,
+      };
+      setIsLeaveConfirmOpen(true);
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -167,16 +191,21 @@ export function useClothingDraft({
     };
   }, [isDirty]);
 
-  const saveDraft = async () => {
-    if (!enabled || isSavingDraft || loadState !== "ready") return;
+  /**
+   * 下書きを保存する。成功したら true（呼び出し元で画面を移動する）、
+   * 失敗・保存できない状態なら false（入力値と写真はそのまま残る）。
+   */
+  const saveDraft = async (): Promise<boolean> => {
+    if (!enabled || savingRef.current || loadState !== "ready") return false;
     if (images.some((image) => image.isProcessing || !image.processed)) {
       setDraftMessage({
         tone: "error",
         text: "画像を準備しています。少し待ってから保存してください",
       });
-      return;
+      return false;
     }
 
+    savingRef.current = true;
     setIsSavingDraft(true);
     setDraftMessage(null);
     try {
@@ -214,15 +243,18 @@ export function useClothingDraft({
         "",
         `/protected/items/new?draft=${result.draftId}`,
       );
-      setDraftMessage({ tone: "success", text: "下書きを保存しました" });
+      // この後は画面を移動するため、離脱確認を出さず、ボタンも押せないままにする
+      leaveAllowedRef.current = true;
+      return true;
     } catch (error) {
       console.error("draft save failed:", error);
       setDraftMessage({
         tone: "error",
         text: "下書きを保存できませんでした。前回保存した下書きはそのまま残っています。もう一度お試しください",
       });
-    } finally {
+      savingRef.current = false;
       setIsSavingDraft(false);
+      return false;
     }
   };
 
@@ -252,6 +284,30 @@ export function useClothingDraft({
     draftMessage,
     saveDraft,
     completeDraft,
+    /** 離脱の確認ダイアログ（LeaveConfirmDialog に渡す） */
+    leaveConfirm: {
+      open: isLeaveConfirmOpen,
+      /** 「編集を続ける」: 移動せず、入力値・写真はそのまま */
+      onCancel: () => {
+        pendingLeaveRef.current = null;
+        setIsLeaveConfirmOpen(false);
+      },
+      /** 「保存せず移動」: 押されたリンクで移動する（下書きは保存しない） */
+      onConfirm: () => {
+        const pending = pendingLeaveRef.current;
+        pendingLeaveRef.current = null;
+        setIsLeaveConfirmOpen(false);
+        if (!pending) return;
+        leaveAllowedRef.current = true;
+        // 同じリンクを押し直すと、Linkの指定（replace・scroll など）がそのまま効く。
+        // リンクが画面から消えていたら、URLで移動する
+        if (pending.anchor.isConnected) {
+          pending.anchor.click();
+        } else {
+          router.push(pending.href);
+        }
+      },
+    },
     /** 登録完了後の画面遷移など、確認なしで離れてよい状態にする */
     allowLeave: () => {
       leaveAllowedRef.current = true;

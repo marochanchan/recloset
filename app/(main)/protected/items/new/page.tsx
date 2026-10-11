@@ -1,4 +1,5 @@
-import { ClothingItemForm } from "@/components/clothing-item-form";
+import { NewClothingItemForm } from "@/components/clothing-item-form";
+import { ClothingFormSkeleton } from "@/components/loading-skeletons";
 import { Button } from "@/components/ui/button";
 import {
   isDraftId,
@@ -43,7 +44,7 @@ async function NewClothingItemContent({
 }) {
   const { draft: rawDraftId } = await searchParams;
   if (rawDraftId === undefined) {
-    return <ClothingItemForm />;
+    return <NewClothingItemForm />;
   }
   if (!isDraftId(rawDraftId)) {
     return <DraftNotFound />;
@@ -75,8 +76,7 @@ async function NewClothingItemContent({
     .slice(0, MAX_DRAFT_IMAGES);
 
   return (
-    <ClothingItemForm
-      key={draft.id}
+    <NewClothingItemForm
       draft={{
         id: draft.id,
         fields: normalizeDraftFields(draft.fields),
@@ -129,9 +129,7 @@ export default function NewClothingItemPage({
       <Suspense fallback={null}>
         <DraftsNotice searchParams={searchParams} />
       </Suspense>
-      <Suspense
-        fallback={<p className="text-sm text-muted-foreground">読み込み中...</p>}
-      >
+      <Suspense fallback={<ClothingFormSkeleton />}>
         <NewClothingItemContent searchParams={searchParams} />
       </Suspense>
     </div>

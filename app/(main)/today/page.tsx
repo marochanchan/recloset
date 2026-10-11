@@ -1,4 +1,5 @@
 import { ClosetSummary } from "@/components/closet-summary";
+import { TodaySkeleton } from "@/components/loading-skeletons";
 import { OnboardingSteps } from "@/components/onboarding-steps";
 import {
   TodayOutfitCard,
@@ -198,11 +199,7 @@ async function TodayContent() {
 export default function TodayPage() {
   return (
     <div className="flex flex-1 w-full flex-col items-center gap-10 px-4 py-8 sm:py-10">
-      <Suspense
-        fallback={
-          <p className="text-sm text-muted-foreground">読み込み中...</p>
-        }
-      >
+      <Suspense fallback={<TodaySkeleton />}>
         <TodayContent />
       </Suspense>
     </div>

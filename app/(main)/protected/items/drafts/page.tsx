@@ -1,6 +1,5 @@
-import { ClothingDraftDeleteButton } from "@/components/clothing-draft-delete-button";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { ClothingDraftCard } from "@/components/clothing-draft-delete-button";
+import { DraftListSkeleton } from "@/components/loading-skeletons";
 import {
   CLOTHING_IMAGE_BUCKET,
   normalizeDraftFields,
@@ -77,7 +76,7 @@ async function DraftList() {
         const coverUrl = paths[0] ? urlByPath.get(paths[0]) : undefined;
         return (
           <li key={draft.id}>
-            <Card className="flex items-center gap-3 p-3">
+            <ClothingDraftCard draftId={draft.id}>
               <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-muted">
                 {coverUrl ? (
                   <Image
@@ -103,15 +102,7 @@ async function DraftList() {
                   ・写真{paths.length}枚・{formatJstDate(draft.updated_at)}保存
                 </p>
               </div>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <Button asChild size="sm">
-                  <Link href={`/protected/items/new?draft=${draft.id}`}>
-                    続きから入力
-                  </Link>
-                </Button>
-                <ClothingDraftDeleteButton draftId={draft.id} />
-              </div>
-            </Card>
+            </ClothingDraftCard>
           </li>
         );
       })}
@@ -134,9 +125,7 @@ export default function ClothingDraftsPage() {
           登録の途中で保存した服です。続きから入力して登録できます。
         </p>
       </div>
-      <Suspense
-        fallback={<p className="text-sm text-muted-foreground">読み込み中...</p>}
-      >
+      <Suspense fallback={<DraftListSkeleton />}>
         <DraftList />
       </Suspense>
     </div>

@@ -11,8 +11,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ClothingImageSection } from "@/components/clothing-image-section";
+import { rememberDraftSavedNotice } from "@/components/draft-saved-notice";
 import { FavoriteToggle } from "@/components/favorite-toggle";
 import { ImageAutofillStatus } from "@/components/image-autofill-status";
+import { LeaveConfirmDialog } from "@/components/leave-confirm-dialog";
 import { SeasonSelector } from "@/components/season-selector";
 import { useImageAutofill } from "@/components/use-image-autofill";
 import {
@@ -619,6 +621,7 @@ export function ClothingItemForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
+      <LeaveConfirmDialog {...clothingDraft.leaveConfirm} />
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">
@@ -891,7 +894,14 @@ export function ClothingItemForm({
                     type="button"
                     variant="outline"
                     className="w-full"
-                    onClick={clothingDraft.saveDraft}
+                    onClick={async () => {
+                      // 保存に成功したときだけCloset一覧へ移動する
+                      // （失敗したら画面に残り、入力値と写真はそのまま）
+                      if (await clothingDraft.saveDraft()) {
+                        rememberDraftSavedNotice();
+                        router.push("/protected/items");
+                      }
+                    }}
                     disabled={
                       isLoading ||
                       isPreparingImages ||
@@ -939,5 +949,26 @@ function NeedsCheckNote() {
     <p className="text-sm text-muted-foreground">
       写真だけでは判断しにくいため、確認してください
     </p>
+  );
+}
+
+/**
+ * 新規登録ページ用。cacheComponents が有効な App Router は、離れたページを
+ * <Activity> で隠したまま残し、次に同じパスを開いたときに入力中の状態ごと
+ * 再表示する（検索パラメータは区別しない）。リンク・router.push で開いたときは
+ * 毎回新しいフォームにし、ブラウザの「戻る・進む」では状態を戻す。
+ * 下書きを再開するときは下書きIDも key に含める。
+ */
+export function NewClothingItemForm({
+  draft = null,
+}: {
+  draft?: ClothingDraftToResume | null;
+}) {
+  const { bfcacheId } = useRouter();
+  return (
+    <ClothingItemForm
+      key={`${bfcacheId}:${draft?.id ?? "new"}`}
+      draft={draft}
+    />
   );
 }

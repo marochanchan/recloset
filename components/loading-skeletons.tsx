@@ -72,3 +72,136 @@ export function ItemDetailSkeleton() {
     </div>
   );
 }
+
+// Closet「今日見直す3着」（ReviewSuggestionsCard と同じ枠・3行）
+export function ReviewSuggestionsSkeleton() {
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border bg-muted/30 p-4">
+      <div className="flex flex-col gap-1.5">
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-3 w-3/4" />
+      </div>
+      <div className="flex flex-col gap-2">
+        {Array.from({ length: 3 }, (_, index) => (
+          <Card key={index} className="flex items-center gap-3 p-2.5">
+            <Skeleton className="h-16 w-16 shrink-0" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-3 w-full" />
+            </div>
+            <Skeleton className="h-8 w-14 shrink-0" />
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Closet の絞り込み（カテゴリ・シーズン・絞り込みの3グループ）
+const FILTER_SKELETON_CHIPS = [8, 6, 3];
+
+export function ClosetFilterBarSkeleton() {
+  return (
+    <div className="flex flex-col gap-4">
+      {FILTER_SKELETON_CHIPS.map((count, group) => (
+        <div key={group} className="flex flex-col gap-2">
+          <Skeleton className="h-3 w-14" />
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: count }, (_, index) => (
+              <Skeleton key={index} className="h-8 w-16 rounded-full" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Today（挨拶・天気・今日のRe:try 3着・サマリー・導線）
+export function TodaySkeleton() {
+  return (
+    <div className="flex w-full max-w-3xl flex-col gap-10">
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-7 w-2/3" />
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <div className="grid gap-3 sm:grid-cols-3">
+            {Array.from({ length: 3 }, (_, index) => (
+              <Card key={index} className="flex gap-3 p-3 sm:flex-col">
+                <Skeleton className="h-24 w-24 shrink-0 sm:aspect-square sm:h-auto sm:w-full" />
+                <div className="flex flex-1 flex-col gap-2">
+                  <Skeleton className="h-5 w-16" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-8 w-24" />
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-6 w-40" />
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+          {Array.from({ length: 3 }, (_, index) => (
+            <Skeleton key={index} className="h-[5.5rem] rounded-xl" />
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-12 w-full rounded-lg" />
+        <Skeleton className="h-12 w-full rounded-lg" />
+      </div>
+    </div>
+  );
+}
+
+// 服の登録フォーム（写真・タイトル・カテゴリー・ブランド・シーズン・ボタン）
+export function ClothingFormSkeleton() {
+  return (
+    <Card className="flex flex-col gap-6 p-6">
+      <Skeleton className="h-8 w-32" />
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-4 w-36" />
+        <Skeleton className="h-14 w-full rounded-lg" />
+      </div>
+      {Array.from({ length: 3 }, (_, index) => (
+        <div key={index} className="flex flex-col gap-2">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-9 w-full" />
+        </div>
+      ))}
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-4 w-20" />
+        <div className="flex flex-wrap gap-2">
+          {Array.from({ length: 5 }, (_, index) => (
+            <Skeleton key={index} className="h-9 w-14 rounded-full" />
+          ))}
+        </div>
+      </div>
+      <Skeleton className="h-9 w-full" />
+    </Card>
+  );
+}
+
+// 下書き一覧（写真・タイトル・補足・ボタンの行）
+export function DraftListSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      {Array.from({ length: 3 }, (_, index) => (
+        <Card key={index} className="flex items-center gap-3 p-3">
+          <Skeleton className="h-16 w-16 shrink-0" />
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-3 w-3/4" />
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <Skeleton className="h-8 w-24" />
+            <Skeleton className="h-8 w-14" />
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
