@@ -141,7 +141,9 @@ export function TodaySkeleton() {
           </div>
         </div>
       </div>
-      <WeeklyProgressSkeleton />
+      {/* 今週のRe:Closetは服が0着のときは表示しないため、全体のスケルトンには含めない
+          （0着のユーザーに一瞬だけカードの枠が出るのを防ぐ）。服がある場合は
+          カードの位置で WeeklyProgressSkeleton を表示する */}
       <div className="flex flex-col gap-3">
         <Skeleton className="h-6 w-40" />
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
@@ -162,7 +164,10 @@ export function TodaySkeleton() {
 export function WeeklyProgressSkeleton() {
   return (
     <Card className="flex flex-col gap-3 p-4">
-      <Skeleton className="h-6 w-36" />
+      <div className="flex items-baseline justify-between">
+        <Skeleton className="h-6 w-36" />
+        <Skeleton className="h-3 w-14" />
+      </div>
       <div className="flex items-baseline justify-between">
         <Skeleton className="h-4 w-20" />
         <Skeleton className="h-7 w-24" />
@@ -175,8 +180,8 @@ export function WeeklyProgressSkeleton() {
       </div>
       <Skeleton className="h-3 w-2/3" />
       <div className="grid grid-cols-2 gap-2">
-        <Skeleton className="h-8" />
-        <Skeleton className="h-8" />
+        <Skeleton className="h-10" />
+        <Skeleton className="h-10" />
       </div>
     </Card>
   );

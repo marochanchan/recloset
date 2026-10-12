@@ -16,7 +16,10 @@ import {
   WeeklyProgressCard,
   WeeklyProgressError,
 } from "@/components/weekly-progress-card";
-import { fetchWeeklyProgress } from "@/lib/habit-progress-query";
+import {
+  fetchWeeklyProgress,
+  type WeeklyProgressResult,
+} from "@/lib/habit-progress-query";
 import {
   getCurrentClaims,
   getCurrentDisplayName,
@@ -46,12 +49,19 @@ const NEXT_LINKS = [
 ];
 
 // 今週のRe:Closet（見直し・着用の週次進捗）。Todayの他の表示を待たせないよう、
-// 独立したSuspenseで読み込む。取得に失敗したら0着ではなくエラーを表示する
-async function WeeklyProgressSection() {
-  const result = await fetchWeeklyProgress(await createClient());
+// 独立したSuspenseで表示する。取得はTodayContentの開始時に並行して始めておき
+// （取得の待ち時間が直列にならず、スケルトンの表示が短くなる）、ここで結果を待つ。
+// 取得に失敗したら0着ではなくエラーを表示する
+async function WeeklyProgressSection({
+  resultPromise,
+}: {
+  resultPromise: Promise<WeeklyProgressResult>;
+}) {
+  const result = await resultPromise;
   return result.ok ? (
     <WeeklyProgressCard
       progress={result.progress}
+      weekStartDateKey={result.range.weekStartDateKey}
       goalLoadFailed={result.goalLoadFailed}
     />
   ) : (
@@ -63,6 +73,9 @@ async function WeeklyProgressSection() {
 // 未ログインはproxyで/auth/loginへリダイレクトされる。
 async function TodayContent() {
   const supabase = await createClient();
+  // 週次進捗は他の取得と並行して始める（例外は投げず、失敗は ok:false で返る）。
+  // 服が0着なら表示しないため、結果は使わずに終わる
+  const weeklyProgressPromise = fetchWeeklyProgress(supabase);
   const [
     displayName,
     totalResult,
@@ -178,7 +191,7 @@ async function TodayContent() {
       {/* 服が0着のときはオンボーディングを優先し、進捗は出さない */}
       {!isClosetEmpty && (
         <Suspense fallback={<WeeklyProgressSkeleton />}>
-          <WeeklyProgressSection />
+          <WeeklyProgressSection resultPromise={weeklyProgressPromise} />
         </Suspense>
       )}
 

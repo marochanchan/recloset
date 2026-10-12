@@ -1,3 +1,4 @@
+import { ScrollToHashTarget } from "@/components/scroll-to-hash-target";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { ReviewSuggestion } from "@/lib/review-suggestions";
@@ -19,9 +20,16 @@ export function ReviewSuggestionsCard({
 }) {
   return (
     <section
+      id="review-suggestions"
       aria-labelledby="review-suggestions-title"
-      className="flex flex-col gap-3 rounded-xl border bg-muted/30 p-4"
+      className="flex scroll-mt-4 flex-col gap-3 rounded-xl border bg-muted/30 p-4"
     >
+      {/* Todayの「今日の3着を見る」（/protected/items#review-suggestions-title）から
+          来た場合、このカードは後から表示されるため、表示時にカードの先頭へ移動する */}
+      <ScrollToHashTarget
+        targetId="review-suggestions-title"
+        scrollTo="review-suggestions"
+      />
       <div className="flex flex-col gap-1">
         <h2 id="review-suggestions-title" className="text-base font-semibold">
           今日見直す3着
