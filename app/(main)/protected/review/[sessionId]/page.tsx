@@ -13,9 +13,10 @@ import {
   REVIEW_SESSION_DECISION_LABELS,
   summarizeReviewDecisions,
 } from "@/lib/closet-review";
-import { CLOTHING_IMAGE_BUCKET } from "@/lib/clothing-drafts";
 import { PHOTO_ONLY_TITLE } from "@/lib/clothing-options";
+import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -28,8 +29,6 @@ export const metadata: Metadata = {
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// 見直しは1着ずつ時間をかけて進めることがあるため、他の画面（10分）より長くする
-const SIGNED_URL_EXPIRES_IN = 3600; // 1時間
 
 type SessionItemRow = {
   id: string;
@@ -74,22 +73,13 @@ async function loadSession(sessionId: string) {
     )[0];
     if (cover) coverPathByItem.set(item.id, cover.image_path);
   }
-  const urlByPath = new Map<string, string>();
-  const coverPaths = [...coverPathByItem.values()];
-  if (coverPaths.length > 0) {
-    const { data: signed, error: signError } = await supabase.storage
-      .from(CLOTHING_IMAGE_BUCKET)
-      .createSignedUrls(coverPaths, SIGNED_URL_EXPIRES_IN);
-    if (signError) {
-      console.error("review session signed url error:", signError);
-    } else {
-      for (const entry of signed) {
-        if (!entry.error && entry.path && entry.signedUrl) {
-          urlByPath.set(entry.path, entry.signedUrl);
-        }
-      }
-    }
-  }
+  const claims = await getCurrentClaims();
+  const urlByPath = await getPrivateSignedImageUrls(
+    supabase,
+    claims?.sub,
+    [...coverPathByItem.values()],
+    "review session",
+  );
 
   const itemById = new Map<string, SessionItemRow>();
   for (const item of itemsResult.data) {

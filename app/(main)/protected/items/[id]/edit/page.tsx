@@ -1,12 +1,13 @@
 import { ClothingItemForm } from "@/components/clothing-item-form";
+import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const SIGNED_URL_EXPIRES_IN = 600; // 10分
 
 async function EditClothingItemContent({
   params,
@@ -39,26 +40,13 @@ async function EditClothingItemContent({
     notFound();
   }
 
-  const paths = item.clothing_images.map((img) => img.image_path);
-  const signedUrlMap = new Map<string, string>();
-
-  if (paths.length > 0) {
-    const { data: signedUrls, error: signError } = await supabase.storage
-      .from("clothing-images")
-      .createSignedUrls(paths, SIGNED_URL_EXPIRES_IN);
-
-    if (signError) {
-      console.error("edit clothing image signed url error:", signError);
-    } else {
-      for (const entry of signedUrls) {
-        if (entry.error || !entry.path || !entry.signedUrl) {
-          console.error("edit clothing image signed url entry error:", entry);
-          continue;
-        }
-        signedUrlMap.set(entry.path, entry.signedUrl);
-      }
-    }
-  }
+  const claims = await getCurrentClaims();
+  const signedUrlMap = await getPrivateSignedImageUrls(
+    supabase,
+    claims?.sub,
+    item.clothing_images.map((img) => img.image_path),
+    "edit clothing image",
+  );
 
   const initialImages = item.clothing_images
     .map((img) => {

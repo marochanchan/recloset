@@ -22,6 +22,7 @@ import {
 } from "@/lib/clothing-options";
 import { getMarketplaceLinks } from "@/lib/marketplace-urls";
 import { createClient } from "@/lib/supabase/server";
+import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { formatJstDate, hasWornToday } from "@/lib/wear-logs";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -29,7 +30,6 @@ import { Suspense } from "react";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const SIGNED_URL_EXPIRES_IN = 600; // 10分
 
 async function ClothingItemDetail({
   params,
@@ -60,26 +60,16 @@ async function ClothingItemDetail({
     notFound();
   }
 
-  const paths = item.clothing_images.map((img) => img.image_path);
-  const signedUrlMap = new Map<string, string>();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
 
-  if (paths.length > 0) {
-    const { data: signedUrls, error: signError } = await supabase.storage
-      .from("clothing-images")
-      .createSignedUrls(paths, SIGNED_URL_EXPIRES_IN);
-
-    if (signError) {
-      console.error("clothing image signed url error:", signError);
-    } else {
-      for (const entry of signedUrls) {
-        if (entry.error || !entry.path || !entry.signedUrl) {
-          console.error("clothing image signed url entry error:", entry);
-          continue;
-        }
-        signedUrlMap.set(entry.path, entry.signedUrl);
-      }
-    }
-  }
+  // RLSで取得した本人の服の画像だけを署名する
+  const signedUrlMap = await getPrivateSignedImageUrls(
+    supabase,
+    userId,
+    item.clothing_images.map((img) => img.image_path),
+    "clothing item detail",
+  );
 
   const imageUrls = item.clothing_images
     .map((img) => signedUrlMap.get(img.image_path))
@@ -95,8 +85,6 @@ async function ClothingItemDetail({
 
   // 公開UIで「公開名が設定済みか」を判定するため、本人の公開名を取得する。
   // 公開可否の最終判定はServer Action（setClothingItemPublication）側で行う。
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const userId = claimsData?.claims?.sub;
   let displayName: string | null = null;
   if (userId) {
     const { data: profile, error: profileError } = await supabase

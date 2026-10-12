@@ -9,8 +9,12 @@ import {
   suggestTodayOutfit,
   type OutfitItemInput,
 } from "@/lib/outfit-suggestion";
-import { getCurrentDisplayName } from "@/lib/supabase/current-user";
+import {
+  getCurrentClaims,
+  getCurrentDisplayName,
+} from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { getJstDateKey, getTodayWeather } from "@/lib/weather";
 import { getCurrentSeasonJst, getDaysSinceLastWorn } from "@/lib/wear-logs";
 import { ChevronRight, Plus, Recycle } from "lucide-react";
@@ -21,8 +25,6 @@ import { Suspense } from "react";
 export const metadata: Metadata = {
   title: "Today | Re:Closet",
 };
-
-const SIGNED_URL_EXPIRES_IN = 600; // 10分
 
 // Today下部の主要導線（同じ見た目で並べる）。
 // クローゼット一覧へはサマリーの「登録している服」から開けるため置かない。
@@ -109,25 +111,18 @@ async function TodayContent() {
     const pickPaths = suggestion.picks
       .map((pick) => pick.item.imagePath)
       .filter((path): path is string => Boolean(path));
-    if (pickPaths.length > 0) {
-      const { data: signedUrls, error: signError } = await supabase.storage
-        .from("clothing-images")
-        .createSignedUrls(pickPaths, SIGNED_URL_EXPIRES_IN);
-      if (signError) {
-        console.error("today outfit signed url error:", signError);
-      } else {
-        const urlByPath = new Map(
-          signedUrls
-            .filter((entry) => !entry.error && entry.path && entry.signedUrl)
-            .map((entry) => [entry.path as string, entry.signedUrl]),
-        );
-        for (const pick of suggestion.picks) {
-          const url = pick.item.imagePath
-            ? urlByPath.get(pick.item.imagePath)
-            : undefined;
-          if (url) imageUrls.set(pick.item.id, url);
-        }
-      }
+    const claims = await getCurrentClaims();
+    const urlByPath = await getPrivateSignedImageUrls(
+      supabase,
+      claims?.sub,
+      pickPaths,
+      "today outfit",
+    );
+    for (const pick of suggestion.picks) {
+      const url = pick.item.imagePath
+        ? urlByPath.get(pick.item.imagePath)
+        : undefined;
+      if (url) imageUrls.set(pick.item.id, url);
     }
 
     outfit = { suggestion, imageUrls };

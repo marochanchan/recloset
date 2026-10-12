@@ -13,6 +13,10 @@ import { normalizeSeasons, STATUS_OPTIONS } from "@/lib/clothing-options";
 import { buildDecisionHints } from "@/lib/decision-hints";
 import { isUsableDisplayName } from "@/lib/display-name";
 import { type NextAction, buildNextAction } from "@/lib/next-action";
+import {
+  forgetPublicSignedUrls,
+  forgetSignedUrls,
+} from "@/lib/signed-image-url-cache";
 import { createClient } from "@/lib/supabase/server";
 import {
   getCurrentSeasonJst,
@@ -294,6 +298,12 @@ async function setClothingItemPublication(
     }
   }
 
+  // 公開解除した服の画像URLを公開用キャッシュに残さない。公開RPCの結果から
+  // 外れるため再配布はされないが、多重防御として捨てる（同じインスタンスのみ）
+  if (!isPublic) {
+    forgetPublicSignedUrls();
+  }
+
   revalidatePath(`/protected/items/${itemId}`);
   // 公開ページにも反映させる
   revalidatePath("/discover");
@@ -355,6 +365,8 @@ export async function deleteClothingItem(
     console.error("deleteClothingItem: delete error", deleteError);
     return { error: "服の削除に失敗しました" };
   }
+
+  forgetSignedUrls(imagePaths);
 
   if (imagePaths.length > 0) {
     const { error: removeError } = await supabase.storage

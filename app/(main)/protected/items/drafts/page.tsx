@@ -1,11 +1,10 @@
 import { ClothingDraftCard } from "@/components/clothing-draft-delete-button";
 import { DraftListSkeleton } from "@/components/loading-skeletons";
-import {
-  CLOTHING_IMAGE_BUCKET,
-  normalizeDraftFields,
-} from "@/lib/clothing-drafts";
+import { normalizeDraftFields } from "@/lib/clothing-drafts";
 import { getCategoryLabel } from "@/lib/clothing-options";
+import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { formatJstDate } from "@/lib/wear-logs";
 import type { Metadata } from "next";
 import Image from "next/image";
@@ -15,8 +14,6 @@ import { Suspense } from "react";
 export const metadata: Metadata = {
   title: "下書き | Re:Closet",
 };
-
-const SIGNED_URL_EXPIRES_IN = 600; // 10分
 
 // 本人の下書き一覧（RLSにより本人の行だけが返る）
 async function DraftList() {
@@ -50,21 +47,15 @@ async function DraftList() {
   const coverPaths = drafts
     .map((draft) => (Array.isArray(draft.image_paths) ? draft.image_paths[0] : null))
     .filter((path): path is string => typeof path === "string");
-  const urlByPath = new Map<string, string>();
-  if (coverPaths.length > 0) {
-    const { data: signed, error: signError } = await supabase.storage
-      .from(CLOTHING_IMAGE_BUCKET)
-      .createSignedUrls(coverPaths, SIGNED_URL_EXPIRES_IN);
-    if (signError) {
-      console.error("draft cover signed url error:", signError);
-    } else {
-      for (const entry of signed) {
-        if (!entry.error && entry.path && entry.signedUrl) {
-          urlByPath.set(entry.path, entry.signedUrl);
-        }
-      }
-    }
-  }
+  // image_pathsは本人が書き込める値のため、本人のフォルダ以外のパスは
+  // 共通関数側で署名しない
+  const claims = await getCurrentClaims();
+  const urlByPath = await getPrivateSignedImageUrls(
+    supabase,
+    claims?.sub,
+    coverPaths,
+    "draft cover",
+  );
 
   return (
     <ul className="flex flex-col gap-3">

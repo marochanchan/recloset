@@ -2,6 +2,7 @@ import { ItemGridSkeleton } from "@/components/loading-skeletons";
 import { PublicClothingItemCard } from "@/components/public-clothing-item-card";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
+import { getPublicSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -9,8 +10,6 @@ import { Suspense } from "react";
 export const metadata: Metadata = {
   title: "気になる服 | Re:Closet",
 };
-
-const SIGNED_URL_EXPIRES_IN = 600; // 10分
 
 // list_my_liked_public_clothing_items（migration 011）の戻り値。
 // 本人の「気になる」のうち、現在公開中の服だけが返る（非公開になった服は含まれない）。
@@ -57,26 +56,11 @@ async function LikedClothingItemsList() {
     .map((item) => item.cover_image_path)
     .filter((path): path is string => Boolean(path));
 
-  const signedUrlMap = new Map<string, string>();
-
-  if (coverPaths.length > 0) {
-    // 公開服の画像だけを許可するStorageポリシー（migration 008）により発行できる
-    const { data: signedUrls, error: signError } = await supabase.storage
-      .from("clothing-images")
-      .createSignedUrls(coverPaths, SIGNED_URL_EXPIRES_IN);
-
-    if (signError) {
-      console.error("liked clothing image signed url error:", signError);
-    } else {
-      for (const entry of signedUrls) {
-        if (entry.error || !entry.path || !entry.signedUrl) {
-          console.error("liked clothing image signed url entry error:", entry);
-          continue;
-        }
-        signedUrlMap.set(entry.path, entry.signedUrl);
-      }
-    }
-  }
+  // 公開服の画像だけを許可するStorageポリシー（migration 008）により発行できる
+  const signedUrlMap = await getPublicSignedImageUrls(
+    coverPaths,
+    "liked clothing image",
+  );
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">

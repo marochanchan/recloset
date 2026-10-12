@@ -26,14 +26,14 @@ import {
   type ReviewDecision,
   type ReviewItemInput,
 } from "@/lib/review-suggestions";
+import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { cn } from "@/lib/utils";
 import { getJstDateKey } from "@/lib/weather";
 import { getCurrentSeasonJst } from "@/lib/wear-logs";
 import Link from "next/link";
 import { Suspense } from "react";
-
-const SIGNED_URL_EXPIRES_IN = 600; // 10分
 
 type SearchParamsPromise = Promise<RawSearchParams>;
 
@@ -215,25 +215,13 @@ async function ClothingItemsList({
     .map((item) => item.clothing_images[0]?.image_path)
     .filter((path): path is string => Boolean(path));
 
-  const signedUrlMap = new Map<string, string>();
-
-  if (representativePaths.length > 0) {
-    const { data: signedUrls, error: signError } = await supabase.storage
-      .from("clothing-images")
-      .createSignedUrls(representativePaths, SIGNED_URL_EXPIRES_IN);
-
-    if (signError) {
-      console.error("clothing image signed url error:", signError);
-    } else {
-      for (const entry of signedUrls) {
-        if (entry.error || !entry.path || !entry.signedUrl) {
-          console.error("clothing image signed url entry error:", entry);
-          continue;
-        }
-        signedUrlMap.set(entry.path, entry.signedUrl);
-      }
-    }
-  }
+  const claims = await getCurrentClaims();
+  const signedUrlMap = await getPrivateSignedImageUrls(
+    supabase,
+    claims?.sub,
+    representativePaths,
+    "closet list",
+  );
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -370,24 +358,16 @@ async function ReviewSuggestions() {
           coverPathByItem.set(image.clothing_item_id, image.image_path);
         }
       }
-      const coverPaths = [...coverPathByItem.values()];
-      if (coverPaths.length > 0) {
-        const { data: signed, error: signError } = await supabase.storage
-          .from("clothing-images")
-          .createSignedUrls(coverPaths, SIGNED_URL_EXPIRES_IN);
-        if (signError) {
-          console.error("review suggestion signed url error:", signError);
-        } else {
-          const urlByPath = new Map(
-            signed
-              .filter((entry) => !entry.error && entry.path && entry.signedUrl)
-              .map((entry) => [entry.path as string, entry.signedUrl]),
-          );
-          for (const [itemId, path] of coverPathByItem) {
-            const url = urlByPath.get(path);
-            if (url) imageUrls.set(itemId, url);
-          }
-        }
+      const claims = await getCurrentClaims();
+      const urlByPath = await getPrivateSignedImageUrls(
+        supabase,
+        claims?.sub,
+        [...coverPathByItem.values()],
+        "review suggestion",
+      );
+      for (const [itemId, path] of coverPathByItem) {
+        const url = urlByPath.get(path);
+        if (url) imageUrls.set(itemId, url);
       }
     }
   }

@@ -15,6 +15,7 @@ import { getMarketplaceLinks } from "@/lib/marketplace-urls";
 import { buildLoginHrefForDiscoverItem } from "@/lib/safe-redirect";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { getPublicSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { formatJstDate } from "@/lib/wear-logs";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -23,7 +24,6 @@ import { cache, Suspense } from "react";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const SIGNED_URL_EXPIRES_IN = 600; // 10分
 
 // get_public_clothing_item（migration 008）の戻り値。
 // 公開してよい列だけを返すRPCで、user_id・購入情報・着用情報・statusは含まない。
@@ -106,25 +106,10 @@ async function PublicClothingItemDetail({
 
   const supabase = await createClient();
   const paths = item.image_paths ?? [];
-  const signedUrlMap = new Map<string, string>();
-
-  if (paths.length > 0) {
-    const { data: signedUrls, error: signError } = await supabase.storage
-      .from("clothing-images")
-      .createSignedUrls(paths, SIGNED_URL_EXPIRES_IN);
-
-    if (signError) {
-      console.error("public clothing image signed url error:", signError);
-    } else {
-      for (const entry of signedUrls) {
-        if (entry.error || !entry.path || !entry.signedUrl) {
-          console.error("public clothing image signed url entry error:", entry);
-          continue;
-        }
-        signedUrlMap.set(entry.path, entry.signedUrl);
-      }
-    }
-  }
+  const signedUrlMap = await getPublicSignedImageUrls(
+    paths,
+    "public clothing image",
+  );
 
   const imageUrls = paths
     .map((path) => signedUrlMap.get(path))
