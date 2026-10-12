@@ -1,4 +1,5 @@
 import { DisplayNameForm } from "@/components/display-name-form";
+import { WeeklyReviewGoalForm } from "@/components/weekly-review-goal-form";
 import {
   Card,
   CardContent,
@@ -7,6 +8,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getSafeReturnTo } from "@/lib/display-name";
+import { WEEKLY_REVIEW_GOAL_LOAD_ERROR_MESSAGE } from "@/lib/habit-progress-copy";
+import { fetchWeeklyReviewGoal } from "@/lib/habit-settings";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
@@ -69,6 +72,22 @@ async function DisplayNameSettings({
   );
 }
 
+// 週次の見直し目標（RLSにより本人の設定だけが返る。未保存なら週3着）。
+// 読み込めなかった場合も選び直して保存できるよう、選択なしでフォームを出す
+async function WeeklyReviewGoalSettings() {
+  const result = await fetchWeeklyReviewGoal(await createClient());
+  return (
+    <div className="flex flex-col gap-3">
+      {!result.ok && (
+        <p className="text-sm text-muted-foreground">
+          {WEEKLY_REVIEW_GOAL_LOAD_ERROR_MESSAGE}。選び直して保存できます。
+        </p>
+      )}
+      <WeeklyReviewGoalForm initialGoal={result.ok ? result.goal : undefined} />
+    </div>
+  );
+}
+
 // ログイン中のアカウント（メールアドレス）の確認用。編集機能は持たない。
 // ヘッダーと同じgetCurrentClaims（リクエスト内でキャッシュ）を使う。
 async function AccountEmail() {
@@ -93,7 +112,7 @@ export default function SettingsPage({
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold">設定</h1>
         <p className="text-sm text-muted-foreground">
-          アカウントや公開情報を設定できます。
+          アカウントや公開情報、見直しの目標を設定できます。
         </p>
       </div>
 
@@ -118,6 +137,29 @@ export default function SettingsPage({
             }
           >
             <DisplayNameSettings searchParams={searchParams} />
+          </Suspense>
+        </CardContent>
+      </Card>
+
+      <Card id="weekly-review-goal" className="scroll-mt-20">
+        <CardHeader>
+          <CardTitle className="text-lg">週次の見直し目標</CardTitle>
+          <CardDescription>
+            1週間（月曜〜日曜）に見直す服の目安です。Todayの「今週のRe:Closet」に反映されます。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <ul className="list-disc pl-5 text-sm text-muted-foreground">
+            <li>AI診断とスワイプでの見直しを合わせて数えます（同じ服は週1着）</li>
+            <li>着用記録は目標に含めません</li>
+            <li>いつでも変更でき、今週の進捗も新しい目標で計算し直します</li>
+          </ul>
+          <Suspense
+            fallback={
+              <p className="text-sm text-muted-foreground">読み込み中...</p>
+            }
+          >
+            <WeeklyReviewGoalSettings />
           </Suspense>
         </CardContent>
       </Card>

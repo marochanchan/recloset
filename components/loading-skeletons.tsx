@@ -141,6 +141,7 @@ export function TodaySkeleton() {
           </div>
         </div>
       </div>
+      <WeeklyProgressSkeleton />
       <div className="flex flex-col gap-3">
         <Skeleton className="h-6 w-40" />
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
@@ -154,6 +155,30 @@ export function TodaySkeleton() {
         <Skeleton className="h-12 w-full rounded-lg" />
       </div>
     </div>
+  );
+}
+
+// Todayの「今週のRe:Closet」（components/weekly-progress-card.tsx）
+export function WeeklyProgressSkeleton() {
+  return (
+    <Card className="flex flex-col gap-3 p-4">
+      <Skeleton className="h-6 w-36" />
+      <div className="flex items-baseline justify-between">
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-7 w-24" />
+      </div>
+      <Skeleton className="h-2 w-full rounded-full" />
+      <Skeleton className="h-4 w-3/4" />
+      <div className="flex items-baseline justify-between border-t pt-3">
+        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-5 w-10" />
+      </div>
+      <Skeleton className="h-3 w-2/3" />
+      <div className="grid grid-cols-2 gap-2">
+        <Skeleton className="h-8" />
+        <Skeleton className="h-8" />
+      </div>
+    </Card>
   );
 }
 

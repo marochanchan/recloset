@@ -44,7 +44,10 @@ psql_run -f supabase/tests/supabase_stub.sql >/dev/null
 
 echo "== migrations 001-015"
 for f in supabase/migrations/0*.sql; do
-  case "$f" in *016_*) continue ;; esac
+  # 016より前（001〜015）だけを適用する。017以降は016の後に作られたもので、
+  # 修正前の状態の再現（016_before.test.sql）には含めない
+  num=$(basename "$f" | cut -c1-3)
+  [ "$((10#$num))" -lt 16 ] || continue
   docker exec -w / -e PGOPTIONS="-c client_min_messages=warning" "$CONTAINER" \
     psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres -f "$f" >/dev/null
 done

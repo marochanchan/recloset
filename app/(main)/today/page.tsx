@@ -1,5 +1,8 @@
 import { ClosetSummary } from "@/components/closet-summary";
-import { TodaySkeleton } from "@/components/loading-skeletons";
+import {
+  TodaySkeleton,
+  WeeklyProgressSkeleton,
+} from "@/components/loading-skeletons";
 import { OnboardingSteps } from "@/components/onboarding-steps";
 import {
   TodayOutfitCard,
@@ -9,6 +12,11 @@ import {
   suggestTodayOutfit,
   type OutfitItemInput,
 } from "@/lib/outfit-suggestion";
+import {
+  WeeklyProgressCard,
+  WeeklyProgressError,
+} from "@/components/weekly-progress-card";
+import { fetchWeeklyProgress } from "@/lib/habit-progress-query";
 import {
   getCurrentClaims,
   getCurrentDisplayName,
@@ -37,7 +45,21 @@ const NEXT_LINKS = [
   },
 ];
 
-// ログイン後のトップ（天気・今日のRe:try・クローゼットサマリー）。
+// 今週のRe:Closet（見直し・着用の週次進捗）。Todayの他の表示を待たせないよう、
+// 独立したSuspenseで読み込む。取得に失敗したら0着ではなくエラーを表示する
+async function WeeklyProgressSection() {
+  const result = await fetchWeeklyProgress(await createClient());
+  return result.ok ? (
+    <WeeklyProgressCard
+      progress={result.progress}
+      goalLoadFailed={result.goalLoadFailed}
+    />
+  ) : (
+    <WeeklyProgressError />
+  );
+}
+
+// ログイン後のトップ（天気・今日のRe:try・今週のRe:Closet・クローゼットサマリー）。
 // 未ログインはproxyで/auth/loginへリダイレクトされる。
 async function TodayContent() {
   const supabase = await createClient();
@@ -152,6 +174,13 @@ async function TodayContent() {
           )
         )}
       </div>
+
+      {/* 服が0着のときはオンボーディングを優先し、進捗は出さない */}
+      {!isClosetEmpty && (
+        <Suspense fallback={<WeeklyProgressSkeleton />}>
+          <WeeklyProgressSection />
+        </Suspense>
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">クローゼットサマリー</h2>

@@ -1,6 +1,11 @@
 "use server";
 
 import { validateDisplayName } from "@/lib/display-name";
+import {
+  parseWeeklyReviewGoalValue,
+  type WeeklyReviewGoal,
+} from "@/lib/habit-progress";
+import { saveWeeklyReviewGoal } from "@/lib/habit-settings";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
@@ -64,4 +69,47 @@ export async function updateDisplayName(
   // 公開中の服がある場合、一覧・詳細の「公開した人」に新しい名前を反映する
   revalidatePath("/(main)/discover", "layout");
   return { error: null, displayName: updated.display_name as string };
+}
+
+type UpdateWeeklyReviewGoalResult =
+  | { error: string; goal?: undefined }
+  | { error: null; goal: WeeklyReviewGoal };
+
+/**
+ * ログインユーザー本人の週次の見直し目標（user_habit_settings、migration 017）を保存する。
+ * - 対象ユーザーはクライアントから受け取らず、auth.getUser()の結果だけを使う
+ * - 受け付ける値は "3"・"7"・"14"・"none"（目標なし）だけ。DBのCHECK制約が最終防衛線
+ * - 保存後、Todayの進捗に新しい目標を反映する（今週の進捗率も新しい目標で計算される）
+ */
+export async function updateWeeklyReviewGoal(
+  input: unknown,
+): Promise<UpdateWeeklyReviewGoalResult> {
+  const parsed = parseWeeklyReviewGoalValue(input);
+  if (!parsed.ok) {
+    return { error: "目標を選択肢から選んでください" };
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { error: "ログイン情報が確認できませんでした" };
+  }
+
+  const saved = await saveWeeklyReviewGoal(supabase, user.id, parsed.goal);
+  if (!saved.ok) {
+    return {
+      error:
+        saved.reason === "invalid"
+          ? "目標を選択肢から選んでください"
+          : "目標の保存に失敗しました。時間をおいてもう一度お試しください",
+    };
+  }
+
+  revalidatePath("/protected/settings");
+  revalidatePath("/today");
+  return { error: null, goal: saved.goal };
 }
