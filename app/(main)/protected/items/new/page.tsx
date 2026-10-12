@@ -44,7 +44,7 @@ async function NewClothingItemContent({
 }) {
   const { draft: rawDraftId, mode } = await searchParams;
   if (rawDraftId === undefined) {
-    // ?mode=photo（Closetの「続けて写真だけ登録」）なら、写真だけ登録で開く
+    // ?mode=photo（Closet・見直し画面の「写真だけで登録」）なら、写真だけで登録する画面で開く
     return (
       <NewClothingItemForm entryMode={mode === "photo" ? "photo" : "normal"} />
     );

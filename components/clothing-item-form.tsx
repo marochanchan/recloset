@@ -13,11 +13,15 @@ import {
 import { ClothingImageSection } from "@/components/clothing-image-section";
 import {
   rememberDraftSavedNotice,
-  rememberPhotoRegisteredNotice,
 } from "@/components/draft-saved-notice";
+import { EntryModeSelector } from "@/components/entry-mode-selector";
 import { FavoriteToggle } from "@/components/favorite-toggle";
 import { ImageAutofillStatus } from "@/components/image-autofill-status";
-import { LeaveConfirmDialog } from "@/components/leave-confirm-dialog";
+import {
+  DEFAULT_LEAVE_DESCRIPTION,
+  LeaveConfirmDialog,
+} from "@/components/leave-confirm-dialog";
+import { PhotoBatchRegisterForm } from "@/components/photo-batch-register-form";
 import { SeasonSelector } from "@/components/season-selector";
 import { useImageAutofill } from "@/components/use-image-autofill";
 import {
@@ -25,6 +29,10 @@ import {
   type ClothingDraftToResume,
 } from "@/components/use-clothing-draft";
 import type { DraftFields } from "@/lib/clothing-drafts";
+import {
+  PHOTO_ENTRY_PENDING_NOTE,
+  resolveEntryLeaveGuards,
+} from "@/lib/photo-batch-state";
 import {
   MAX_IMAGE_COUNT,
   useClothingImages,
@@ -35,8 +43,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  PHOTO_ONLY_CATEGORY,
-  PHOTO_ONLY_TITLE,
   CATEGORY_OPTIONS,
   COLOR_OPTIONS,
   getSubcategoryOptions,
@@ -54,7 +60,7 @@ import {
 } from "@/lib/marketplace-urls";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const selectClassName = cn(
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
@@ -103,14 +109,23 @@ export type ClothingEntryMode = "normal" | "photo";
 
 type ClothingItemFormProps = {
   mode?: "create" | "edit";
-  /** 新規登録で最初に選んでおく入力方法（下書きの再開・編集では通常登録） */
-  entryMode?: ClothingEntryMode;
   /** mode === "edit" のとき必須 */
   itemId?: string;
   initialValues?: ClothingItemFormInitialValues;
   initialImages?: ExistingClothingImage[];
   /** 新規登録で再開する下書き（サーバーで本人の下書きと確認済み） */
   draft?: ClothingDraftToResume | null;
+  /**
+   * 新規登録ページで「写真だけ登録」を選んだとき（親が写真からまとめて登録する画面を
+   * 表示する）。指定したときだけ、入力方法の切り替えを表示する
+   */
+  onEntryModeChange?: (mode: ClothingEntryMode) => void;
+  /** 離脱の確認をこのフォームで行うか（新規登録ページで隠れているときはfalse） */
+  leaveGuardEnabled?: boolean;
+  /** 写真だけ登録の画面に、まだ登録していない写真がある（離脱の確認に含める） */
+  otherEntryPending?: boolean;
+  /** 保存していない変更の有無が変わったとき（新規登録ページで離脱の確認をまとめるため） */
+  onDirtyChange?: (isDirty: boolean) => void;
 } & React.ComponentPropsWithoutRef<"div">;
 
 export function ClothingItemForm({
@@ -120,16 +135,16 @@ export function ClothingItemForm({
   initialValues,
   initialImages = [],
   draft = null,
-  entryMode = "normal",
+  onEntryModeChange,
+  leaveGuardEnabled = true,
+  otherEntryPending = false,
+  onDirtyChange,
   ...props
 }: ClothingItemFormProps) {
   const isEdit = mode === "edit";
-  // 写真だけ登録を選べるのは、新しく登録するとき（下書きの再開・編集を除く）だけ。
-  // 写真1枚で1着を登録する（写真以外は入力せず、AIも呼ばない）
-  const canChooseEntryMode = !isEdit && !draft;
-  const [isPhotoOnly, setIsPhotoOnly] = useState(
-    canChooseEntryMode && entryMode === "photo",
-  );
+  // 写真だけ登録（写真からまとめて登録）は別の画面（photo-batch-register-form.tsx）。
+  // 切り替えを出すのは、新しく登録するとき（下書きの再開・編集を除く）だけ
+  const canChooseEntryMode = !isEdit && !draft && onEntryModeChange !== undefined;
 
   // フォームの初期値。下書きから再開する場合は下書きの値、編集では保存済みの値。
   // 未保存の変更があるかどうかの基準にもなる
@@ -219,8 +234,6 @@ export function ClothingItemForm({
   const imageState = useClothingImages({
     initialImages,
     onError: setError,
-    // 写真だけ登録は1着につき写真1枚（通常登録で選んだ写真は切り替えても消さない）
-    maxImages: isPhotoOnly ? 1 : undefined,
   });
   const {
     images,
@@ -233,11 +246,9 @@ export function ClothingItemForm({
 
   // 新規登録では、代表画像（先頭）からタイトル・カテゴリーを自動入力する
   const representativeImage = activeImages[0];
-  // 写真だけ登録ではAIを呼ばない（無効にし、解析対象も渡さない）
   const autofill = useImageAutofill({
-    enabled: !isEdit && !isPhotoOnly,
+    enabled: !isEdit,
     target:
-      !isPhotoOnly &&
       representativeImage?.kind === "new" &&
       representativeImage.processed &&
       !representativeImage.isProcessing
@@ -280,7 +291,13 @@ export function ClothingItemForm({
     ),
     addDraftImages,
     setDraftPaths,
+    leaveGuardEnabled,
+    externalPending: otherEntryPending,
   });
+  const isDirty = clothingDraft.isDirty;
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
   const isDraftBlocking =
     clothingDraft.isLoadingDraft || clothingDraft.draftLoadFailed;
 
@@ -325,12 +342,7 @@ export function ClothingItemForm({
     setMarketplaceUrlErrors(urlErrors);
     if (Object.keys(urlErrors).length > 0) {
       setIsMarketplaceOpen(true);
-      // 写真だけ登録では出品先URLの欄を出していないため、切り替え先を伝える
-      setError(
-        isPhotoOnly
-          ? "通常登録に切り替えて、出品先URLの入力内容を確認してください"
-          : "出品先URLの入力内容を確認してください",
-      );
+      setError("出品先URLの入力内容を確認してください");
       return;
     }
 
@@ -341,17 +353,6 @@ export function ClothingItemForm({
       (img) => img.kind === "existing" && !img.pendingDelete,
     ).length;
 
-    // 写真だけ登録は、写真1枚で1着
-    if (isPhotoOnly && newImages.length === 0) {
-      setError("服の写真を1枚選んでください");
-      return;
-    }
-    if (isPhotoOnly && activeImages.length > 1) {
-      setError(
-        "写真だけ登録は1着につき写真1枚です。写真を1枚にするか、通常登録に切り替えてください",
-      );
-      return;
-    }
     if (activeExistingCount + newImages.length > MAX_IMAGE_COUNT) {
       setError(`画像は合計${MAX_IMAGE_COUNT}枚までです`);
       return;
@@ -390,18 +391,12 @@ export function ClothingItemForm({
           ? itemId
           : (pendingItemIdRef.current ??= crypto.randomUUID());
 
-      // 写真だけ登録では、DBの必須項目（タイトル・カテゴリー）を決まった値で補う。
-      // 通常登録で入力済みの値があれば、そのまま使う
-      const savedCategory =
-        isPhotoOnly && !category ? PHOTO_ONLY_CATEGORY : category;
-      const savedTitle = isPhotoOnly && !title.trim() ? PHOTO_ONLY_TITLE : title;
-
       const payload = {
-        title: savedTitle,
+        title,
         brand: brand || null,
-        category: savedCategory,
+        category,
         // 種類はカテゴリーに属する値、メインカラーは選択肢にある値だけを保存する
-        subcategory: isSubcategoryForCategory(savedCategory, subcategory)
+        subcategory: isSubcategoryForCategory(category, subcategory)
           ? subcategory
           : null,
         main_color: isColorValue(mainColor) ? mainColor : null,
@@ -610,7 +605,6 @@ export function ClothingItemForm({
         });
       } else {
         isLeaving = true;
-        if (isPhotoOnly) rememberPhotoRegisteredNotice();
         resetForm();
         router.push("/protected/items");
       }
@@ -692,8 +686,11 @@ export function ClothingItemForm({
       <LeaveConfirmDialog
         {...clothingDraft.leaveConfirm}
         description={
-          isPhotoOnly
-            ? "このまま移動すると、選んだ写真は登録されません。"
+          // 写真だけ登録の画面（隠れている）に未登録の写真があれば、1回の確認で一緒に伝える
+          otherEntryPending
+            ? isDirty
+              ? `${DEFAULT_LEAVE_DESCRIPTION}${PHOTO_ENTRY_PENDING_NOTE}`
+              : PHOTO_ENTRY_PENDING_NOTE
             : undefined
         }
       />
@@ -711,16 +708,14 @@ export function ClothingItemForm({
         <CardContent>
           {canChooseEntryMode && (
             <EntryModeSelector
-              isPhotoOnly={isPhotoOnly}
-              onChange={setIsPhotoOnly}
+              isPhotoOnly={false}
+              onChange={(photoOnly) => {
+                if (photoOnly) onEntryModeChange?.("photo");
+              }}
               disabled={isLoading || clothingDraft.isSavingDraft}
             />
           )}
-          <p className="mb-4 text-xs text-muted-foreground">
-            {isPhotoOnly
-              ? "写真を選んで登録するだけ。名前や種類はあとから追加できます"
-              : "* 必須項目"}
-          </p>
+          <p className="mb-4 text-xs text-muted-foreground">* 必須項目</p>
           <form
             onSubmit={handleSubmit}
             onInvalidCapture={(e) => {
@@ -735,12 +730,10 @@ export function ClothingItemForm({
                 description={
                   isEdit
                     ? "写真を追加・並べ替え・削除できます"
-                    : isPhotoOnly
-                      ? "服の写真を1枚選んでください"
-                      : "写真からタイトルとカテゴリーを自動入力できます。写真なしでも登録できます"
+                    : "写真からタイトルとカテゴリーを自動入力できます。写真なしでも登録できます"
                 }
                 autofillStatus={
-                  isEdit || isPhotoOnly ? undefined : (
+                  isEdit ? undefined : (
                     <ImageAutofillStatus
                       status={autofill.status}
                       canAnalyze={autofill.canAnalyze}
@@ -750,9 +743,7 @@ export function ClothingItemForm({
                 }
               />
 
-              {/* 写真だけ登録では、写真以外の入力欄を出さない（入力済みの値は残る） */}
-              {!isPhotoOnly && (
-                <>
+              <>
                   <div className="grid gap-2">
                     <Label htmlFor="title" className="flex items-center gap-2">
                       タイトル *
@@ -948,13 +939,7 @@ export function ClothingItemForm({
                     </div>
                   </details>
                 </>
-              )}
 
-              {isPhotoOnly && activeImages.length > 1 && (
-                <p className="text-sm text-muted-foreground">
-                  写真だけ登録は1着につき写真1枚です。写真を1枚にするか、通常登録に切り替えてください
-                </p>
-              )}
               {error && <p className="text-sm text-red-500">{error}</p>}
               {clothingDraft.isLoadingDraft && (
                 <p className="text-sm text-muted-foreground">
@@ -973,9 +958,7 @@ export function ClothingItemForm({
                   isLoading ||
                   isPreparingImages ||
                   clothingDraft.isSavingDraft ||
-                  isDraftBlocking ||
-                  // 写真だけ登録は、写真1枚のときだけ押せる
-                  (isPhotoOnly && activeImages.length !== 1)
+                  isDraftBlocking
                 }
               >
                 {isPreparingImages && !isLoading
@@ -986,12 +969,9 @@ export function ClothingItemForm({
                     : "登録中..."
                   : isEdit
                     ? "保存する"
-                    : isPhotoOnly
-                      ? "クローゼットに登録"
-                      : "登録する"}
+                    : "登録する"}
               </Button>
-              {/* 写真だけ登録は入力がないため、下書きは使わない */}
-              {!isEdit && !isPhotoOnly && (
+              {!isEdit && (
                 <div className="flex flex-col gap-1">
                   <Button
                     type="button"
@@ -1037,56 +1017,6 @@ export function ClothingItemForm({
   );
 }
 
-// 新規登録の入力方法の切り替え（入力中の値・写真は切り替えても残る）
-function EntryModeSelector({
-  isPhotoOnly,
-  onChange,
-  disabled,
-}: {
-  isPhotoOnly: boolean;
-  onChange: (isPhotoOnly: boolean) => void;
-  disabled: boolean;
-}) {
-  const options = [
-    { photoOnly: false, label: "通常登録", description: "名前や種類も入力（AIが補助）" },
-    { photoOnly: true, label: "写真だけ登録", description: "写真1枚ですぐ登録" },
-  ];
-  return (
-    <div
-      role="radiogroup"
-      aria-label="登録のしかた"
-      className="mb-4 grid grid-cols-2 gap-2"
-    >
-      {options.map((option) => {
-        const selected = option.photoOnly === isPhotoOnly;
-        return (
-          <button
-            key={option.label}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            disabled={disabled}
-            onClick={() => onChange(option.photoOnly)}
-            className={cn(
-              "flex flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left transition-colors disabled:opacity-50",
-              selected
-                ? "border-primary bg-primary/5"
-                : "text-muted-foreground hover:bg-accent",
-            )}
-          >
-            <span className="text-sm font-medium text-foreground">
-              {option.label}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {option.description}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 // 写真からAIが入力した値の目印（ユーザーが修正すると消える）
 function AiBadge() {
   return (
@@ -1120,11 +1050,51 @@ export function NewClothingItemForm({
   entryMode?: ClothingEntryMode;
 }) {
   const { bfcacheId } = useRouter();
+  if (draft) {
+    return (
+      <ClothingItemForm key={`${bfcacheId}:${draft.id}:normal`} draft={draft} />
+    );
+  }
   return (
-    <ClothingItemForm
-      key={`${bfcacheId}:${draft?.id ?? "new"}:${entryMode}`}
-      draft={draft}
-      entryMode={entryMode}
-    />
+    <NewClothingItemEntry key={`${bfcacheId}:new:${entryMode}`} entryMode={entryMode} />
+  );
+}
+
+// 通常登録と、写真からまとめて登録する画面（photo-batch-register-form.tsx）を切り替える。
+// 切り替えても入力中の内容・選んだ写真が消えないよう、どちらも表示を隠すだけにする
+// （写真からまとめて登録する画面は、はじめて選んだときに作る）。
+// 離脱の確認は表示中の画面だけが行い、もう一方の未保存の内容も1回の確認で伝える
+// （隠れた画面の確認ダイアログは見えないため、二重に・見えない確認を出さない）
+function NewClothingItemEntry({ entryMode }: { entryMode: ClothingEntryMode }) {
+  const [mode, setMode] = useState<ClothingEntryMode>(entryMode);
+  const [isPhotoMounted, setIsPhotoMounted] = useState(entryMode === "photo");
+  const [normalDirty, setNormalDirty] = useState(false);
+  const [photoPending, setPhotoPending] = useState(false);
+  const changeMode = (next: ClothingEntryMode) => {
+    if (next === "photo") setIsPhotoMounted(true);
+    setMode(next);
+  };
+  const guards = resolveEntryLeaveGuards({ mode, normalDirty, photoPending });
+  return (
+    <>
+      <div hidden={mode !== "normal"}>
+        <ClothingItemForm
+          onEntryModeChange={changeMode}
+          leaveGuardEnabled={guards.normal}
+          otherEntryPending={photoPending}
+          onDirtyChange={setNormalDirty}
+        />
+      </div>
+      {isPhotoMounted && (
+        <div hidden={mode !== "photo"}>
+          <PhotoBatchRegisterForm
+            onSwitchToNormal={() => changeMode("normal")}
+            leaveGuardEnabled={guards.photo}
+            otherEntryDirty={normalDirty}
+            onPendingChange={setPhotoPending}
+          />
+        </div>
+      )}
+    </>
   );
 }

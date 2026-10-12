@@ -51,9 +51,18 @@ export function useClothingDraft({
   images,
   addDraftImages,
   setDraftPaths,
+  leaveGuardEnabled = true,
+  externalPending = false,
 }: {
   /** 新規登録のときだけtrue（編集では下書きを使わない） */
   enabled: boolean;
+  /**
+   * 離脱の確認をこのフォームで行うか（新規登録ページで隠れているときはfalse。
+   * 隠れた画面の確認ダイアログは見えないため、表示中の画面だけが確認する）
+   */
+  leaveGuardEnabled?: boolean;
+  /** このフォーム以外に未保存の内容がある（写真だけ登録で選んだ写真など） */
+  externalPending?: boolean;
   initialDraft: ClothingDraftToResume | null;
   /** フォームの初期値（変更の有無の基準） */
   initialFields: DraftFields;
@@ -141,8 +150,9 @@ export function useClothingDraft({
     toSnapshot(fields, imageIdsOf(images)) !== baseline;
 
   // 未保存の変更があるときだけ、離脱の確認を出す
+  const isLeaveGuardActive = leaveGuardEnabled && (isDirty || externalPending);
   useEffect(() => {
-    if (!isDirty) return;
+    if (!isLeaveGuardActive) return;
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (leaveAllowedRef.current) return;
@@ -189,7 +199,7 @@ export function useClothingDraft({
       window.removeEventListener("beforeunload", handleBeforeUnload);
       document.removeEventListener("click", handleLinkClick, true);
     };
-  }, [isDirty]);
+  }, [isLeaveGuardActive]);
 
   /**
    * 下書きを保存する。成功したら true（呼び出し元で画面を移動する）、

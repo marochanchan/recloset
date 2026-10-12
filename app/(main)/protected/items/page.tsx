@@ -412,10 +412,14 @@ export default function ClothingItemsPage({
       {/* 狭い画面ではボタンが見出しの下へ折り返す */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">クローゼット一覧</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Suspense fallback={null}>
             <DraftsButton />
           </Suspense>
+          {/* 写真を選ぶだけで、1着でもまとめてでも登録できる入口 */}
+          <Button asChild variant="outline">
+            <Link href="/protected/items/new?mode=photo">写真だけで登録</Link>
+          </Button>
           <Button asChild>
             <Link href="/protected/items/new">服を登録</Link>
           </Button>

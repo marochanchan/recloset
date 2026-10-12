@@ -74,9 +74,14 @@ export function OnboardingSteps({
 
       {showRegisterCta && (
         <div className="flex flex-col gap-3 border-t pt-4">
-          <Button asChild className="w-full sm:w-fit">
-            <Link href="/protected/items/new">最初の服を登録する</Link>
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button asChild className="w-full sm:w-fit">
+              <Link href="/protected/items/new">最初の服を登録する</Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full sm:w-fit">
+              <Link href="/protected/items/new?mode=photo">写真だけで、まとめて登録</Link>
+            </Button>
+          </div>
           <p className="text-xs text-muted-foreground">
             着用記録・AI診断・Loopへの公開は、服を登録したあとの詳細ページから行えます。
           </p>

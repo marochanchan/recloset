@@ -80,10 +80,10 @@ async function ReviewHome() {
       <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center">
         <p className="font-medium">見直せる服がありません</p>
         <p className="text-sm text-muted-foreground">
-          まずはクローゼットに服を登録してみましょう。写真だけでも登録できます。
+          まずはクローゼットに服を登録してみましょう。写真だけで、1着でもまとめてでも登録できます。
         </p>
         <Button asChild size="sm">
-          <Link href="/protected/items/new?mode=photo">写真だけ登録</Link>
+          <Link href="/protected/items/new?mode=photo">写真だけで登録</Link>
         </Button>
       </div>
     );
