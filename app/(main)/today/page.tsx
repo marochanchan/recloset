@@ -1,9 +1,11 @@
 import { ClosetSummary } from "@/components/closet-summary";
 import {
+  ReQuestSkeleton,
   TodaySkeleton,
   WeeklyProgressSkeleton,
 } from "@/components/loading-skeletons";
 import { OnboardingSteps } from "@/components/onboarding-steps";
+import { ReQuestCard, ReQuestError } from "@/components/re-quest-card";
 import {
   TodayOutfitCard,
   WeatherAttribution,
@@ -20,6 +22,10 @@ import {
   fetchWeeklyProgress,
   type WeeklyProgressResult,
 } from "@/lib/habit-progress-query";
+import {
+  fetchReQuestProgress,
+  type ReQuestResult,
+} from "@/lib/re-quest-query";
 import {
   getCurrentClaims,
   getCurrentDisplayName,
@@ -71,11 +77,21 @@ async function WeeklyProgressSection({
 
 // ログイン後のトップ（天気・今日のRe:try・今週のRe:Closet・クローゼットサマリー）。
 // 未ログインはproxyで/auth/loginへリダイレクトされる。
+async function ReQuestSection({
+  resultPromise,
+}: {
+  resultPromise: Promise<ReQuestResult>;
+}) {
+  const result = await resultPromise;
+  return result.ok ? <ReQuestCard progress={result.progress} /> : <ReQuestError />;
+}
+
 async function TodayContent() {
   const supabase = await createClient();
-  // 週次進捗は他の取得と並行して始める（例外は投げず、失敗は ok:false で返る）。
+  // 週次進捗・Re:Questは他の取得と並行して始める（例外は投げず、失敗は ok:false で返る）。
   // 服が0着なら表示しないため、結果は使わずに終わる
   const weeklyProgressPromise = fetchWeeklyProgress(supabase);
+  const reQuestPromise = fetchReQuestProgress(supabase);
   const [
     displayName,
     totalResult,
@@ -188,11 +204,17 @@ async function TodayContent() {
         )}
       </div>
 
-      {/* 服が0着のときはオンボーディングを優先し、進捗は出さない */}
+      {/* 服が0着のときはオンボーディングを優先し、クエスト・進捗は出さない。
+          今日のRe:Quest（今日、何か1つ）→ 今週のRe:Closet（週の見直し目標）の順 */}
       {!isClosetEmpty && (
-        <Suspense fallback={<WeeklyProgressSkeleton />}>
-          <WeeklyProgressSection resultPromise={weeklyProgressPromise} />
-        </Suspense>
+        <div className="flex flex-col gap-6">
+          <Suspense fallback={<ReQuestSkeleton />}>
+            <ReQuestSection resultPromise={reQuestPromise} />
+          </Suspense>
+          <Suspense fallback={<WeeklyProgressSkeleton />}>
+            <WeeklyProgressSection resultPromise={weeklyProgressPromise} />
+          </Suspense>
+        </div>
       )}
 
       <section className="flex flex-col gap-3">
