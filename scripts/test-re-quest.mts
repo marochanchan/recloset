@@ -43,7 +43,11 @@ const { fetchReQuestProgress } = await import("../lib/re-quest-query.ts");
 const NOW = new Date("2026-10-15T03:00:00Z");
 const RANGE = getJstWeekRangeUtc(NOW);
 
-type Activity = { kind: "register" | "review" | "wear"; clothingItemId: string; occurredAt: string };
+type Activity = {
+  kind: "register" | "review" | "wear" | "organize" | "circulate";
+  clothingItemId: string;
+  occurredAt: string;
+};
 const act = (kind: Activity["kind"], clothingItemId: string, occurredAt: string): Activity => ({
   kind,
   clothingItemId,
@@ -124,6 +128,26 @@ describe("summarizeActivitiesByDay（重複・範囲）", () => {
       RANGE,
     );
     assert.equal(thursday.wearLogCount, 2);
+  });
+
+  test("整理・循環（Re:Garden用の種類）は登録・見直し・着用に混ぜず、行動日にも数えない", () => {
+    const days = summarizeActivitiesByDay(
+      [act("organize", "a", "2026-10-15T00:00:00Z"), act("circulate", "b", "2026-10-15T00:00:00Z")],
+      RANGE,
+    );
+    assert.deepEqual(days[3], {
+      dateKey: "2026-10-15",
+      registeredItemCount: 0,
+      reviewedItemCount: 0,
+      wearLogCount: 0,
+    });
+    const progress = buildReQuestProgress({
+      activities: [act("organize", "a", "2026-10-15T00:00:00Z")],
+      range: RANGE,
+      now: NOW,
+    });
+    assert.equal(progress.achievedToday, false);
+    assert.equal(progress.activeDaysThisWeek, 0);
   });
 
   test("週の範囲外（前週の日曜23:59 JST・翌週の月曜0:00 JST）は数えない", () => {

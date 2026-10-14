@@ -15,15 +15,22 @@ import {
 // - 記録が削除・変更されると集計も変わる（服を削除すると、その服の着用・見直しの記録も消える）
 //
 // Re:Quest・Re:Garden・Re:Storyで共通に使う。表示の文言はここに置かない。
-// カテゴリ・季節の仕分け、出品・売却は、上書きされない記録がないため今は含めない
-// （将来、共通の行動ログを作るときに検討する）
+// - organize（整理: 仕分け・手放し候補）・circulate（循環: 出品中・売却済み）は、
+//   行動履歴（closet_activity_events、migration 019）にだけある種類。
+//   Re:Quest の日ごとの集計（summarizeActivitiesByDay）には含めない
 // ============================================================
 
 // lib/habit-progress.ts・lib/wear-logs.ts と同じ日本時間のオフセット
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export const CLOSET_ACTIVITY_KINDS = ["register", "review", "wear"] as const;
+export const CLOSET_ACTIVITY_KINDS = [
+  "register",
+  "review",
+  "wear",
+  "organize",
+  "circulate",
+] as const;
 
 export type ClosetActivityKind = (typeof CLOSET_ACTIVITY_KINDS)[number];
 
@@ -105,7 +112,8 @@ export function isActiveDay(summary: DailyActivitySummary): boolean {
 
 /**
  * 週の行動を日ごとにまとめる（月曜→日曜の7日分。行動がない日も0で返す）。
- * 範囲外・不正な時刻の行動は数えない
+ * 範囲外・不正な時刻の行動は数えない。
+ * 登録・見直し・着用だけを数え、整理・循環は数えない（見直しなどに混ぜない）
  */
 export function summarizeActivitiesByDay(
   activities: ClosetActivity[],
@@ -123,7 +131,10 @@ export function summarizeActivitiesByDay(
       wearCount.set(dateKey, (wearCount.get(dateKey) ?? 0) + 1);
       continue;
     }
-    const byDay = activity.kind === "register" ? registered : reviewed;
+    let byDay: Map<string, Set<string>>;
+    if (activity.kind === "register") byDay = registered;
+    else if (activity.kind === "review") byDay = reviewed;
+    else continue;
     const ids = byDay.get(dateKey) ?? new Set<string>();
     ids.add(activity.clothingItemId);
     byDay.set(dateKey, ids);

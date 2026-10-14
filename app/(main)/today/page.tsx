@@ -1,9 +1,11 @@
 import { ClosetSummary } from "@/components/closet-summary";
 import {
+  GardenSkeleton,
   ReQuestSkeleton,
   TodaySkeleton,
   WeeklyProgressSkeleton,
 } from "@/components/loading-skeletons";
+import { GardenCard, GardenError } from "@/components/garden-card";
 import { OnboardingSteps } from "@/components/onboarding-steps";
 import { ReQuestCard, ReQuestError } from "@/components/re-quest-card";
 import {
@@ -22,6 +24,7 @@ import {
   fetchWeeklyProgress,
   type WeeklyProgressResult,
 } from "@/lib/habit-progress-query";
+import { fetchGardenGrowth, type GardenResult } from "@/lib/garden-query";
 import {
   fetchReQuestProgress,
   type ReQuestResult,
@@ -86,12 +89,26 @@ async function ReQuestSection({
   return result.ok ? <ReQuestCard progress={result.progress} /> : <ReQuestError />;
 }
 
+async function GardenSection({
+  resultPromise,
+}: {
+  resultPromise: Promise<GardenResult>;
+}) {
+  const [result, claims] = await Promise.all([resultPromise, getCurrentClaims()]);
+  return result.ok ? (
+    <GardenCard growth={result.growth} userId={claims?.sub ?? null} />
+  ) : (
+    <GardenError />
+  );
+}
+
 async function TodayContent() {
   const supabase = await createClient();
   // 週次進捗・Re:Questは他の取得と並行して始める（例外は投げず、失敗は ok:false で返る）。
   // 服が0着なら表示しないため、結果は使わずに終わる
   const weeklyProgressPromise = fetchWeeklyProgress(supabase);
   const reQuestPromise = fetchReQuestProgress(supabase);
+  const gardenPromise = fetchGardenGrowth(supabase);
   const [
     displayName,
     totalResult,
@@ -205,11 +222,15 @@ async function TodayContent() {
       </div>
 
       {/* 服が0着のときはオンボーディングを優先し、クエスト・進捗は出さない。
-          今日のRe:Quest（今日、何か1つ）→ 今週のRe:Closet（週の見直し目標）の順 */}
+          今日のRe:Quest（今日、何か1つ）→ Re:Garden（行動で育つ植物）
+          → 今週のRe:Closet（週の見直し目標）の順 */}
       {!isClosetEmpty && (
         <div className="flex flex-col gap-6">
           <Suspense fallback={<ReQuestSkeleton />}>
             <ReQuestSection resultPromise={reQuestPromise} />
+          </Suspense>
+          <Suspense fallback={<GardenSkeleton />}>
+            <GardenSection resultPromise={gardenPromise} />
           </Suspense>
           <Suspense fallback={<WeeklyProgressSkeleton />}>
             <WeeklyProgressSection resultPromise={weeklyProgressPromise} />
