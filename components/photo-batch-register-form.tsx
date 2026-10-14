@@ -449,9 +449,17 @@ export function PhotoBatchRegisterForm({
             </div>
           ) : (
             summary.saved > 0 && (
-              <Button asChild variant="outline" className="min-h-11">
-                <Link href="/protected/items">Closetで登録した服を見る</Link>
-              </Button>
+              <div className="flex flex-col gap-2">
+                {/* 写真だけで登録した服に、続けてカテゴリ・季節を付けられる */}
+                <Button asChild className="min-h-11">
+                  <Link href="/protected/items/classify">
+                    クイック仕分けでカテゴリ・季節を付ける
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="min-h-11">
+                  <Link href="/protected/items">Closetで登録した服を見る</Link>
+                </Button>
+              </div>
             )
           )}
         </CardContent>

@@ -42,6 +42,7 @@ import {
 } from "@/components/use-clothing-images";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getCategoryClassifiedPatch } from "@/lib/clothing-classify";
 import {
   CATEGORY_OPTIONS,
   COLOR_OPTIONS,
@@ -416,7 +417,16 @@ export function ClothingItemForm({
       if (isEdit) {
         const { error: updateError } = await supabase
           .from("clothing_items")
-          .update(payload)
+          .update({
+            ...payload,
+            // カテゴリを変えたときだけ、分類した日時を記録する（migration 018。
+            // クイック仕分けで未分類として扱わないため）
+            ...getCategoryClassifiedPatch(
+              initialValues?.category ?? "",
+              category,
+              new Date(),
+            ),
+          })
           .eq("id", targetItemId);
         if (updateError) throw updateError;
       } else {

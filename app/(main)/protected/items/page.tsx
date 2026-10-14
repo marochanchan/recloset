@@ -416,6 +416,10 @@ export default function ClothingItemsPage({
           <Suspense fallback={null}>
             <DraftsButton />
           </Suspense>
+          {/* 写真だけで登録した服などに、カテゴリ・季節をカードで付けていく入口 */}
+          <Button asChild variant="outline">
+            <Link href="/protected/items/classify">クイック仕分け</Link>
+          </Button>
           {/* 写真を選ぶだけで、1着でもまとめてでも登録できる入口 */}
           <Button asChild variant="outline">
             <Link href="/protected/items/new?mode=photo">写真だけで登録</Link>
