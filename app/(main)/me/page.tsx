@@ -156,6 +156,11 @@ export default function MyPage() {
             label="気になる服"
             description="Re:Closet Loopで保存した服"
           />
+          <MenuLink
+            href="/protected/story"
+            label="Re:Story これまでの記録"
+            description="服との日々を、月ごとに振り返る"
+          />
         </CardContent>
       </Card>
 

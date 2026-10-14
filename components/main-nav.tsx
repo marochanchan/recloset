@@ -44,10 +44,11 @@ const MAIN_NAV_ITEMS: MainNavItem[] = [
     href: "/me",
     label: "My Page",
     icon: User,
-    // 設定はMy Pageから開く画面のため、My Pageを現在地とする
+    // 設定・Re:StoryはMy Pageから開く画面のため、My Pageを現在地とする
     match: (pathname) =>
       isPathOrChild(pathname, "/me") ||
-      isPathOrChild(pathname, "/protected/settings"),
+      isPathOrChild(pathname, "/protected/settings") ||
+      isPathOrChild(pathname, "/protected/story"),
   },
 ];
 

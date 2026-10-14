@@ -10,6 +10,7 @@ import {
   GARDEN_STAGE_LABELS,
   getGardenNextStageMessage,
 } from "@/lib/garden-copy";
+import Link from "next/link";
 
 // Todayの「Re:Garden」。ふだんの行動で育つ植物キャラクター
 // （今日の行動は Re:Quest、週の見直し目標は 今週のRe:Closet が担当する）。
@@ -81,6 +82,14 @@ export function GardenCard({
             </div>
           ))}
         </dl>
+
+        {/* 振り返りは Re:Story へ（控えめなリンク） */}
+        <Link
+          href="/protected/story"
+          className="self-end text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        >
+          これまでの記録を見る →
+        </Link>
       </Card>
     </section>
   );

@@ -181,6 +181,42 @@ export function ReQuestSkeleton() {
   );
 }
 
+// Re:Story（app/(main)/protected/story/page.tsx。月の切り替え・まとめ・タイムライン）
+export function ReStorySkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-8 w-20" />
+        <Skeleton className="h-6 w-28" />
+        <Skeleton className="h-8 w-20" />
+      </div>
+      <Card className="flex flex-col gap-3 p-4">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-7 w-24 self-end" />
+        <div className="grid grid-cols-5 gap-1">
+          {Array.from({ length: 5 }, (_, index) => (
+            <Skeleton key={index} className="h-12" />
+          ))}
+        </div>
+        <div className="grid grid-cols-5 gap-1 border-t pt-3">
+          {Array.from({ length: 5 }, (_, index) => (
+            <Skeleton key={index} className="h-10" />
+          ))}
+        </div>
+      </Card>
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-5 w-32" />
+        {Array.from({ length: 3 }, (_, index) => (
+          <div key={index} className="flex flex-col gap-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Todayの「Re:Garden」（components/garden-card.tsx）
 export function GardenSkeleton() {
   return (
