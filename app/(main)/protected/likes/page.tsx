@@ -1,3 +1,4 @@
+import { LikeButton } from "@/components/like-button";
 import { ItemGridSkeleton } from "@/components/loading-skeletons";
 import { PublicClothingItemCard } from "@/components/public-clothing-item-card";
 import { Button } from "@/components/ui/button";
@@ -69,21 +70,27 @@ async function LikedClothingItemsList() {
           ? (signedUrlMap.get(item.cover_image_path) ?? null)
           : null;
 
+        // buttonをLinkの中に入れないよう、カード本体のLinkと♡（解除）を兄弟要素として重ねる。
+        // 解除すると既存のServer Actionが /protected/likes を再検証し、一覧から消える
         return (
-          <Link
-            key={item.id}
-            href={`/discover/${item.id}`}
-            className="block h-full"
-          >
-            <PublicClothingItemCard
-              title={item.title}
-              brand={item.brand}
-              category={item.category}
-              seasons={item.seasons ?? []}
-              ownerDisplayName={item.owner_display_name ?? "Re:Closetユーザー"}
-              imageUrl={imageUrl}
-            />
-          </Link>
+          <div key={item.id} className="relative h-full">
+            <Link
+              href={`/discover/${item.id}`}
+              className="group block h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:opacity-80"
+            >
+              <PublicClothingItemCard
+                title={item.title}
+                brand={item.brand}
+                category={item.category}
+                seasons={item.seasons ?? []}
+                ownerDisplayName={item.owner_display_name ?? "Re:Closetユーザー"}
+                imageUrl={imageUrl}
+              />
+            </Link>
+            <div className="absolute right-2 top-2">
+              <LikeButton itemId={item.id} initialLiked />
+            </div>
+          </div>
         );
       })}
     </div>
@@ -102,7 +109,7 @@ export default function LikedClothingItemsPage() {
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold">気になる服</h1>
         <p className="text-sm text-muted-foreground">
-          Re:Closet Loopで「気になる」に保存した服です。保存したことは、あなた以外には表示されません。
+          Re:Closet Loopで「気になる」に保存した服です。保存したことは、あなた以外には表示されません。公開が終了した服は一覧に表示されません（再公開された場合は、再び表示されることがあります）。
         </p>
       </div>
 

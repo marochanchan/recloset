@@ -139,10 +139,21 @@ async function PublicClothingItemDetail({
           </div>
         ) : itemState && !itemState.isOwner ? (
           <div className="absolute right-3 top-3 z-10">
-            <LikeButton itemId={item.id} initialLiked={itemState.isLiked} />
+            <LikeButton
+              itemId={item.id}
+              initialLiked={itemState.isLiked}
+              showSavedNotice
+            />
           </div>
         ) : null}
       </div>
+
+      {/* ♡を表示しているときだけ（未ログイン・他人の服）、保存の意味と、取引できないことを伝える */}
+      {(!user || (itemState && !itemState.isOwner)) && (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          ♡で気になる服に保存できます{!user && "（ログインが必要です）"}。保存は持ち主に通知されません。Re:Closet内での売買やメッセージはできません。
+        </p>
+      )}
 
       <Card>
         <CardHeader>
