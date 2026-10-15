@@ -65,7 +65,7 @@ export default function AiDiagnosisPage({
 }) {
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">AI診断</h1>
+      <h1 className="text-2xl font-bold">AIと一緒に見直す</h1>
 
       <Suspense
         fallback={

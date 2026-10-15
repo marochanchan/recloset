@@ -26,6 +26,8 @@ import {
 import { getStatusLabel } from "@/lib/clothing-options";
 import { DIAGNOSIS_TYPE_LABELS } from "@/lib/decision-hints";
 import type { NextAction } from "@/lib/next-action";
+import { Check, Sprout } from "lucide-react";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 
 type AiDiagnosisFlowProps = {
@@ -140,24 +142,17 @@ function ElaborationAction({ diagnosisId }: { diagnosisId: string }) {
     });
   };
 
+  // 見出しは外側のブロック（「もう少し考えたいときは」）が担うため、本文だけを出す
   if (elaboration) {
     return (
-      <div className="flex flex-col gap-1">
-        <p className="text-sm font-medium">
-          Geminiと、この服との今の距離を考える
-        </p>
-        <p className="whitespace-pre-line text-sm text-muted-foreground">
-          {elaboration}
-        </p>
-      </div>
+      <p className="whitespace-pre-line text-sm leading-relaxed">
+        {elaboration}
+      </p>
     );
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm text-muted-foreground">
-        次の一歩とは少し違う角度から、この服との今の関係を言葉にしてみます。
-      </p>
       <Button
         type="button"
         variant="outline"
@@ -267,6 +262,51 @@ function NotWornReasonButtons({
   );
 }
 
+// 主ボタン・副ボタン共通。スマホでも押しやすい高さにし、文言が長くても折り返す
+const NEXT_LINK_BUTTON_CLASS =
+  "h-auto min-h-11 w-full whitespace-normal py-2 text-center";
+
+/**
+ * 診断後の導線（既存画面へのリンクだけ）。
+ * diagnosisIdがある＝ai_diagnosesへの保存に成功した場合だけ、Re:Questへの記録を案内する
+ * （Re:Questの「見直し」はai_diagnosesを直接数えるため、保存できていれば必ず反映される）。
+ * Re:Gardenは活動記録（トリガー）経由かつ1日1ptのため、記録されたとは断定せず仕組みだけを伝える
+ */
+function DiagnosisNextLinks({
+  itemId,
+  recorded,
+}: {
+  itemId: string;
+  recorded: boolean;
+}) {
+  return (
+    <section aria-labelledby="diagnosis-next-title" className="flex flex-col gap-3">
+      <h2 id="diagnosis-next-title" className="text-base font-semibold">
+        次にできること
+      </h2>
+      {recorded && (
+        <p className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm">
+          <Sprout className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            今回の見直しは、今日のRe:Questに記録されました。Re:Gardenも、見直しをした日ごとに育ちます。
+          </span>
+        </p>
+      )}
+      <Button asChild className={NEXT_LINK_BUTTON_CLASS}>
+        <Link href={`/protected/items/${itemId}`}>服の詳細へ</Link>
+      </Button>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Button asChild variant="outline" className={NEXT_LINK_BUTTON_CLASS}>
+          <Link href="/protected/items#review-suggestions-title">次の1着を見直す</Link>
+        </Button>
+        <Button asChild variant="outline" className={NEXT_LINK_BUTTON_CLASS}>
+          <Link href="/today">Todayで今日の記録を見る</Link>
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 export function AiDiagnosisFlow({
   itemId,
   title,
@@ -363,7 +403,7 @@ export function AiDiagnosisFlow({
 
             <div className="flex flex-col gap-2">
               <p className="text-sm font-medium">
-                最近着ていない理由に近いものは？（最大2つ）
+                この服を着る機会や、着るときに気になることは？（最大2つ）
               </p>
               <NotWornReasonButtons
                 options={NOT_WORN_REASON_OPTIONS}
@@ -379,7 +419,7 @@ export function AiDiagnosisFlow({
               onClick={handleSubmit}
               disabled={!canSubmit || isPending}
             >
-              {isPending ? "診断中..." : "診断する"}
+              {isPending ? "考えています..." : "提案を見る"}
             </Button>
           </CardContent>
         </Card>
@@ -388,31 +428,39 @@ export function AiDiagnosisFlow({
       {result && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">診断結果</CardTitle>
+            <CardTitle className="text-lg">今回の提案</CardTitle>
             <CardDescription>
-              これは手放す・残すを決める答えではなく、あなたが考えるためのヒントです。
+              これは手放す・残すを決める答えではなく、あなたが考えるためのヒントです。最終的に決めるのはあなたです。
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-6">
-            <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium">診断タイプ</p>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">
-                  {DIAGNOSIS_TYPE_LABELS[result.decision.choice].badge}
-                </Badge>
-                <span className="text-sm text-muted-foreground">
-                  {DIAGNOSIS_TYPE_LABELS[result.decision.choice].caption}
-                </span>
-              </div>
+            {/* 提案（日本語）を主役に、診断タイプ（英語）は小さく添える */}
+            <div className="flex flex-col items-start gap-2 rounded-lg bg-muted/50 p-4">
+              <Badge variant="outline" className="bg-background">
+                {DIAGNOSIS_TYPE_LABELS[result.decision.choice].badge}
+              </Badge>
+              <p className="text-2xl font-bold leading-snug">
+                {DIAGNOSIS_TYPE_LABELS[result.decision.choice].caption}
+              </p>
             </div>
 
             {/* 着用記録とあなたの回答のうち、今回の診断に関係が深いものを
                 ルールベースで選んで表示する（lib/decision-hints.ts） */}
-            <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium">判断のヒント</p>
-              <ul className="list-disc pl-5 text-sm text-muted-foreground">
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-0.5">
+                <p className="text-sm font-medium">この提案につながったこと</p>
+                <p className="text-xs text-muted-foreground">
+                  あなたの回答と、Re:Closetでの着用記録の有無をもとに考えました。
+                </p>
+              </div>
+              <ul className="flex flex-col gap-2">
                 {result.decisionHints.map((hint) => (
-                  <li key={hint}>{hint}</li>
+                  <li key={hint} className="flex items-start gap-2 text-sm">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted">
+                      <Check className="h-3 w-3" aria-hidden="true" />
+                    </span>
+                    <span className="break-words">{hint}</span>
+                  </li>
                 ))}
               </ul>
             </div>
@@ -433,14 +481,25 @@ export function AiDiagnosisFlow({
                 </div>
               )}
             </div>
-
-            {result.diagnosisId && (
-              <div className="flex flex-col gap-2 border-t pt-3">
-                <ElaborationAction diagnosisId={result.diagnosisId} />
-              </div>
-            )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Geminiは独立したブロック。押したときだけ、1診断1回まで（履歴の保存に成功したときだけ出す） */}
+      {result?.diagnosisId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">もう少し考えたいときは</CardTitle>
+            <CardDescription>AIが、考えるための問いを1つ返します</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ElaborationAction diagnosisId={result.diagnosisId} />
+          </CardContent>
+        </Card>
+      )}
+
+      {result && (
+        <DiagnosisNextLinks itemId={itemId} recorded={result.diagnosisId !== null} />
       )}
     </div>
   );
