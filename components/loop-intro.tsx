@@ -24,17 +24,24 @@ async function LoopLikesLink() {
 /**
  * Re:Closet Loopの見出し（/ と /discover で共通）。
  * スマホで公開服一覧がファーストビューに入るよう、大きなヒーローにはしない。
+ * トップ（/）ではサービス紹介がh1のため、headingLevel="h2" で見出しを1段下げる
+ * （見た目は変えない）。
  */
-export function LoopIntro() {
+export function LoopIntro({
+  headingLevel = "h1",
+}: {
+  headingLevel?: "h1" | "h2";
+}) {
+  const Heading = headingLevel;
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
         <p className="text-xs font-medium tracking-wide text-muted-foreground">
           Re:Closet Loop
         </p>
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+        <Heading className="text-xl font-bold tracking-tight sm:text-2xl">
           誰かのクローゼットをのぞいてみる
-        </h1>
+        </Heading>
         <p className="text-sm text-muted-foreground">
           Re:Closetで服を見直した持ち主が、「次の誰かへつなぎたい」と公開した服です。
         </p>

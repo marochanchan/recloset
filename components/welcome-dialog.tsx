@@ -8,15 +8,19 @@ import { useEffect, useRef } from "react";
 // 未ログインのLoopトップ（/）で一度だけ出す、Re:Closetの初回案内。
 // ネイティブの<dialog>（showModal）を使うため、背景の操作無効化・Escで閉じる・
 // フォーカスの閉じ込めと復帰はブラウザが行う。
-// 閉じた日時をlocalStorageに保存し、一定期間は再表示しない（DBは使わない）。
+// 閉じた日時をlocalStorageに保存し、一定期間は自動で再表示しない（DBは使わない）。
+// トップの「使い方を見る」（WelcomeDialogTrigger）からは、いつでも開き直せる。
 
 const DISMISSED_STORAGE_KEY = "recloset:welcome-dialog-dismissed-at";
 const RESHOW_AFTER_MS = 30 * 24 * 60 * 60 * 1000; // 30日
 
+// 「使い方を見る」からダイアログを開くためのイベント（同じページ内だけで使う）
+const OPEN_EVENT = "recloset:open-welcome-dialog";
+
 const STEPS = [
-  "1着登録",
+  "写真で1着登録",
   "着た日を記録",
-  "AIと一緒に次を考える",
+  "AIと一緒に見直す",
   "Loopやフリマへつなぐ",
 ] as const;
 
@@ -49,6 +53,17 @@ export function WelcomeDialog() {
     const dialog = dialogRef.current;
     if (!dialog || dialog.open || wasRecentlyDismissed()) return;
     dialog.showModal();
+  }, []);
+
+  // 「使い方を見る」から開く。自動表示の抑止期間中でも開ける。
+  // 既に開いている場合は何もしない（二重に開かない）
+  useEffect(() => {
+    const open = () => {
+      const dialog = dialogRef.current;
+      if (dialog && !dialog.open) dialog.showModal();
+    };
+    window.addEventListener(OPEN_EVENT, open);
+    return () => window.removeEventListener(OPEN_EVENT, open);
   }, []);
 
   const close = () => {
@@ -111,7 +126,7 @@ export function WelcomeDialog() {
         <div className="flex flex-col gap-2">
           <Button asChild>
             <Link href="/auth/sign-up" onClick={close}>
-              はじめる
+              新規登録してはじめる
             </Link>
           </Button>
           <Button type="button" variant="ghost" onClick={close}>
@@ -120,5 +135,23 @@ export function WelcomeDialog() {
         </div>
       </div>
     </dialog>
+  );
+}
+
+/** 初回ダイアログを開き直すボタン（同じページにWelcomeDialogがあるときに使う） */
+export function WelcomeDialogTrigger({
+  className,
+}: {
+  className?: string;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className={className}
+      onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}
+    >
+      使い方を見る
+    </Button>
   );
 }
