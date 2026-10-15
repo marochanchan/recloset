@@ -36,9 +36,14 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { getJstDateKey, getTodayWeather } from "@/lib/weather";
+import {
+  getWeatherRegion,
+  WEATHER_REGION_COOKIE,
+} from "@/lib/weather-regions";
 import { getCurrentSeasonJst, getDaysSinceLastWorn } from "@/lib/wear-logs";
 import { ChevronRight, Plus, Recycle } from "lucide-react";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -109,6 +114,10 @@ async function TodayContent() {
   const weeklyProgressPromise = fetchWeeklyProgress(supabase);
   const reQuestPromise = fetchReQuestProgress(supabase);
   const gardenPromise = fetchGardenGrowth(supabase);
+  // 天気の地域（Cookieの地域キーを一覧と照合する。未設定・不正な値は未設定として扱う）
+  const region = getWeatherRegion(
+    (await cookies()).get(WEATHER_REGION_COOKIE)?.value,
+  );
   const [
     displayName,
     totalResult,
@@ -139,8 +148,8 @@ async function TodayContent() {
         .in("category", ["tops", "bottoms", "dress", "outer"])
         .order("sort_order", { referencedTable: "clothing_images" })
         .limit(300),
-      // 横浜の今日の天気（30分キャッシュ。失敗時はnull）
-      getTodayWeather(),
+      // 設定した地域の今日の天気（地域ごとに30分キャッシュ。未設定・失敗時はnull）
+      region ? getTodayWeather(region) : Promise.resolve(null),
     ]);
 
   // 件数の取得に成功し、かつ0件のときだけ初回向けの案内を出す
@@ -213,6 +222,7 @@ async function TodayContent() {
         ) : (
           outfit && (
             <TodayOutfitCard
+              region={region}
               weather={weather}
               suggestion={outfit.suggestion}
               imageUrls={outfit.imageUrls}

@@ -2,14 +2,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { WearTodayButton } from "@/components/wear-today-button";
+import { WeatherRegionSetting } from "@/components/weather-region-setting";
 import type { OutfitPick, OutfitSuggestion } from "@/lib/outfit-suggestion";
 import {
   OPEN_METEO_ATTRIBUTION_URL,
   OPEN_METEO_LICENSE_URL,
-  WEATHER_LOCATION,
   getWeatherLabel,
   type DailyWeather,
 } from "@/lib/weather";
+import type { WeatherRegion } from "@/lib/weather-regions";
 import {
   Cloud,
   CloudDrizzle,
@@ -24,6 +25,9 @@ import Image from "next/image";
 import Link from "next/link";
 
 type TodayOutfitCardProps = {
+  /** 設定した地域（Cookieをサーバーで検証済み。未設定・不正ならnull） */
+  region: WeatherRegion | null;
+  /** 設定した地域の今日の天気（未設定・取得失敗ならnull） */
   weather: DailyWeather | null;
   suggestion: OutfitSuggestion;
   /** 候補の服ID → 代表画像の署名付きURL */
@@ -115,10 +119,12 @@ function OutfitPickCard({
 
 /**
  * ログイン中トップの「今日のRe:try」（天気ベースのコーデ候補）。
- * 横浜の今日の天気と、自分のクローゼットからカテゴリごとに選んだ候補を表示する。
+ * 設定した地域の今日の天気と、自分のクローゼットからカテゴリごとに選んだ候補を表示する。
+ * 地域が未設定なら、天気の枠で地域の設定を案内する（候補は月ベースの季節で選ぶ）。
  * 服同士の色や形の相性を判断したものではない。
  */
 export function TodayOutfitCard({
+  region,
   weather,
   suggestion,
   imageUrls,
@@ -135,35 +141,41 @@ export function TodayOutfitCard({
           今日のRe:try
         </h2>
         <p className="text-sm text-muted-foreground">
-          {suggestion.basis === "weather"
-            ? "横浜の今日の天気と着用記録から、しばらく出番のない服を中心に選びました。"
+          {suggestion.basis === "weather" && region
+            ? `${region.name}の今日の天気と着用記録から、しばらく出番のない服を中心に選びました。`
             : "今の季節と着用記録から、しばらく出番のない服を中心に選びました。"}
         </p>
       </div>
 
       <div className="flex flex-col gap-1 rounded-md border px-3 py-2 text-sm">
-        <p className="text-xs text-muted-foreground">
-          {WEATHER_LOCATION.name}の今日の天気
-        </p>
-        {weather ? (
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <WeatherIcon code={weather.weatherCode} />
-            {weatherLabel && <span>{weatherLabel}</span>}
-            <span>
-              最高{Math.round(weather.maxTemp)}℃ / 最低
-              {Math.round(weather.minTemp)}℃
-            </span>
-            {weather.precipitationProbability !== null && (
-              <span className="text-muted-foreground">
-                ・降水{weather.precipitationProbability}%
-              </span>
+        {region && (
+          <>
+            <p className="text-xs text-muted-foreground">
+              {region.name}の天気
+            </p>
+            {weather ? (
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <WeatherIcon code={weather.weatherCode} />
+                {weatherLabel && <span>{weatherLabel}</span>}
+                <span>
+                  最高{Math.round(weather.maxTemp)}℃ / 最低
+                  {Math.round(weather.minTemp)}℃
+                </span>
+                {weather.precipitationProbability !== null && (
+                  <span className="text-muted-foreground">
+                    ・降水{weather.precipitationProbability}%
+                  </span>
+                )}
+              </p>
+            ) : (
+              <p className="text-muted-foreground">
+                天気を取得できませんでした。今の季節から候補を選んでいます。
+              </p>
             )}
-          </p>
-        ) : (
-          <p className="text-muted-foreground">
-            天気を取得できませんでした。今の季節から候補を選んでいます。
-          </p>
+          </>
         )}
+        {/* 未設定なら設定欄を開いて案内し、設定済みなら「地域を変更」を出す */}
+        <WeatherRegionSetting currentRegionKey={region?.key ?? null} />
       </div>
 
       {suggestion.picks.length > 0 ? (
