@@ -119,6 +119,8 @@ export function getCategoryLabel(value: string): string {
 // 一覧では、この仮タイトルを控えめに表示する
 export const PHOTO_ONLY_TITLE = "写真から登録した服";
 export const PHOTO_ONLY_CATEGORY = "other";
+// 一覧のカードで仮タイトルの代わりに出す短い表示（DBのタイトルは変えない）
+export const PHOTO_ONLY_DISPLAY_LABEL = "未仕分け";
 
 export function getSeasonLabel(value: string): string {
   return SEASON_OPTIONS.find((option) => option.value === value)?.label ?? value;

@@ -28,7 +28,8 @@ export function PublicClothingItemCard({
   imageUrl,
 }: PublicClothingItemCardProps) {
   return (
-    <Card className="flex h-full flex-col overflow-hidden">
+    // Loopではリンク（group）の中に置き、hoverで影を強めて押せることを示す
+    <Card className="flex h-full flex-col overflow-hidden transition-shadow group-hover:shadow-md">
       <div className="relative aspect-square bg-muted">
         {imageUrl ? (
           <Image

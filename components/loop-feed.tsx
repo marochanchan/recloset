@@ -82,7 +82,12 @@ export async function LoopFeed() {
         // 「気になる」ボタンを兄弟要素として重ねる
         return (
           <div key={item.id} className="relative h-full">
-            <Link href={`/discover/${item.id}`} className="block h-full">
+            {/* 押せることが伝わるよう、hover（カードの影）・キーボード操作・タップに反応させる。
+                「気になる」ボタンの位置がずれないよう、拡大縮小はしない */}
+            <Link
+              href={`/discover/${item.id}`}
+              className="group block h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:opacity-80"
+            >
               <PublicClothingItemCard
                 title={item.title}
                 brand={item.brand}

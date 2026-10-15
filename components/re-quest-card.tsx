@@ -7,10 +7,11 @@ import {
   getReQuestMessage,
   getWeekdayLabel,
   RE_QUEST_CARD_TITLE,
+  RE_QUEST_GARDEN_NOTE,
   RE_QUEST_LOAD_ERROR_MESSAGE,
 } from "@/lib/re-quest-copy";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, ChevronRight, Circle } from "lucide-react";
+import { CheckCircle2, ChevronRight, Circle, Sprout } from "lucide-react";
 import Link from "next/link";
 
 // Todayの「今日のRe:Quest」。今日、何か1つ行動できたかを見せる
@@ -43,7 +44,7 @@ export function ReQuestCard({ progress }: { progress: ReQuestProgress }) {
                 <Link
                   href={copy.href}
                   className={cn(
-                    "flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors hover:bg-accent",
+                    "flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2 text-sm outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring active:bg-accent",
                     quest.done && "border-primary/40 bg-primary/5",
                   )}
                 >
@@ -72,6 +73,11 @@ export function ReQuestCard({ progress }: { progress: ReQuestProgress }) {
             );
           })}
         </ul>
+
+        <p className="flex items-center gap-1.5 break-words text-xs text-muted-foreground">
+          <Sprout className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {RE_QUEST_GARDEN_NOTE}
+        </p>
 
         <div className="flex flex-col gap-2 border-t pt-3">
           <p className="break-words text-sm">

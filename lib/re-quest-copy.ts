@@ -12,6 +12,9 @@ export const RE_QUEST_LEAD = "今日は1つでOK。できそうなものから�
 
 export const RE_QUEST_LOAD_ERROR_MESSAGE = "今日のクエストを読み込めませんでした";
 
+/** Re:Garden とのつながり（クエストの行動は Re:Garden の登録・見直し・着用のポイントになる） */
+export const RE_QUEST_GARDEN_NOTE = "ここでの行動が、そのまま下のRe:Gardenを育てます。";
+
 export const RE_QUEST_CELEBRATION_MESSAGE = "今日のクエスト、達成しました！";
 
 export const DAILY_QUEST_COPY: Record<

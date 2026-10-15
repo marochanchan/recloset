@@ -6,10 +6,10 @@ import { cn } from "@/lib/utils";
 // 正方形の画像枠）に合わせ、読み込み完了時にレイアウトが大きく動かないようにする。
 
 const GRID_VARIANTS = {
-  // /protected/items（ClothingItemCard）
+  // /protected/items（ClothingItemCard。スマホは2列・余白小さめ）
   closet: {
-    grid: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4",
-    body: "p-6",
+    grid: "grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4",
+    body: "p-3",
   },
   // /discover（PublicClothingItemCard。スマホは2列・余白小さめ）
   discover: {
@@ -73,7 +73,7 @@ export function ItemDetailSkeleton() {
   );
 }
 
-// Closet「今日見直す3着」（ReviewSuggestionsCard と同じ枠・3行）
+// Closet「今日見直す3着」（ReviewSuggestionsCard と同じ枠。スマホは横スクロール・広い画面は3列）
 export function ReviewSuggestionsSkeleton() {
   return (
     <div className="flex flex-col gap-3 rounded-xl border bg-muted/30 p-4">
@@ -81,15 +81,19 @@ export function ReviewSuggestionsSkeleton() {
         <Skeleton className="h-5 w-32" />
         <Skeleton className="h-3 w-3/4" />
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="-mx-4 flex gap-3 overflow-hidden px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:px-0 sm:pb-0">
         {Array.from({ length: 3 }, (_, index) => (
-          <Card key={index} className="flex items-center gap-3 p-2.5">
-            <Skeleton className="h-16 w-16 shrink-0" />
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <Skeleton className="h-4 w-1/2" />
+          <Card
+            key={index}
+            className="flex w-[40%] min-w-[8.5rem] shrink-0 flex-col overflow-hidden sm:w-auto sm:min-w-0"
+          >
+            <Skeleton className="aspect-square w-full rounded-none" />
+            <div className="flex flex-col gap-2 p-2.5">
+              <Skeleton className="h-4 w-3/4" />
               <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-2/3" />
+              <Skeleton className="h-8 w-full" />
             </div>
-            <Skeleton className="h-8 w-14 shrink-0" />
           </Card>
         ))}
       </div>
@@ -130,7 +134,7 @@ export function TodaySkeleton() {
           <div className="grid gap-3 sm:grid-cols-3">
             {Array.from({ length: 3 }, (_, index) => (
               <Card key={index} className="flex gap-3 p-3 sm:flex-col">
-                <Skeleton className="h-24 w-24 shrink-0 sm:aspect-square sm:h-auto sm:w-full" />
+                <Skeleton className="h-32 w-32 shrink-0 sm:aspect-square sm:h-auto sm:w-full" />
                 <div className="flex flex-1 flex-col gap-2">
                   <Skeleton className="h-5 w-16" />
                   <Skeleton className="h-4 w-3/4" />
@@ -225,18 +229,19 @@ export function GardenSkeleton() {
         <Skeleton className="h-6 w-28" />
         <Skeleton className="h-3 w-3/4" />
       </div>
-      <div className="flex flex-col items-center gap-2 py-1">
+      <div className="flex flex-col items-center gap-2 rounded-xl bg-muted/40 py-5">
         <Skeleton className="h-40 w-40 rounded-full" />
         <Skeleton className="h-5 w-12" />
         <Skeleton className="h-7 w-24" />
       </div>
       <Skeleton className="h-2 w-full rounded-full" />
       <Skeleton className="h-4 w-2/3" />
-      <div className="grid grid-cols-5 gap-1 border-t pt-3">
+      <div className="hidden grid-cols-5 gap-1 border-t pt-3 sm:grid">
         {Array.from({ length: 5 }, (_, index) => (
           <Skeleton key={index} className="h-12" />
         ))}
       </div>
+      <Skeleton className="h-10 w-full" />
     </Card>
   );
 }

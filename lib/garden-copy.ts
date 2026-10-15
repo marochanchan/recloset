@@ -14,6 +14,9 @@ export const GARDEN_CARD_TITLE = "Re:Garden";
 
 export const GARDEN_LEAD = "行動した日ごとに、種類ごとに1ptずつ育ちます。";
 
+/** Re:Story への導線（育ってきた行動の記録を振り返る） */
+export const GARDEN_STORY_LINK_LABEL = "Re:Storyで、服と向き合ってきた日々を振り返る";
+
 export const GARDEN_LOAD_ERROR_MESSAGE = "庭のようすを読み込めませんでした";
 
 export const GARDEN_STAGE_LABELS: Record<GardenStageKey, string> = {

@@ -36,7 +36,7 @@ function MenuLink({
   return (
     <Link
       href={href}
-      className="flex items-center justify-between gap-3 rounded-md px-1 py-2 hover:bg-accent"
+      className="flex min-h-11 items-center justify-between gap-3 rounded-md px-2 py-2 outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring active:bg-accent"
     >
       <span className="flex flex-col">
         <span className="text-sm font-medium">{label}</span>

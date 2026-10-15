@@ -32,10 +32,15 @@ import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { cn } from "@/lib/utils";
 import { getJstDateKey } from "@/lib/weather";
 import { getCurrentSeasonJst } from "@/lib/wear-logs";
+import { Camera, FileText, Plus, Tags } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
 type SearchParamsPromise = Promise<RawSearchParams>;
+
+// 詳細へ移動できる衣類カード。押せることが伝わるよう、hover・キーボード操作・タップに反応させる
+const CLICKABLE_CARD_LINK_CLASS =
+  "group block h-full rounded-xl outline-none transition-transform focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.98]";
 
 function FilterChip({
   href,
@@ -224,7 +229,7 @@ async function ClothingItemsList({
   );
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
       {items.map((item) => {
         const representativePath = item.clothing_images[0]?.image_path ?? null;
         const imageUrl = representativePath
@@ -235,7 +240,7 @@ async function ClothingItemsList({
           <Link
             key={item.id}
             href={`/protected/items/${item.id}`}
-            className="block h-full"
+            className={CLICKABLE_CARD_LINK_CLASS}
           >
             <ClothingItemCard
               title={item.title}
@@ -381,9 +386,9 @@ async function ReviewSuggestions() {
   );
 }
 
-// 下書きがあるときだけ、見出し行に「下書き N」ボタンを出す。
+// 下書きがあるときだけ、「下書き N」ボタンを出す。
 // 件数を取得できない場合（下書きテーブルの適用前など）は何も出さない。
-// 見出し行の横に出すため、読み込み後に下の内容を押し下げない
+// 「服を登録」の横に出すため、読み込み後に下の内容を押し下げない
 async function DraftsButton() {
   const supabase = await createClient();
   const { count, error } = await supabase
@@ -391,8 +396,9 @@ async function DraftsButton() {
     .select("*", { count: "exact", head: true });
   if (error || !count) return null;
   return (
-    <Button asChild variant="outline">
+    <Button asChild variant="outline" className="min-h-11 flex-1 sm:min-h-9 sm:flex-none">
       <Link href="/protected/items/drafts">
+        <FileText aria-hidden="true" />
         下書き
         <Badge variant="secondary" className="px-1.5">
           {count}
@@ -409,24 +415,49 @@ export default function ClothingItemsPage({
 }) {
   return (
     <div className="w-full flex flex-col gap-6">
-      {/* 狭い画面ではボタンが見出しの下へ折り返す */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* 登録の導線は重要度順に並べる：写真だけで登録（主）→ クイック仕分け → 服を登録・下書き。
+          狭い画面では縦に積み、広い画面では見出しの下に1行で並べる */}
+      <div className="flex flex-col gap-3">
         <h1 className="text-2xl font-bold">クローゼット一覧</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <Suspense fallback={null}>
-            <DraftsButton />
-          </Suspense>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          {/* 写真を選ぶだけで、1着でもまとめてでも登録できる入口（いちばん手軽な始め方） */}
+          <Button
+            asChild
+            size="lg"
+            className="h-12 w-full px-6 text-base sm:h-10 sm:w-auto sm:text-sm"
+          >
+            <Link href="/protected/items/new?mode=photo">
+              <Camera aria-hidden="true" />
+              写真だけで登録
+            </Link>
+          </Button>
           {/* 写真だけで登録した服などに、カテゴリ・季節をカードで付けていく入口 */}
-          <Button asChild variant="outline">
-            <Link href="/protected/items/classify">クイック仕分け</Link>
+          <Button
+            asChild
+            variant="outline"
+            className="h-auto min-h-12 w-full justify-start gap-3 whitespace-normal px-4 py-2 text-left sm:min-h-10 sm:w-auto"
+          >
+            <Link href="/protected/items/classify">
+              <Tags aria-hidden="true" />
+              <span className="flex flex-col">
+                <span>クイック仕分け</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  カテゴリや季節をサクッと整理
+                </span>
+              </span>
+            </Link>
           </Button>
-          {/* 写真を選ぶだけで、1着でもまとめてでも登録できる入口 */}
-          <Button asChild variant="outline">
-            <Link href="/protected/items/new?mode=photo">写真だけで登録</Link>
-          </Button>
-          <Button asChild>
-            <Link href="/protected/items/new">服を登録</Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" className="min-h-11 flex-1 sm:min-h-9 sm:flex-none">
+              <Link href="/protected/items/new">
+                <Plus aria-hidden="true" />
+                服を登録
+              </Link>
+            </Button>
+            <Suspense fallback={null}>
+              <DraftsButton />
+            </Suspense>
+          </div>
         </div>
       </div>
 

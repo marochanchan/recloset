@@ -66,14 +66,14 @@ function OutfitPickCard({
     <Card className="flex gap-3 overflow-hidden p-3 sm:flex-col">
       <Link
         href={`/protected/items/${item.id}`}
-        className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md bg-muted sm:aspect-square sm:h-auto sm:w-full"
+        className="relative h-32 w-32 shrink-0 overflow-hidden rounded-md bg-muted outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring active:opacity-80 sm:aspect-square sm:h-auto sm:w-full"
       >
         {imageUrl ? (
           <Image
             src={imageUrl}
             alt={item.title}
             fill
-            sizes="(min-width: 640px) 240px, 96px"
+            sizes="(min-width: 640px) 240px, 128px"
             className="object-contain"
             style={{ objectFit: "contain" }}
           />
@@ -94,12 +94,11 @@ function OutfitPickCard({
           >
             {item.title}
           </Link>
+          {/* 選んだ理由は2行までに収める（季節の理由に「・」を含むため区切りは「／」） */}
           {pick.reasons.length > 0 && (
-            <ul className="flex flex-col text-xs text-muted-foreground">
-              {pick.reasons.map((reason) => (
-                <li key={reason}>{reason}</li>
-              ))}
-            </ul>
+            <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+              {pick.reasons.join(" ／ ")}
+            </p>
           )}
         </div>
         <div className="mt-auto">
@@ -137,8 +136,8 @@ export function TodayOutfitCard({
         </h2>
         <p className="text-sm text-muted-foreground">
           {suggestion.basis === "weather"
-            ? "横浜の今日の天気に合わせて、しばらく着ていない服を中心に選びました。"
-            : "今の季節に合わせて、しばらく着ていない服を中心に選びました。"}
+            ? "横浜の今日の天気と着用記録から、しばらく出番のない服を中心に選びました。"
+            : "今の季節と着用記録から、しばらく出番のない服を中心に選びました。"}
         </p>
       </div>
 

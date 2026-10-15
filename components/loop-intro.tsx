@@ -36,7 +36,7 @@ export function LoopIntro() {
           誰かのクローゼットをのぞいてみる
         </h1>
         <p className="text-sm text-muted-foreground">
-          手放そうとしている服を、次の人へつなぐ場所です。
+          Re:Closetで服を見直した持ち主が、「次の誰かへつなぎたい」と公開した服です。
         </p>
       </div>
       <Suspense fallback={null}>

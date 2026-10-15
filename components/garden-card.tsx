@@ -1,5 +1,6 @@
 import { GardenCharacter } from "@/components/garden-character";
 import { GardenStageCelebration } from "@/components/garden-stage-celebration";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GARDEN_GROWTH_KINDS, type GardenGrowth } from "@/lib/garden";
 import {
@@ -8,8 +9,10 @@ import {
   GARDEN_LEAD,
   GARDEN_LOAD_ERROR_MESSAGE,
   GARDEN_STAGE_LABELS,
+  GARDEN_STORY_LINK_LABEL,
   getGardenNextStageMessage,
 } from "@/lib/garden-copy";
+import { BookOpen } from "lucide-react";
 import Link from "next/link";
 
 // Todayの「Re:Garden」。ふだんの行動で育つ植物キャラクター
@@ -42,9 +45,10 @@ export function GardenCard({
           stageKey={growth.stage.key}
         />
 
-        <div className="flex flex-col items-center gap-2 py-1">
+        {/* キャラクターを主役に、やわらかい背景の上に置く */}
+        <div className="flex flex-col items-center gap-2 rounded-xl bg-muted/40 py-5">
           <GardenCharacter stageIndex={growth.stageIndex} />
-          <p className="text-base font-semibold">{stageLabel}</p>
+          <p className="text-lg font-semibold">{stageLabel}</p>
           <p className="text-sm">
             累計{" "}
             <span className="text-2xl font-bold tabular-nums">{growth.totalPoints}</span>
@@ -71,7 +75,8 @@ export function GardenCard({
           <p className="break-words text-sm">{getGardenNextStageMessage(growth)}</p>
         </div>
 
-        <dl className="grid grid-cols-5 gap-1 border-t pt-3 text-center">
+        {/* 行動の種類ごとの内訳。スマホではキャラクターと進捗を優先して省く */}
+        <dl className="hidden grid-cols-5 gap-1 border-t pt-3 text-center sm:grid">
           {GARDEN_GROWTH_KINDS.map((kind) => (
             <div key={kind} className="flex flex-col gap-0.5 rounded-md bg-muted/50 px-1 py-2">
               <dt className="text-[11px] text-muted-foreground">{GARDEN_KIND_LABELS[kind]}</dt>
@@ -83,13 +88,17 @@ export function GardenCard({
           ))}
         </dl>
 
-        {/* 振り返りは Re:Story へ（控えめなリンク） */}
-        <Link
-          href="/protected/story"
-          className="self-end text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        {/* 振り返りは Re:Story へ（育った理由＝これまでの行動を見られる） */}
+        <Button
+          asChild
+          variant="outline"
+          className="h-auto min-h-11 w-full whitespace-normal py-2 text-center active:bg-accent"
         >
-          これまでの記録を見る →
-        </Link>
+          <Link href="/protected/story">
+            <BookOpen aria-hidden="true" />
+            {GARDEN_STORY_LINK_LABEL}
+          </Link>
+        </Button>
       </Card>
     </section>
   );
