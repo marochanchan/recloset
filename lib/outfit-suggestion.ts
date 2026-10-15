@@ -11,6 +11,7 @@ import {
 // トップス（またはワンピース）・ボトムス・必要な日だけアウターを1着ずつ選ぶ。
 // 色や形の相性を判断するものではなく、「今日着る服をクローゼットから
 // 再発見する候補」として、選んだ理由を実データから説明できる形で返す。
+// 服の暖かさは季節タグからの大まかな推定だけを使い、名前（title）からは推測しない。
 // ============================================================
 
 type Season = "spring" | "summer" | "autumn" | "winter";
@@ -65,6 +66,47 @@ export function getSuitableSeasonsForTemp(maxTemp: number): Season[] {
   return ["winter", "autumn"];
 }
 
+/**
+ * 服の暖かさの目安（0=夏物 … 3=冬物）。季節タグからの大まかな推定で、
+ * 服の厚さを確定するものではない
+ */
+export type Warmth = 0 | 1 | 2 | 3;
+
+/**
+ * 季節タグから暖かさを推定する。
+ * 冬だけ → 3 / 冬と春・秋（または夏） → 2 / 春・秋（冬なし） → 1 / 夏だけ → 0。
+ * オールシーズン・未設定は推定できないためnull
+ */
+export function estimateWarmthFromSeasons(seasons: string[]): Warmth | null {
+  const normalized = normalizeSeasons(seasons);
+  if (normalized.length === 0 || isAllSeasons(normalized)) return null;
+  const hasWinter = normalized.includes("winter");
+  const hasMid = normalized.includes("spring") || normalized.includes("autumn");
+  const hasSummer = normalized.includes("summer");
+  if (hasWinter) return hasMid || hasSummer ? 2 : 3;
+  return hasMid ? 1 : 0;
+}
+
+/**
+ * 今日の最高気温に合う暖かさの目安。
+ * 25℃以上 → 0 / 18〜24℃ → 1 / 14〜17℃ → 1 / 10〜13℃ → 2 / 9℃以下 → 3。
+ * 10〜17℃でも冬物が無条件で先にならないよう、14℃以上は春秋物を目安にする
+ */
+export function getTargetWarmth(maxTemp: number): Warmth {
+  if (maxTemp >= 25) return 0;
+  if (maxTemp >= 14) return 1;
+  if (maxTemp >= 10) return 2;
+  return 3;
+}
+
+// オールシーズン・季節未設定の服は暖かさを推定できないため、目安から「1段階ずれ」として扱う
+const UNKNOWN_WARMTH_DISTANCE = 1;
+
+function getWarmthDistance(item: OutfitItemInput, target: Warmth): number {
+  const warmth = estimateWarmthFromSeasons(item.seasons);
+  return warmth === null ? UNKNOWN_WARMTH_DISTANCE : Math.abs(warmth - target);
+}
+
 /** 天気が取れない場合の、月ベースの季節に合うseason */
 export function getSuitableSeasonsForMonth(currentSeason: Season): Season[] {
   if (currentSeason === "summer") return ["summer"];
@@ -108,13 +150,16 @@ function getSeasonFit(seasons: string[], suitable: Season[]): SeasonFit {
 }
 
 /**
- * 最近着ていない度合い（大きいほど優先）。
- * 2週間以上着ていない服 > 着用記録がない服 > 最近着た服 の順。
+ * 最近着ていない度合いの段階（大きいほど優先）。
+ * 2か月以上 > 1か月以上 > 2週間以上 > 着用記録がない > 最近着た の順。
+ * 段階にまとめ、同じ段階の中は日付で入れ替わるようにする（毎日同じ服にならないように）
  */
-function getRecencyScore(days: number | null): number {
-  if (days === null) return 20;
-  if (days >= 14) return 100 + Math.min(days, 365);
-  return days;
+function getRecencyBucket(days: number | null): number {
+  if (days === null) return 2;
+  if (days >= 60) return 5;
+  if (days >= 30) return 4;
+  if (days >= 14) return 3;
+  return 1;
 }
 
 function getRecencyReason(days: number | null): string | null {
@@ -125,11 +170,31 @@ function getRecencyReason(days: number | null): string | null {
   return null;
 }
 
+/**
+ * アウターを提案する理由（今日の気温から）。服の厚さは断定せず、今日の気温に対する目安を伝える。
+ * 選んだ服の推定と目安が合わない（より合う服がない）場合は、軽め・暖かいとは書かない
+ */
+function getOuterWeatherReason(
+  weather: OutfitWeatherInput,
+  target: Warmth,
+  warmthMatches: boolean,
+): string {
+  const max = Math.round(weather.maxTemp);
+  const min = Math.round(weather.minTemp);
+  if (!warmthMatches) return `最低${min}℃。羽織れるものがあると安心`;
+  if (target >= 3) return `最低${min}℃。暖かいアウターを`;
+  if (target === 2) return `最高${max}℃。しっかりめのアウターも候補に`;
+  if (max >= 18) return `朝晩は${min}℃。軽めの羽織りを`;
+  return `最高${max}℃。軽めのアウターを`;
+}
+
 function buildReasons(
   item: OutfitItemInput,
   fit: SeasonFit,
   basis: OutfitSuggestion["basis"],
   suitable: Season[],
+  /** アウターのとき、今日の気温からの理由（先頭に置き、季節の理由は重ねない） */
+  outerWeatherReason: string | null = null,
 ): string[] {
   // 季節一致は具体的な理由として先頭に、オールシーズンは情報量が少ないため
   // 他に理由がない場合の補足として最後に置く。
@@ -143,7 +208,7 @@ function buildReasons(
       : null;
 
   return [
-    seasonMatchReason,
+    outerWeatherReason ?? seasonMatchReason,
     item.status === "candidate" ? "手放す前にもう一度" : null,
     getRecencyReason(item.daysSinceLastWorn),
     item.favorite ? "お気に入りの一着" : null,
@@ -160,13 +225,16 @@ type ScoredItem = {
 };
 
 /**
- * 並び順: 1. 気温に合う（season一致・オールシーズン > season未設定）
- *         2. 最近着ていない  3. お気に入り  4. 手放し候補  5. 日替わりの決定的な順
+ * 並び順: 1. 季節が合う（season一致・オールシーズン > season未設定）
+ *         2. 今日の気温に対する暖かさの近さ（天気が取れた日だけ）
+ *         3. 最近着ていない段階  4. お気に入り  5. 手放し候補  6. 日替わりの決定的な順
+ * 季節が明らかに合わない服は除外する
  */
 function scoreItems(
   items: OutfitItemInput[],
   suitable: Season[],
   dateKey: string,
+  targetWarmth: Warmth | null,
 ): ScoredItem[] {
   return items
     .map((item) => {
@@ -176,7 +244,8 @@ function scoreItems(
         fit,
         sortKey: [
           fit === "match" || fit === "all" ? 1 : 0,
-          getRecencyScore(item.daysSinceLastWorn),
+          targetWarmth === null ? 0 : -getWarmthDistance(item, targetWarmth),
+          getRecencyBucket(item.daysSinceLastWorn),
           item.favorite ? 1 : 0,
           item.status === "candidate" ? 1 : 0,
           stableHash(`${dateKey}:${item.id}`),
@@ -213,6 +282,8 @@ export function suggestTodayOutfit({
   const needsOuter = weather
     ? needsOuterForWeather(weather)
     : needsOuterForMonth(currentSeason);
+  // 暖かさの目安は天気が取れた日だけ使う（月ベースのときは従来どおり季節だけで選ぶ）
+  const targetWarmth = weather ? getTargetWarmth(weather.maxTemp) : null;
 
   const eligible = items.filter((item) =>
     ELIGIBLE_STATUSES.includes(item.status),
@@ -242,12 +313,27 @@ export function suggestTodayOutfit({
       suggestable.filter((item) => categories.includes(item.category)),
       suitable,
       dateKey,
+      targetWarmth,
     )[0];
     if (!best) return null;
+    const outerWeatherReason =
+      slot === "outer" && weather && targetWarmth !== null
+        ? getOuterWeatherReason(
+            weather,
+            targetWarmth,
+            estimateWarmthFromSeasons(best.item.seasons) === targetWarmth,
+          )
+        : null;
     return {
       slot,
       item: best.item,
-      reasons: buildReasons(best.item, best.fit, basis, suitable),
+      reasons: buildReasons(
+        best.item,
+        best.fit,
+        basis,
+        suitable,
+        outerWeatherReason,
+      ),
       wornToday: false,
     };
   };
