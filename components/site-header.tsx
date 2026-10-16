@@ -7,10 +7,14 @@ import { hasEnvVars } from "@/lib/utils";
 import Link from "next/link";
 import { Suspense } from "react";
 
+// ロゴはセージのマークと丸ゴシックの「Re:Closet」。認証画面のヘッダーでも使う
 export function HeaderLogo({ href }: { href: string }) {
   return (
-    <Link href={href} className="flex items-center gap-1.5 font-semibold text-base">
-      <BrandMark size={20} />
+    <Link
+      href={href}
+      className="flex items-center gap-2 rounded-lg font-heading text-lg font-semibold tracking-wide outline-none [font-feature-settings:'palt'] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+      <BrandMark size={22} className="text-primary" />
       Re:Closet
     </Link>
   );
@@ -52,7 +56,7 @@ async function SiteHeaderContent() {
 
 export function SiteHeader() {
   return (
-    <header className="w-full flex justify-center border-b border-b-foreground/10">
+    <header className="w-full flex justify-center border-b border-border/70 bg-background">
       <div className="relative w-full max-w-5xl flex h-14 items-center justify-center gap-3 px-5 text-sm md:justify-between">
         {!hasEnvVars ? (
           <>

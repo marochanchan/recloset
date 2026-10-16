@@ -64,7 +64,7 @@ export function DisplayNameForm({
       <Button type="submit" disabled={isPending}>
         {isPending ? "保存中..." : "保存する"}
       </Button>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
       {savedName && (
         <div className="flex flex-col gap-2">
           <p className="text-sm">公開名を「{savedName}」に保存しました。</p>

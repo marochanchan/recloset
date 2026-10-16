@@ -78,7 +78,7 @@ export function ClosetReviewUndoLastButton({
         <Undo2 className="h-4 w-4" aria-hidden="true" />
         {isPending ? "戻しています..." : "最後の判断をやり直す"}
       </Button>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

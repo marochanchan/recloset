@@ -649,7 +649,7 @@ export function ClothingItemForm({
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             {savedItem.failedImages > 0 && (
-              <p className="text-sm text-yellow-600">
+              <p className="text-sm text-amber-800 dark:text-amber-300">
                 {isEdit ? "服の情報は保存されましたが、" : "服は登録されましたが、"}
                 {savedItem.totalImages}枚中
                 {savedItem.failedImages}枚の画像登録に失敗しました
@@ -658,7 +658,7 @@ export function ClothingItemForm({
               </p>
             )}
             {savedItem.draftCleanupFailed && (
-              <p className="text-sm text-yellow-600">
+              <p className="text-sm text-amber-800 dark:text-amber-300">
                 服は登録されました。下書きの削除に失敗したため、下書き一覧から削除してください
                 （もう一度登録する必要はありません）
               </p>
@@ -941,7 +941,7 @@ export function ClothingItemForm({
                               }
                             />
                             {fieldError && (
-                              <p className="text-sm text-red-500">{fieldError}</p>
+                              <p className="text-sm text-destructive">{fieldError}</p>
                             )}
                           </div>
                         );
@@ -950,14 +950,14 @@ export function ClothingItemForm({
                   </details>
                 </>
 
-              {error && <p className="text-sm text-red-500">{error}</p>}
+              {error && <p className="text-sm text-destructive">{error}</p>}
               {clothingDraft.isLoadingDraft && (
                 <p className="text-sm text-muted-foreground">
                   下書きの写真を読み込んでいます…
                 </p>
               )}
               {clothingDraft.draftLoadFailed && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-destructive">
                   下書きの写真を読み込めませんでした。写真を失わないよう、保存・登録を止めています。ページを再読み込みしてください
                 </p>
               )}
@@ -1010,7 +1010,7 @@ export function ClothingItemForm({
                     <p
                       className={
                         clothingDraft.draftMessage.tone === "error"
-                          ? "text-sm text-red-500"
+                          ? "text-sm text-destructive"
                           : "text-sm text-muted-foreground"
                       }
                     >

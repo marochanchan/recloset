@@ -385,7 +385,7 @@ export function PhotoBatchRegisterForm({
 
           {/* 変換できなかった写真・枚数の上限は、写真が多くても見えるよう一覧の上に出す */}
           {notices.length > 0 && (
-            <ul role="alert" className="flex flex-col gap-1 text-sm text-red-500">
+            <ul role="alert" className="flex flex-col gap-1 text-sm text-destructive">
               {notices.map((notice, i) => (
                 <li key={i} className="[overflow-wrap:anywhere]">
                   {notice}
@@ -413,7 +413,7 @@ export function PhotoBatchRegisterForm({
           )}
 
           {resultMessage && !isRegistering && (
-            <p role="alert" className="text-sm text-red-500 [overflow-wrap:anywhere]">
+            <p role="alert" className="text-sm text-destructive [overflow-wrap:anywhere]">
               {resultMessage}
             </p>
           )}
@@ -524,7 +524,7 @@ function PhotoThumbnail({
           </span>
         )}
         {failed && (
-          <span className="absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white">
+          <span className="absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground">
             <AlertCircle className="h-4 w-4" aria-hidden="true" />
             <span className="sr-only">登録できませんでした</span>
           </span>
@@ -555,7 +555,7 @@ function PhotoThumbnail({
       {/* 失敗した写真だけ、理由と「取り消す」を出す（再試行は下の登録ボタンでまとめて行う） */}
       {failed && photo.failure && (
         <div className="flex flex-col gap-1">
-          <p className="text-[11px] leading-snug text-red-600 [overflow-wrap:anywhere]">
+          <p className="text-[11px] leading-snug text-destructive [overflow-wrap:anywhere]">
             {describePhotoFailure(photo.failure)}
           </p>
           {canDiscardPhoto(photo) && (

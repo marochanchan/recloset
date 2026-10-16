@@ -240,7 +240,7 @@ export function ClosetReviewSession({
       <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center">
         {completeFailed ? (
           <>
-            <p className="text-sm text-red-500">
+            <p className="text-sm text-destructive">
               結果を保存できませんでした。判断はすべて保存されています
             </p>
             <Button
@@ -387,7 +387,7 @@ export function ClosetReviewSession({
           {REVIEW_SESSION_DECISION_LABELS.skip}
         </Button>
       </div>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
       <p className="text-xs text-muted-foreground">
         判断は記録として残すだけです。服の状態は変わりません。途中でやめても、続きから再開できます。
       </p>

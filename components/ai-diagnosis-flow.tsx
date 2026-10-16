@@ -105,7 +105,7 @@ function RebyeCandidateAction({
       >
         {isPending ? "変更中..." : `${candidateLabel}に変更する`}
       </Button>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }
@@ -167,7 +167,7 @@ function ElaborationAction({ diagnosisId }: { diagnosisId: string }) {
             ? "再試行"
             : "この服との関係を言葉にしてみる"}
       </Button>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }
@@ -412,7 +412,7 @@ export function AiDiagnosisFlow({
               />
             </div>
 
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && <p className="text-sm text-destructive">{error}</p>}
 
             <Button
               type="button"

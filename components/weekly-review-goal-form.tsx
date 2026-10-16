@@ -101,7 +101,7 @@ export function WeeklyReviewGoalForm({ initialGoal }: WeeklyReviewGoalFormProps)
         {isPending ? "保存中..." : "保存する"}
       </Button>
       {error && (
-        <p role="alert" className="text-sm text-red-500">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       )}

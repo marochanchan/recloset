@@ -28,7 +28,7 @@ export function StartClosetReviewButton({ label }: { label: string }) {
       >
         {isPending ? "準備しています..." : label}
       </Button>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

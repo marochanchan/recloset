@@ -10,6 +10,31 @@ export default {
   ],
   theme: {
     extend: {
+      // 英数字はGeist、日本語は本文がZen Kaku Gothic New・見出しがZen Maru Gothic。
+      // Webフォントを読み込めないときも崩れないよう、OS標準の日本語フォントを続けて指定する
+      fontFamily: {
+        sans: [
+          "var(--font-geist-sans)",
+          "var(--font-zen-kaku)",
+          "Hiragino Sans",
+          "Hiragino Kaku Gothic ProN",
+          "Noto Sans JP",
+          "Yu Gothic",
+          "Meiryo",
+          "sans-serif",
+        ],
+        heading: [
+          "var(--font-zen-maru)",
+          "Hiragino Maru Gothic ProN",
+          "var(--font-zen-kaku)",
+          "Hiragino Sans",
+          "Hiragino Kaku Gothic ProN",
+          "Noto Sans JP",
+          "Yu Gothic",
+          "Meiryo",
+          "sans-serif",
+        ],
+      },
       colors: {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
@@ -41,6 +66,7 @@ export default {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
+        blush: "hsl(var(--blush))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -52,7 +78,9 @@ export default {
           "5": "hsl(var(--chart-5))",
         },
       },
+      // --radius（12px）を基準に、カードは少し大きく、小さな部品は控えめな丸みにする
       borderRadius: {
+        xl: "calc(var(--radius) + 4px)",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",

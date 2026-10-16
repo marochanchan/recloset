@@ -100,7 +100,7 @@ export function LikeButton({
       {error && (
         <p
           role="alert"
-          className="absolute right-0 top-12 z-10 w-max max-w-[10rem] rounded-md border bg-background px-2 py-1 text-xs text-red-500 shadow-sm"
+          className="absolute right-0 top-12 z-10 w-max max-w-[10rem] rounded-md border bg-background px-2 py-1 text-xs text-destructive shadow-sm"
         >
           {error}
         </p>

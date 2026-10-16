@@ -67,10 +67,10 @@ export function HeaderMainNav() {
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "rounded-md px-3 py-2 transition-colors",
+                  "rounded-full px-4 py-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                   isActive
-                    ? "bg-accent font-medium text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-primary/10 font-medium text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
                 )}
               >
                 {item.label}
@@ -90,7 +90,7 @@ export function BottomMainNav() {
   return (
     <nav
       aria-label="メインメニュー"
-      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
     >
       <ul className="grid h-16 grid-cols-4">
         {MAIN_NAV_ITEMS.map((item) => {
@@ -102,17 +102,25 @@ export function BottomMainNav() {
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "flex h-full flex-col items-center justify-center gap-1 text-[11px] transition-colors",
+                  "group flex h-full flex-col items-center justify-center gap-0.5 text-[11px] tracking-wide outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                   isActive
-                    ? "font-semibold text-foreground"
+                    ? "font-semibold text-primary"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <Icon
-                  className="h-5 w-5"
-                  strokeWidth={isActive ? 2.5 : 2}
-                  aria-hidden="true"
-                />
+                {/* 選択中のタブは、アイコンの後ろにセージの淡いピルを敷いて示す */}
+                <span
+                  className={cn(
+                    "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
+                    isActive ? "bg-primary/10" : "group-hover:bg-accent",
+                  )}
+                >
+                  <Icon
+                    className="h-5 w-5"
+                    strokeWidth={isActive ? 2.25 : 1.75}
+                    aria-hidden="true"
+                  />
+                </span>
                 {item.label}
               </Link>
             </li>

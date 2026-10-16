@@ -53,7 +53,7 @@ export function WearTodayButton({
   };
 
   const errorMessage = error && (
-    <p className={isPlan ? "text-xs text-red-500" : "text-sm text-red-500"}>
+    <p className={isPlan ? "text-xs text-destructive" : "text-sm text-destructive"}>
       {error}
     </p>
   );

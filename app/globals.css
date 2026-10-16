@@ -3,53 +3,61 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * Re:Closet のデザイントークン（大人可愛い × ナチュラル）
+   * アイボリーの背景に、濃いセージ（主ボタン・選択中）と、くすみピンク（hover・飾り）を合わせる。
+   * 文字色の組み合わせは WCAG AA（本文 4.5:1 以上、入力欄の枠 3:1 以上）を満たす値にしている。
+   */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+    --background: 40 37.5% 96.9%; /* #FAF8F4 アイボリー */
+    --foreground: 48 5.1% 19.4%; /* #34332F チャコール */
+    --card: 45 100% 99.2%; /* #FFFEFB 背景より少し明るい生成り */
+    --card-foreground: 48 5.1% 19.4%;
+    --popover: 45 100% 99.2%;
+    --popover-foreground: 48 5.1% 19.4%;
+    --primary: 148 16.5% 33.3%; /* #476354 濃いセージ */
+    --primary-foreground: 45 40% 98%;
+    --secondary: 39 37.8% 91.2%; /* #F1EBE0 あたたかいクリーム */
+    --secondary-foreground: 48 5.1% 19.4%;
+    --muted: 38 29.7% 92.7%; /* #F2EEE7 */
+    --muted-foreground: 42 6.7% 37.8%; /* #67635A */
+    --accent: 11 42.1% 92.5%; /* #F4E7E4 淡いくすみピンク（hover・選択の面） */
+    --accent-foreground: 48 5.1% 19.4%;
+    --blush: 6 33.9% 76.9%; /* #D8B4B0 くすみピンク（飾り用。文字色には使わない） */
+    --destructive: 3 58.4% 44.3%; /* #B3362F */
+    --destructive-foreground: 0 0% 100%;
+    --border: 38 27.5% 86.5%; /* #E6DFD3 淡いベージュ */
+    --input: 37 10% 52.9%; /* #938A7B 入力欄の枠（背景と3:1以上） */
+    --ring: 148 16.5% 33.3%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
   }
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --background: 80 5.7% 10.4%; /* #1B1C19 あたたかみのある墨色 */
+    --foreground: 40 24% 90.2%; /* #ECE8E0 */
+    --card: 75 5.9% 13.3%; /* #232420 */
+    --card-foreground: 40 24% 90.2%;
+    --popover: 75 5.9% 13.3%;
+    --popover-foreground: 40 24% 90.2%;
+    --primary: 144 17.9% 69.4%; /* #A3BFAE 明るいセージ */
+    --primary-foreground: 80 5.7% 10.4%;
+    --secondary: 72 5.7% 17.1%; /* #2D2E29 */
+    --secondary-foreground: 40 24% 90.2%;
+    --muted: 72 6% 16.3%; /* #2B2C27 */
+    --muted-foreground: 41 8.7% 63.9%; /* #ABA69B */
+    --accent: 5 10.3% 21%; /* #3B3130 くすみピンクを沈めた色 */
+    --accent-foreground: 40 24% 90.2%;
+    --blush: 6 31.6% 69%; /* #C99C97 */
+    /* ダークでは文字色・背景色のどちらで使っても読めるよう、明るい赤に暗い文字を合わせる */
+    --destructive: 5 72.7% 72.7%; /* #EC8F87 */
+    --destructive-foreground: 80 5.7% 10.4%;
+    --border: 70 5.7% 20.8%; /* #373832 */
+    --input: 45 5.7% 41.6%; /* #706D64 */
+    --ring: 144 17.9% 69.4%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -63,6 +71,15 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background font-sans text-foreground;
+  }
+  /* 見出しは丸ゴシック。日本語の字間を詰めて（palt）すっきり見せる。
+     本文の可読性を優先し、見出しフォントは h1〜h3・CardTitle・ロゴに限る */
+  h1,
+  h2,
+  h3 {
+    @apply font-heading;
+    font-feature-settings: "palt";
+    letter-spacing: 0.02em;
   }
 }

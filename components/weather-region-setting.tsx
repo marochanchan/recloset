@@ -177,7 +177,7 @@ export function WeatherRegionSetting({
         aria-live="polite"
         className={
           status.kind === "error"
-            ? "text-xs text-red-500"
+            ? "text-xs text-destructive"
             : "text-xs text-muted-foreground"
         }
       >
