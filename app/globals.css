@@ -77,8 +77,8 @@
   body {
     @apply bg-background font-sans text-foreground;
   }
-  /* 見出しは丸ゴシック。日本語の字間を詰めて（palt）すっきり見せる。
-     本文の可読性を優先し、見出しフォントは h1〜h3・CardTitle・ロゴに限る */
+  /* 見出しは本文と同じゴシック（Zen Kaku Gothic New）の太字。
+     日本語の字間を詰めて（palt）、誌面の見出しのようにすっきり見せる */
   h1,
   h2,
   h3 {

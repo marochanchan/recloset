@@ -52,7 +52,7 @@ export function ClothingImageSection({
   return (
     <section aria-labelledby="images-heading" className="grid gap-3">
       <div className="grid gap-1">
-        <h2 id="images-heading" className="text-sm font-medium">
+        <h2 id="images-heading" className="text-base font-bold">
           {maxImages === 1 ? "写真（1枚）" : `写真（任意・最大${maxImages}枚）`}
         </h2>
         <p className="text-sm text-muted-foreground">{description}</p>
@@ -71,16 +71,25 @@ export function ClothingImageSection({
           disabled={isFull}
           className="peer sr-only"
         />
+        {/* 写真がまだないときは、生成りの大きな枠にして写真を主役にする */}
         <label
           htmlFor="images"
           className={cn(
-            "flex min-h-14 w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-3 text-sm font-medium transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring",
+            "flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary/30 bg-photo px-4 text-sm font-medium transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring",
+            images.length === 0 ? "min-h-36 flex-col py-6" : "min-h-14 py-3",
             isFull
               ? "cursor-not-allowed text-muted-foreground opacity-60"
-              : "cursor-pointer hover:bg-accent",
+              : "cursor-pointer hover:border-primary/50 hover:bg-accent",
           )}
         >
-          <ImagePlus className="h-5 w-5" aria-hidden="true" />
+          <span
+            className={cn(
+              "flex items-center justify-center rounded-full bg-card text-primary",
+              images.length === 0 ? "h-12 w-12" : "h-8 w-8",
+            )}
+          >
+            <ImagePlus className="h-5 w-5" aria-hidden="true" />
+          </span>
           {isFull ? `写真は${maxImages}枚まで追加済みです` : "写真を追加"}
         </label>
       </div>

@@ -258,19 +258,20 @@ export function ClothingClassifySession({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium" aria-live="polite">
-          {progress.index + 1} / {total}着
+        <p className="text-sm" aria-live="polite">
+          <span className="text-lg font-bold tabular-nums">{progress.index + 1}</span>
+          <span className="text-muted-foreground"> / {total}着</span>
         </p>
         <p className="text-xs text-muted-foreground">
           仕分け済み {progress.savedIds.length}着
         </p>
       </div>
       <div
-        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+        className="h-1.5 w-full overflow-hidden rounded-full bg-secondary"
         aria-hidden="true"
       >
         <div
-          className="h-full bg-primary transition-[width]"
+          className="h-full rounded-full bg-primary transition-[width]"
           style={{ width: `${(progress.index / total) * 100}%` }}
         />
       </div>
@@ -285,7 +286,7 @@ export function ClothingClassifySession({
       >
         <div
           className={cn(
-            "overflow-hidden rounded-xl border bg-background shadow-sm",
+            "overflow-hidden rounded-3xl border border-border/60 bg-card shadow-sm",
             dragX === 0 && "transition-transform duration-150",
             isBusy && "opacity-70",
           )}
@@ -293,7 +294,7 @@ export function ClothingClassifySession({
             transform: `translateX(${dragX}px) rotate(${dragX / 30}deg)`,
           }}
         >
-          <div className="relative aspect-[4/5] max-h-[45vh] w-full bg-muted">
+          <div className="relative aspect-[4/5] max-h-[45vh] w-full bg-photo">
             {current.imageUrl ? (
               <Image
                 key={current.id}
@@ -313,7 +314,7 @@ export function ClothingClassifySession({
             )}
             {dragX !== 0 && (
               <span
-                className="absolute right-4 top-4 rounded-md border-2 border-muted-foreground bg-background/90 px-3 py-1 text-lg font-bold text-muted-foreground"
+                className="absolute right-4 top-4 rounded-lg border-2 border-muted-foreground bg-card/90 px-3 py-1 text-lg font-bold text-muted-foreground"
                 style={{ opacity: swipeStrength }}
                 aria-hidden="true"
               >
@@ -321,7 +322,7 @@ export function ClothingClassifySession({
               </span>
             )}
             {isCurrentSaved && (
-              <span className="absolute left-3 top-3 rounded-full bg-background/90 px-2.5 py-0.5 text-xs font-medium">
+              <span className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-0.5 text-xs font-medium text-primary-foreground">
                 保存済み
               </span>
             )}
@@ -487,7 +488,7 @@ function ClassifyDone({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1 rounded-lg border p-5 text-center">
+      <div className="flex flex-col gap-1 rounded-3xl bg-gradient-to-b from-primary/10 to-blush/20 px-5 py-8 text-center">
         <p className="text-lg font-bold">
           {savedCount > 0 ? "おつかれさまでした" : "ここまでにしました"}
         </p>

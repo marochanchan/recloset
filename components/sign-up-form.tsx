@@ -60,10 +60,10 @@ export function SignUpForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
+      <Card className="rounded-3xl border-border/60 px-1 py-2 shadow-sm">
         <CardHeader>
           <CardTitle className="text-2xl">新規登録</CardTitle>
-          <CardDescription>Re:Closetのアカウントを作成</CardDescription>
+          <CardDescription>Re:Closetのアカウントを作成して、お気に入りの服を記録しはじめましょう。</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignUp}>
@@ -103,7 +103,14 @@ export function SignUpForm({
                   onChange={(e) => setRepeatPassword(e.target.value)}
                 />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && (
+                <p
+                  role="alert"
+                  className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
+                  {error}
+                </p>
+              )}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "登録中..." : "登録する"}
               </Button>

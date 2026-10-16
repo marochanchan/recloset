@@ -81,7 +81,7 @@ export function WelcomeDialog() {
       onClick={(event) => {
         if (event.target === event.currentTarget) close();
       }}
-      className="m-auto w-[calc(100%-2rem)] max-w-sm rounded-xl border bg-background p-0 text-foreground shadow-lg backdrop:bg-black/40"
+      className="m-auto w-[calc(100%-2rem)] max-w-sm rounded-3xl border border-border/70 bg-card p-0 text-foreground shadow-lg backdrop:bg-black/40"
     >
       <div className="relative flex flex-col gap-4 p-5">
         <button
@@ -110,7 +110,7 @@ export function WelcomeDialog() {
           {STEPS.map((step, index) => (
             <li
               key={step}
-              className="flex items-center gap-2 rounded-lg bg-muted/60 px-3 py-2"
+              className="flex items-center gap-2 rounded-xl bg-secondary/70 px-3 py-2"
             >
               <span
                 aria-hidden="true"

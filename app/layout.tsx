@@ -43,11 +43,11 @@ const zenKakuGothic = Zen_Kaku_Gothic_New({
   preload: false,
 });
 
-// 見出し（丸ゴシック）。h1〜h3・CardTitle・ロゴだけで使うため、太さは2つに絞る
-// （font-semibold の見出しは 700 で表示される）
+// ロゴの「Re:Closet」だけに使う丸ゴシック。英字だけなので、実際に読み込まれるのは
+// 英字の範囲（unicode-range）の小さなファイルだけ。太さも1つに絞る
 const zenMaruGothic = Zen_Maru_Gothic({
   variable: "--font-zen-maru",
-  weight: ["500", "700"],
+  weight: "700",
   display: "swap",
   subsets: ["latin"],
   preload: false,

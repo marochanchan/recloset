@@ -13,9 +13,9 @@ async function LoopLikesLink() {
   return (
     <Link
       href="/protected/likes"
-      className="inline-flex h-8 w-fit items-center gap-1.5 rounded-full border px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      className="inline-flex h-9 w-fit items-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-sm text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <Heart className="h-3.5 w-3.5" aria-hidden="true" />
+      <Heart className="h-3.5 w-3.5 text-blush-foreground" aria-hidden="true" />
       気になる服
     </Link>
   );
@@ -36,10 +36,10 @@ export function LoopIntro({
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <p className="text-xs font-medium tracking-wide text-muted-foreground">
+        <p className="text-xs font-medium tracking-[0.2em] text-primary">
           Re:Closet Loop
         </p>
-        <Heading className="text-xl font-bold tracking-tight sm:text-2xl">
+        <Heading className="text-2xl font-bold sm:text-3xl">
           誰かのクローゼットをのぞいてみる
         </Heading>
         <p className="text-sm text-muted-foreground">

@@ -1,54 +1,23 @@
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 
 // 一覧・詳細ページのSuspense fallback用。実データのレイアウト（grid列数・gap・
 // 正方形の画像枠）に合わせ、読み込み完了時にレイアウトが大きく動かないようにする。
 
-const GRID_VARIANTS = {
-  // /protected/items は枠なしの縦長カード（ClosetGridSkeleton）を使う
-  // /discover（PublicClothingItemCard。スマホは2列・余白小さめ）
-  discover: {
-    grid: "grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4",
-    body: "p-3 sm:p-6",
-  },
-} as const;
-
 const GRID_SKELETON_COUNT = 6;
 
+// /protected/items（ClothingItemCard）・/discover（PublicClothingItemCard）は、
+// どちらも枠なし・縦長4:5の写真（スマホ2列 → 3列 → 4列）
 export function ItemGridSkeleton({
   variant,
 }: {
-  variant: keyof typeof GRID_VARIANTS | "closet";
+  variant: "closet" | "discover";
 }) {
-  if (variant === "closet") return <ClosetGridSkeleton />;
-  const { grid, body } = GRID_VARIANTS[variant];
-
-  return (
-    <div role="status" aria-label="読み込み中" className={grid}>
-      {Array.from({ length: GRID_SKELETON_COUNT }, (_, index) => (
-        <Card key={index} className="overflow-hidden">
-          <Skeleton className="aspect-square w-full rounded-none" />
-          <div className={cn("flex flex-col gap-3", body)}>
-            <Skeleton className="h-5 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-            <div className="flex gap-2">
-              <Skeleton className="h-5 w-14" />
-              <Skeleton className="h-5 w-10" />
-            </div>
-          </div>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-// /protected/items（ClothingItemCard。枠なし・縦長4:5の写真。スマホ2列 → 3列 → 4列）
-function ClosetGridSkeleton() {
   return (
     <div
       role="status"
       aria-label="読み込み中"
+      data-variant={variant}
       className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4"
     >
       {Array.from({ length: GRID_SKELETON_COUNT }, (_, index) => (

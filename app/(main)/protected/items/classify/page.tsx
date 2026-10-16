@@ -167,7 +167,7 @@ async function ClassifyContent({ mode }: { mode: ClassifyMode }) {
 
   if (itemIds.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center">
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-12 text-center">
         <p className="text-sm text-muted-foreground">
           {mode === "category"
             ? "カテゴリが未分類の服はありません"
@@ -252,7 +252,7 @@ export default function ClothingClassifyPage({
         ← クローゼットに戻る
       </Link>
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-bold">クイック仕分け</h1>
+        <h1 className="text-2xl font-bold">クイック仕分け</h1>
         <p className="text-xs text-muted-foreground">
           写真を見ながら、カテゴリや季節をタップで付けていきます。一度に全部やらなくて大丈夫です。
         </p>

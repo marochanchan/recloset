@@ -9,7 +9,8 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative">
+    // 背景は、セージと淡いピンクがほんのり重なるやわらかなグラデーション
+    <div className="relative bg-gradient-to-b from-primary/10 via-background to-blush/20">
       <header className="absolute inset-x-0 top-0 flex h-14 items-center justify-center text-sm">
         <HeaderLogo href="/" />
       </header>

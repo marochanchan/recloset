@@ -77,7 +77,7 @@ async function ReviewHome() {
     );
   } else if (reviewableCount === 0) {
     main = (
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center">
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-12 text-center">
         <p className="font-medium">見直せる服がありません</p>
         <p className="text-sm text-muted-foreground">
           まずはクローゼットに服を登録してみましょう。写真だけで、1着でもまとめてでも登録できます。

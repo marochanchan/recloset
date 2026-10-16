@@ -61,7 +61,7 @@ export function ClothingImageThumbnail({
     >
       <div
         className={cn(
-          "relative h-28 w-28 overflow-hidden rounded-md border bg-muted",
+          "relative h-28 w-28 overflow-hidden rounded-xl border border-border/70 bg-photo",
           isPendingDelete && "opacity-40",
           isDragOverTarget && "ring-2 ring-primary",
         )}
@@ -98,7 +98,7 @@ export function ClothingImageThumbnail({
             role="button"
             aria-label="ドラッグして並び替え"
             title="ドラッグして並び替え"
-            className="absolute right-1 top-1 flex h-6 w-6 touch-none cursor-grab items-center justify-center rounded-md bg-background/80 text-muted-foreground active:cursor-grabbing"
+            className="absolute right-1 top-1 flex h-6 w-6 touch-none cursor-grab items-center justify-center rounded-md bg-card/90 text-muted-foreground active:cursor-grabbing"
             onPointerDown={onDragPointerDown}
             onPointerMove={onDragPointerMove}
             onPointerUp={onDragPointerUp}
@@ -133,7 +133,7 @@ export function ClothingImageThumbnail({
           </Button>
         </>
       ) : isConfirmingDelete ? (
-        <div className="flex w-full flex-col gap-1 rounded-md border border-destructive/50 p-1.5">
+        <div className="flex w-full flex-col gap-1 rounded-lg border border-destructive/40 bg-destructive/5 p-1.5">
           <p className="text-center text-[11px] text-destructive">
             この画像を削除しますか？
           </p>

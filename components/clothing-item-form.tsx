@@ -59,13 +59,21 @@ import {
   validateMarketplaceUrl,
   type MarketplaceService,
 } from "@/lib/marketplace-urls";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+// 入力欄（components/ui/input.tsx）と同じ見た目のセレクト
 const selectClassName = cn(
-  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+  "flex h-9 w-full rounded-lg border border-input bg-card px-3 py-1 text-base transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
 );
+
+// 折りたたみ（詳しく入力・出品先）の枠と見出し
+const DETAILS_CLASS =
+  "group/details rounded-2xl border border-border/70 bg-card px-4 py-3";
+const SUMMARY_CLASS =
+  "flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden";
 
 // 保存する（縮小・再エンコード後の）画像の上限。Storageバケットの上限と同じ
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -725,7 +733,10 @@ export function ClothingItemForm({
               disabled={isLoading || clothingDraft.isSavingDraft}
             />
           )}
-          <p className="mb-4 text-xs text-muted-foreground">* 必須項目</p>
+          <p className="mb-5 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <RequiredMark />
+            の項目だけ入力すれば登録できます
+          </p>
           <form
             onSubmit={handleSubmit}
             onInvalidCapture={(e) => {
@@ -756,7 +767,8 @@ export function ClothingItemForm({
               <>
                   <div className="grid gap-2">
                     <Label htmlFor="title" className="flex items-center gap-2">
-                      タイトル *
+                      タイトル
+                      <RequiredMark />
                       {autofill.isAiValue("title") && <AiBadge />}
                     </Label>
                     <Input
@@ -770,7 +782,8 @@ export function ClothingItemForm({
 
                   <div className="grid gap-2">
                     <Label htmlFor="category" className="flex items-center gap-2">
-                      カテゴリー *
+                      カテゴリー
+                      <RequiredMark />
                       {autofill.isAiValue("category") && <AiBadge />}
                     </Label>
                     <select
@@ -867,12 +880,16 @@ export function ClothingItemForm({
                   <FavoriteToggle checked={favorite} onCheckedChange={setFavorite} />
 
                   <details
-                    className="rounded-md border px-3 py-2"
+                    className={DETAILS_CLASS}
                     open={isDetailsOpen}
                     onToggle={(e) => setIsDetailsOpen(e.currentTarget.open)}
                   >
-                    <summary className="cursor-pointer text-sm font-medium">
+                    <summary className={SUMMARY_CLASS}>
                       詳しく入力（任意）
+                      <ChevronDown
+                        className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open/details:rotate-180"
+                        aria-hidden="true"
+                      />
                     </summary>
                     <div className="flex flex-col gap-6 pb-1 pt-3">
                       <div className="grid gap-2">
@@ -906,12 +923,16 @@ export function ClothingItemForm({
                   </details>
 
                   <details
-                    className="rounded-md border px-3 py-2"
+                    className={DETAILS_CLASS}
                     open={isMarketplaceOpen}
                     onToggle={(e) => setIsMarketplaceOpen(e.currentTarget.open)}
                   >
-                    <summary className="cursor-pointer text-sm font-medium">
+                    <summary className={SUMMARY_CLASS}>
                       出品先URL（任意）
+                      <ChevronDown
+                        className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open/details:rotate-180"
+                        aria-hidden="true"
+                      />
                     </summary>
                     <div className="flex flex-col gap-4 pb-1 pt-3">
                       <p className="text-sm text-muted-foreground">
@@ -1030,8 +1051,17 @@ export function ClothingItemForm({
 // 写真からAIが入力した値の目印（ユーザーが修正すると消える）
 function AiBadge() {
   return (
-    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+    <span className="rounded-full bg-blush/20 px-2 py-0.5 text-[10px] font-medium text-blush-foreground">
       写真から入力
+    </span>
+  );
+}
+
+// 必須項目の目印（入力欄には required を付けている）
+function RequiredMark() {
+  return (
+    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-primary">
+      必須
     </span>
   );
 }

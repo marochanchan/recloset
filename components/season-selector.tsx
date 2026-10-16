@@ -17,7 +17,7 @@ const chipClassName = (selected: boolean) =>
     "inline-flex h-9 items-center rounded-full border px-4 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
     selected
       ? "border-primary bg-primary font-medium text-primary-foreground"
-      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+      : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground",
   );
 
 export function SeasonSelector({

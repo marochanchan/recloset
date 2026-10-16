@@ -41,7 +41,7 @@ async function LikedClothingItemsList() {
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center">
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-12 text-center">
         <p className="font-medium">まだ気になる服はありません</p>
         <p className="text-sm text-muted-foreground">
           Re:Closet Loopで♡を押した服が、ここに並びます。
@@ -64,7 +64,7 @@ async function LikedClothingItemsList() {
   );
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
       {items.map((item) => {
         const imageUrl = item.cover_image_path
           ? (signedUrlMap.get(item.cover_image_path) ?? null)

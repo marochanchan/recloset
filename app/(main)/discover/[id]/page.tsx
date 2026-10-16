@@ -3,12 +3,6 @@ import { LikeButton, LoginToLikeLink } from "@/components/like-button";
 import { ItemDetailSkeleton } from "@/components/loading-skeletons";
 import { MarketplaceLinks } from "@/components/marketplace-links";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { formatSeasons, getCategoryLabel } from "@/lib/clothing-options";
 import { getMyLoopItemStates } from "@/lib/loop-likes";
 import { getMarketplaceLinks } from "@/lib/marketplace-urls";
@@ -129,7 +123,7 @@ async function PublicClothingItemDetail({
     : undefined;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {/* ハートはメイン画像の右上に重ねる（自分の服には出さない） */}
       <div className="relative">
         <ClothingImageGallery images={imageUrls} alt={item.title} />
@@ -155,48 +149,57 @@ async function PublicClothingItemDetail({
         </p>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">{item.title}</CardTitle>
+      {/* 名前・ブランドを誌面風に。カテゴリ・季節は小さなバッジで添える */}
+      <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
           {item.brand && (
-            <p className="text-sm text-muted-foreground">{item.brand}</p>
-          )}
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">
-              {getCategoryLabel(item.category)}
-            </Badge>
-            {formatSeasons(item.seasons) && (
-              <Badge variant="secondary">{formatSeasons(item.seasons)}</Badge>
-            )}
-          </div>
-
-          {itemState?.isOwner && (
-            <p className="text-xs text-muted-foreground">
-              あなたが公開している服です
+            <p className="truncate text-xs font-medium tracking-[0.15em] text-muted-foreground">
+              {item.brand}
             </p>
           )}
-
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <dt className="text-muted-foreground">公開した人</dt>
-            <dd>{item.owner_display_name ?? "Re:Closetユーザー"}</dd>
-
-            <dt className="text-muted-foreground">公開日</dt>
-            <dd>{formatJstDate(item.published_at)}</dd>
-          </dl>
-
-          {marketplaceLinks.length > 0 && (
-            <div className="flex flex-col gap-2 border-t pt-4">
-              <p className="text-sm font-medium">この服が気になったら</p>
-              <MarketplaceLinks links={marketplaceLinks} />
-              <p className="text-xs text-muted-foreground">
-                外部サイトに移動します。出品状況は各サービスでご確認ください。
-              </p>
-            </div>
+          <h1 className="break-words text-2xl font-bold leading-snug">{item.title}</h1>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Badge variant="secondary">{getCategoryLabel(item.category)}</Badge>
+          {formatSeasons(item.seasons) && (
+            <Badge variant="secondary">{formatSeasons(item.seasons)}</Badge>
           )}
-        </CardContent>
-      </Card>
+        </div>
+        {itemState?.isOwner && (
+          <p className="text-xs text-muted-foreground">
+            あなたが公開している服です
+          </p>
+        )}
+      </div>
+
+      {/* 公開した人・公開日 */}
+      <dl className="flex flex-col divide-y divide-border rounded-2xl border border-border/70 bg-card px-4 text-sm">
+        <div className="flex items-baseline justify-between gap-4 py-3">
+          <dt className="shrink-0 text-muted-foreground">公開した人</dt>
+          <dd className="min-w-0 break-words text-right font-medium">
+            {item.owner_display_name ?? "Re:Closetユーザー"}
+          </dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-4 py-3">
+          <dt className="shrink-0 text-muted-foreground">公開日</dt>
+          <dd className="text-right">{formatJstDate(item.published_at)}</dd>
+        </div>
+      </dl>
+
+      {marketplaceLinks.length > 0 && (
+        <section
+          aria-labelledby="loop-marketplace-title"
+          className="flex flex-col gap-3 rounded-3xl bg-gradient-to-br from-primary/10 to-blush/20 p-5"
+        >
+          <h2 id="loop-marketplace-title" className="text-base font-bold">
+            この服が気になったら
+          </h2>
+          <MarketplaceLinks links={marketplaceLinks} />
+          <p className="text-xs text-muted-foreground">
+            外部サイトに移動します。出品状況は各サービスでご確認ください。
+          </p>
+        </section>
+      )}
     </div>
   );
 }

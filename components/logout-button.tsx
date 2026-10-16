@@ -13,5 +13,9 @@ export function LogoutButton() {
     window.location.assign("/");
   };
 
-  return <Button onClick={logout}>ログアウト</Button>;
+  return (
+    <Button variant="outline" className="w-full" onClick={logout}>
+      ログアウト
+    </Button>
+  );
 }

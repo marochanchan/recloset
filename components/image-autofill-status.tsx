@@ -54,7 +54,7 @@ export function ImageAutofillStatus({
   return (
     <div
       aria-live="polite"
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border bg-muted/40 px-3 py-2 text-sm"
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-primary/10 px-3.5 py-2.5 text-sm"
     >
       {message && (
         <p

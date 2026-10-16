@@ -426,7 +426,7 @@ export function PhotoBatchRegisterForm({
                   <p className="text-sm font-medium">
                     {progress.done} / {progress.total}着 登録中…
                   </p>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary" aria-hidden="true">
                     <div
                       className="h-full rounded-full bg-primary motion-safe:transition-[width]"
                       style={{ width: `${Math.round((progress.done / Math.max(progress.total, 1)) * 100)}%` }}
@@ -495,7 +495,7 @@ function PhotoThumbnail({
 
   return (
     <li className="flex flex-col gap-1">
-      <div className="relative aspect-square overflow-hidden rounded-md border bg-muted">
+      <div className="relative aspect-square overflow-hidden rounded-xl border border-border/70 bg-photo">
         {photo.previewUrl ? (
           <Image
             src={photo.previewUrl}

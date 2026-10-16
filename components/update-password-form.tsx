@@ -45,7 +45,7 @@ export function UpdatePasswordForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
+      <Card className="rounded-3xl border-border/60 px-1 py-2 shadow-sm">
         <CardHeader>
           <CardTitle className="text-2xl">新しいパスワードを設定</CardTitle>
           <CardDescription>
@@ -66,7 +66,14 @@ export function UpdatePasswordForm({
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && (
+                <p
+                  role="alert"
+                  className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
+                  {error}
+                </p>
+              )}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "保存中..." : "保存する"}
               </Button>

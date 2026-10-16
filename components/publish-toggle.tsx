@@ -69,7 +69,7 @@ export function PublishToggle({
     return (
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <Badge>公開中</Badge>
+          <Badge className="border-transparent bg-primary/10 text-primary hover:bg-primary/10">公開中</Badge>
           {publishedAtLabel && (
             <p className="text-sm text-muted-foreground">
               {publishedAtLabel}から公開しています
@@ -127,7 +127,7 @@ export function PublishToggle({
 
   if (!hasDisplayName || displayNameRequired) {
     return (
-      <div className="flex flex-col gap-3 rounded-md border p-3 text-sm">
+      <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-secondary/40 p-4 text-sm">
         <p className="font-medium">
           服を公開するには、先に公開名を設定してください
         </p>
@@ -155,7 +155,7 @@ export function PublishToggle({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border p-3 text-sm">
+    <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-secondary/40 p-4 text-sm">
       <p className="font-medium">この服を一般公開しますか？</p>
       <div className="flex flex-col gap-1">
         <p>

@@ -56,7 +56,7 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
+      <Card className="rounded-3xl border-border/60 px-1 py-2 shadow-sm">
         <CardHeader>
           <CardTitle className="text-2xl">ログイン</CardTitle>
           <CardDescription>Re:Closetへログイン</CardDescription>
@@ -80,7 +80,7 @@ export function LoginForm({
                   <Label htmlFor="password">パスワード</Label>
                   <Link
                     href="/auth/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+                    className="ml-auto inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
                   >
                     パスワードを忘れた方
                   </Link>
@@ -93,7 +93,14 @@ export function LoginForm({
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && (
+                <p
+                  role="alert"
+                  className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
+                  {error}
+                </p>
+              )}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "ログイン中..." : "ログイン"}
               </Button>

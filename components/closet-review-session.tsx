@@ -237,7 +237,7 @@ export function ClosetReviewSession({
 
   if (!current) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center">
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-12 text-center">
         {completeFailed ? (
           <>
             <p className="text-sm text-destructive">
@@ -275,7 +275,7 @@ export function ClosetReviewSession({
         </Button>
       </div>
       <div
-        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+        className="h-1.5 w-full overflow-hidden rounded-full bg-secondary"
         aria-hidden="true"
       >
         <div
@@ -294,7 +294,7 @@ export function ClosetReviewSession({
       >
         <div
           className={cn(
-            "overflow-hidden rounded-xl border bg-background shadow-sm",
+            "overflow-hidden rounded-3xl border border-border/60 bg-card shadow-sm",
             dragX === 0 && "transition-transform duration-150",
             isBusy && "opacity-70",
           )}
@@ -302,7 +302,7 @@ export function ClosetReviewSession({
             transform: `translateX(${dragX}px) rotate(${dragX / 30}deg)`,
           }}
         >
-          <div className="relative aspect-[4/5] max-h-[60vh] w-full bg-muted">
+          <div className="relative aspect-[4/5] max-h-[60vh] w-full bg-photo">
             {current.imageUrl ? (
               <Image
                 key={current.id}
@@ -324,7 +324,7 @@ export function ClosetReviewSession({
             {dragX !== 0 && (
               <span
                 className={cn(
-                  "absolute top-4 rounded-md border-2 bg-background/90 px-3 py-1 text-lg font-bold",
+                  "absolute top-4 rounded-lg border-2 bg-card/90 px-3 py-1 text-lg font-bold",
                   dragX > 0
                     ? "left-4 border-primary text-primary"
                     : "right-4 border-muted-foreground text-muted-foreground",

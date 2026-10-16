@@ -9,7 +9,7 @@ import { useState, useTransition } from "react";
 // 画像の上に重ねるハートの見た目（一覧カード・詳細の画像右上で共通）。
 // 画像の色に埋もれないよう、半透明の背景と影をつける。タップ領域は44px。
 const HEART_BUTTON_CLASS =
-  "flex h-11 w-11 items-center justify-center rounded-full bg-background/85 shadow-md backdrop-blur transition-colors hover:bg-background disabled:opacity-70";
+  "flex h-11 w-11 items-center justify-center rounded-full bg-card/90 shadow-sm backdrop-blur-sm outline-none transition-colors hover:bg-card focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-70";
 
 type LikeButtonProps = {
   itemId: string;
@@ -68,7 +68,7 @@ export function LikeButton({
         className={HEART_BUTTON_CLASS}
       >
         <Heart
-          className={cn("h-5 w-5", liked && "text-rose-500")}
+          className={cn("h-5 w-5", liked && "text-blush-foreground")}
           fill={liked ? "currentColor" : "none"}
           aria-hidden="true"
         />
@@ -76,7 +76,7 @@ export function LikeButton({
       {savedNoticeVisible && !error && (
         <div
           role="status"
-          className="absolute right-0 top-12 z-10 flex w-max max-w-[15rem] items-start gap-1 rounded-md border bg-background py-1.5 pl-3 pr-1 text-xs shadow-md"
+          className="absolute right-0 top-12 z-10 flex w-max max-w-[15rem] items-start gap-1 rounded-xl border border-border/70 bg-card py-1.5 pl-3 pr-1 text-xs shadow-md"
         >
           <p className="flex flex-col gap-1 py-0.5">
             <span>気になる服に保存しました</span>
@@ -100,7 +100,7 @@ export function LikeButton({
       {error && (
         <p
           role="alert"
-          className="absolute right-0 top-12 z-10 w-max max-w-[10rem] rounded-md border bg-background px-2 py-1 text-xs text-destructive shadow-sm"
+          className="absolute right-0 top-12 z-10 w-max max-w-[10rem] rounded-xl border border-border/70 bg-card px-2.5 py-1.5 text-xs text-destructive shadow-sm"
         >
           {error}
         </p>

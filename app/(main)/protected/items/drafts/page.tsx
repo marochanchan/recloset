@@ -34,7 +34,7 @@ async function DraftList() {
 
   if (drafts.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center">
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-12 text-center">
         <p className="font-medium">下書きはありません</p>
         <p className="text-sm text-muted-foreground">
           服の登録画面で「下書きとして保存」すると、ここに並びます。
@@ -68,7 +68,7 @@ async function DraftList() {
         return (
           <li key={draft.id}>
             <ClothingDraftCard draftId={draft.id}>
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-muted">
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-photo">
                 {coverUrl ? (
                   <Image
                     src={coverUrl}

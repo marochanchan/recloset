@@ -75,7 +75,7 @@ export function ClothingDraftCard({
       </div>
 
       {isConfirming && (
-        <div className="flex flex-col gap-2 rounded-md border border-destructive/50 p-3">
+        <div className="flex flex-col gap-2 rounded-xl border border-destructive/40 bg-destructive/5 p-3">
           <p className="text-sm font-medium text-destructive">
             この下書きを削除しますか？
           </p>

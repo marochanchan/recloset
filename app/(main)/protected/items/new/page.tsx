@@ -18,7 +18,7 @@ type SearchParamsPromise = Promise<{
 
 function DraftNotFound() {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-12 text-center">
       <p className="font-medium">下書きが見つかりませんでした</p>
       <p className="text-sm text-muted-foreground">
         削除されたか、登録が完了した下書きの可能性があります。
@@ -110,7 +110,7 @@ async function DraftsNotice({
   if (error || !count) return null;
 
   return (
-    <p className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+    <p className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-secondary/60 px-4 py-2.5 text-sm text-muted-foreground">
       <span>保存中の下書きが{count}件あります</span>
       <Link
         href="/protected/items/drafts"

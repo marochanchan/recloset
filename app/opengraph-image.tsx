@@ -20,8 +20,10 @@ export default function OpenGraphImage() {
           alignItems: "center",
           justifyContent: "center",
           gap: 28,
-          background: "#ffffff",
-          color: "#171717",
+          // Re:Closetの配色（アイボリーの背景に、セージとくすみピンクをほんのり重ねる）
+          background:
+            "linear-gradient(135deg, #E9EDE8 0%, #FAF8F4 45%, #FAF8F4 60%, #F3E4E1 100%)",
+          color: "#34332F",
         }}
       >
         <svg
@@ -29,7 +31,7 @@ export default function OpenGraphImage() {
           height="180"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#171717"
+          stroke="#476354"
           strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -42,7 +44,7 @@ export default function OpenGraphImage() {
         <div style={{ fontSize: 88, fontWeight: 600, letterSpacing: -2 }}>
           Re:Closet
         </div>
-        <div style={{ fontSize: 36, color: "#737373" }}>
+        <div style={{ fontSize: 36, color: "#67635A" }}>
           Wear it again. Pass it on.
         </div>
       </div>

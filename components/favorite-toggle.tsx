@@ -23,8 +23,8 @@ export function FavoriteToggle({
         className={cn(
           "flex h-10 w-fit items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           checked
-            ? "border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300"
-            : "text-muted-foreground hover:bg-accent hover:text-foreground",
+            ? "border-blush bg-blush/20 text-blush-foreground"
+            : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground",
         )}
       >
         <Heart

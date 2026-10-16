@@ -212,7 +212,7 @@ function ReviewResult({
         </div>
         <dl className="grid grid-cols-3 gap-2">
           {breakdown.map(({ label, count }) => (
-            <div key={label} className="rounded-lg bg-muted/60 px-2 py-3">
+            <div key={label} className="rounded-xl bg-secondary/60 px-2 py-3">
               <dt className="text-xs text-muted-foreground">{label}</dt>
               <dd className="text-xl font-bold">{count}</dd>
             </div>
@@ -277,7 +277,7 @@ function ResultItemList({
               href={`/protected/items/${item.id}`}
               className="flex items-center gap-3 rounded-lg border p-2 transition-colors hover:bg-accent"
             >
-              <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-muted">
+              <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-photo">
                 {item.imageUrl ? (
                   <Image
                     src={item.imageUrl}
@@ -324,7 +324,7 @@ export default function ClosetReviewSessionPage({
       >
         ← クローゼットに戻る
       </Link>
-      <h1 className="text-xl font-bold">まとめて見直す</h1>
+      <h1 className="text-2xl font-bold">まとめて見直す</h1>
       <Suspense fallback={<ReviewSessionSkeleton />}>
         <ReviewSessionContent params={params} />
       </Suspense>

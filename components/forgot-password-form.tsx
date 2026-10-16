@@ -49,7 +49,7 @@ export function ForgotPasswordForm({
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       {success ? (
-        <Card>
+        <Card className="rounded-3xl border-border/60 px-1 py-2 shadow-sm">
           <CardHeader>
             <CardTitle className="text-2xl">メールをご確認ください</CardTitle>
             <CardDescription>
@@ -63,7 +63,7 @@ export function ForgotPasswordForm({
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card className="rounded-3xl border-border/60 px-1 py-2 shadow-sm">
           <CardHeader>
             <CardTitle className="text-2xl">パスワードを再設定</CardTitle>
             <CardDescription>
@@ -84,7 +84,14 @@ export function ForgotPasswordForm({
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
-                {error && <p className="text-sm text-destructive">{error}</p>}
+                {error && (
+                <p
+                  role="alert"
+                  className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
+                  {error}
+                </p>
+              )}
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? "送信中..." : "再設定メールを送信"}
                 </Button>

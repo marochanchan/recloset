@@ -75,7 +75,7 @@ export function ImageLightbox({
               <X className="h-5 w-5" aria-hidden="true" />
             </button>
           </div>
-          <div className="relative flex-1 bg-muted">
+          <div className="relative flex-1 bg-photo">
             <Image
               src={src}
               alt={alt}

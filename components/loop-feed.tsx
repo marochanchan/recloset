@@ -40,7 +40,7 @@ export async function LoopFeed() {
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-1 rounded-lg border border-dashed px-4 py-10 text-center">
+      <div className="flex flex-col items-center gap-1 rounded-2xl bg-secondary/60 px-6 py-12 text-center">
         <p className="font-medium">まだ公開されている服はありません</p>
         <p className="text-sm text-muted-foreground">
           ユーザーが服を公開すると、ここに並びます。
@@ -71,7 +71,7 @@ export async function LoopFeed() {
     : new Map();
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
       {items.map((item) => {
         const imageUrl = item.cover_image_path
           ? (signedUrlMap.get(item.cover_image_path) ?? null)
@@ -83,7 +83,7 @@ export async function LoopFeed() {
         return (
           <div key={item.id} className="relative h-full">
             {/* 押せることが伝わるよう、hover（カードの影）・キーボード操作・タップに反応させる。
-                「気になる」ボタンの位置がずれないよう、拡大縮小はしない */}
+                「気になる」ボタンの位置がずれないよう、カード全体の拡大縮小はしない */}
             <Link
               href={`/discover/${item.id}`}
               className="group block h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:opacity-80"

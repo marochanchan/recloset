@@ -22,11 +22,11 @@ function HomeIntro() {
   return (
     <section
       aria-labelledby="home-intro-title"
-      className="flex flex-col gap-3 rounded-xl bg-muted/40 p-4 sm:p-6"
+      className="flex flex-col gap-3 rounded-3xl bg-gradient-to-br from-primary/10 via-secondary/50 to-blush/20 px-5 py-6 sm:p-8"
     >
       <h1
         id="home-intro-title"
-        className="text-xl font-bold leading-snug tracking-tight sm:text-2xl"
+        className="text-2xl font-bold leading-snug sm:text-3xl"
       >
         <span className="inline-block">着る、残す、手放す。</span>
         <span className="inline-block">服とのこれからを考える。</span>
@@ -49,7 +49,7 @@ function HomeIntro() {
 // ログイン中は proxy（lib/supabase/proxy.ts）で /today へリダイレクトされる。
 export default function Home() {
   return (
-    <div className="flex-1 w-full flex flex-col gap-5 max-w-5xl p-5">
+    <div className="flex-1 w-full flex flex-col gap-8 max-w-5xl p-5">
       <HomeIntro />
 
       <LoopIntro headingLevel="h2" />

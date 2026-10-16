@@ -1,11 +1,4 @@
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { formatSeasons, getCategoryLabel } from "@/lib/clothing-options";
+import { getCategoryLabel } from "@/lib/clothing-options";
 import Image from "next/image";
 
 // 一般公開ページ用のカード。本人用のClothingItemCardとは分け、
@@ -23,21 +16,22 @@ export function PublicClothingItemCard({
   title,
   brand,
   category,
-  seasons,
   ownerDisplayName,
   imageUrl,
 }: PublicClothingItemCardProps) {
   return (
-    // Loopではリンク（group）の中に置き、hoverで影を強めて押せることを示す
-    <Card className="flex h-full flex-col overflow-hidden transition-shadow group-hover:shadow-md">
-      <div className="relative aspect-square bg-muted">
+    // 枠のないカードで写真を主役にする（Closetのカードと同じ縦長4:5・生成りの背景）。
+    // Loopではリンク（group）の中に置き、hoverで写真を少しだけ寄せて押せることを示す。
+    // 季節は詳細ページで確認できるため、カードには出さない
+    <div className="flex h-full flex-col gap-2">
+      <div className="relative aspect-[4/5] w-full shrink-0 overflow-hidden rounded-xl bg-photo">
         {imageUrl ? (
           <Image
             src={imageUrl}
             alt={title}
             fill
-            sizes="(min-width: 1024px) 33vw, 50vw"
-            className="object-contain"
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+            className="object-contain motion-safe:transition-transform motion-safe:duration-300 group-hover:scale-[1.03]"
             style={{ objectFit: "contain" }}
           />
         ) : (
@@ -45,31 +39,21 @@ export function PublicClothingItemCard({
             画像なし
           </div>
         )}
+        <span className="absolute bottom-2 left-2 rounded-full bg-card/90 px-2 py-0.5 text-[11px] font-medium leading-4 backdrop-blur-sm">
+          {getCategoryLabel(category)}
+        </span>
       </div>
-      {/* スマホは2列表示のため余白・文字を詰め、季節バッジは省略する */}
-      <CardHeader className="space-y-1 p-3 sm:p-6 sm:pb-3">
-        <CardTitle className="line-clamp-2 text-sm leading-snug sm:text-lg sm:leading-snug">
+      <div className="flex min-w-0 flex-col gap-0.5 px-0.5">
+        <p className="line-clamp-2 break-words text-sm font-medium leading-snug">
           {title}
-        </CardTitle>
+        </p>
         {brand && (
-          <p className="truncate text-xs text-muted-foreground sm:text-sm">
-            {brand}
-          </p>
+          <p className="truncate text-xs text-muted-foreground">{brand}</p>
         )}
-      </CardHeader>
-      <CardContent className="mt-auto flex flex-col gap-2 p-3 pt-0 sm:gap-3 sm:p-6 sm:pt-0">
-        <div className="flex flex-wrap gap-1.5 sm:gap-2">
-          <Badge variant="secondary">{getCategoryLabel(category)}</Badge>
-          {formatSeasons(seasons) && (
-            <Badge variant="secondary" className="hidden sm:inline-flex">
-              {formatSeasons(seasons)}
-            </Badge>
-          )}
-        </div>
-        <p className="truncate text-xs text-muted-foreground">
+        <p className="truncate text-[11px] text-muted-foreground">
           {ownerDisplayName}
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

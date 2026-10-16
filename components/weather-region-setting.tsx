@@ -140,7 +140,7 @@ export function WeatherRegionSetting({
             </Button>
             <select
               aria-label="都道府県を選ぶ"
-              className="min-h-11 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+              className="min-h-11 rounded-lg border border-input bg-card px-3 text-sm focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-50"
               value=""
               onChange={(event) => handleSelect(event.target.value)}
               disabled={isBusy}
