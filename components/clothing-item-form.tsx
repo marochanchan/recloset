@@ -674,7 +674,7 @@ export function ClothingItemForm({
                 href="/protected/items"
                 className="underline underline-offset-4"
               >
-                クローゼット一覧へ戻る
+                クローゼットに戻る
               </Link>
               {(savedItem.draftKept || savedItem.draftCleanupFailed) && (
                 <Link

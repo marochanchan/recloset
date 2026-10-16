@@ -322,7 +322,7 @@ export default function ClosetReviewSessionPage({
         href="/protected/items"
         className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
       >
-        ← クローゼット一覧に戻る
+        ← クローゼットに戻る
       </Link>
       <h1 className="text-xl font-bold">まとめて見直す</h1>
       <Suspense fallback={<ReviewSessionSkeleton />}>

@@ -32,7 +32,7 @@ import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { cn } from "@/lib/utils";
 import { getJstDateKey } from "@/lib/weather";
 import { getCurrentSeasonJst } from "@/lib/wear-logs";
-import { Camera, FileText, Plus, Tags } from "lucide-react";
+import { Camera, ChevronDown, FileText, Layers, Plus, SlidersHorizontal, Tags } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -40,7 +40,15 @@ type SearchParamsPromise = Promise<RawSearchParams>;
 
 // 詳細へ移動できる衣類カード。押せることが伝わるよう、hover・キーボード操作・タップに反応させる
 const CLICKABLE_CARD_LINK_CLASS =
-  "group block h-full rounded-xl outline-none transition-transform focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.98]";
+  "group block h-full rounded-xl outline-none transition-transform focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background active:scale-[0.98]";
+
+// 空状態（服が0着・条件に合う服がない）の枠
+const EMPTY_STATE_CLASS =
+  "flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-12 text-center";
+
+// 「その他の登録方法」の中の1行
+const MORE_REGISTER_LINK_CLASS =
+  "flex min-h-12 items-center gap-3 rounded-lg px-3 py-2 text-sm outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring active:bg-accent";
 
 function FilterChip({
   href,
@@ -57,10 +65,10 @@ function FilterChip({
       scroll={false}
       aria-current={selected ? "true" : undefined}
       className={cn(
-        "inline-flex h-8 items-center rounded-full border px-3 text-sm transition-colors",
+        "inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border px-3.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
         selected
           ? "border-primary bg-primary font-medium text-primary-foreground"
-          : "text-muted-foreground hover:bg-accent hover:text-foreground",
+          : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground",
       )}
     >
       {label}
@@ -83,7 +91,9 @@ function FilterGroup({
   );
 }
 
-// カテゴリ・シーズンの絞り込み（URLの ?category= / ?season= を切り替えるリンク）
+// カテゴリ・シーズンの絞り込み（URLの ?category= / ?season= を切り替えるリンク）。
+// よく使うカテゴリは1行の横スクロールで常に見せ、季節・お気に入り・手放し候補は
+// 「季節・状態」に折りたたむ（どれかを選んでいるときは開いた状態で表示する）
 async function ClosetFilterBar({
   searchParams,
 }: {
@@ -94,9 +104,24 @@ async function ClosetFilterBar({
   const hrefFor = (change: Partial<ClosetFilters>) =>
     buildClosetFilterHref(rawParams, filters, change);
 
+  // 折りたたみの見出しに、選択中の条件を短く出す
+  const secondaryLabels = [
+    filters.season
+      ? SEASON_OPTIONS.find((option) => option.value === filters.season)?.label
+      : null,
+    filters.favorite ? "お気に入り" : null,
+    filters.status === "candidate" ? "手放し候補" : null,
+  ].filter((label): label is string => Boolean(label));
+  const hasSecondaryFilters = secondaryLabels.length > 0;
+
   return (
-    <div className="flex flex-col gap-4">
-      <FilterGroup label="カテゴリ">
+    <div className="flex flex-col gap-2">
+      {/* スマホでは画面の端まで横スクロールさせる（親の余白 p-5 を打ち消す） */}
+      <div
+        role="group"
+        aria-label="カテゴリ"
+        className="-mx-5 flex gap-2 overflow-x-auto px-5 py-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden"
+      >
         <FilterChip
           href={hrefFor({ category: null })}
           label="すべて"
@@ -110,39 +135,68 @@ async function ClosetFilterBar({
             selected={filters.category === option.value}
           />
         ))}
-      </FilterGroup>
-      <FilterGroup label="シーズン">
-        <FilterChip
-          href={hrefFor({ season: null })}
-          label="すべて"
-          selected={filters.season === null}
-        />
-        {SEASON_OPTIONS.map((option) => (
-          <FilterChip
-            key={option.value}
-            href={hrefFor({ season: option.value })}
-            label={option.label}
-            selected={filters.season === option.value}
-          />
-        ))}
-      </FilterGroup>
-      <FilterGroup label="絞り込み">
-        <FilterChip
-          href={hrefFor({ favorite: false, status: null })}
-          label="すべて"
-          selected={!filters.favorite && filters.status === null}
-        />
-        <FilterChip
-          href={hrefFor({ favorite: true, status: null })}
-          label="お気に入り"
-          selected={filters.favorite}
-        />
-        <FilterChip
-          href={hrefFor({ favorite: false, status: "candidate" })}
-          label="手放し候補"
-          selected={filters.status === "candidate"}
-        />
-      </FilterGroup>
+      </div>
+
+      <div className="flex flex-wrap items-start justify-between gap-x-3">
+        <details className="group/filters min-w-0 flex-1" open={hasSecondaryFilters}>
+          <summary className="flex min-h-10 w-fit cursor-pointer list-none items-center gap-1.5 rounded-lg pr-2 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            季節・状態で絞り込む
+            {hasSecondaryFilters && (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                {secondaryLabels.join("・")}
+              </span>
+            )}
+            <ChevronDown
+              className="h-4 w-4 transition-transform group-open/filters:rotate-180"
+              aria-hidden="true"
+            />
+          </summary>
+          <div className="flex flex-col gap-3 pb-2 pt-2">
+            <FilterGroup label="シーズン">
+              <FilterChip
+                href={hrefFor({ season: null })}
+                label="すべて"
+                selected={filters.season === null}
+              />
+              {SEASON_OPTIONS.map((option) => (
+                <FilterChip
+                  key={option.value}
+                  href={hrefFor({ season: option.value })}
+                  label={option.label}
+                  selected={filters.season === option.value}
+                />
+              ))}
+            </FilterGroup>
+            <FilterGroup label="状態">
+              <FilterChip
+                href={hrefFor({ favorite: false, status: null })}
+                label="すべて"
+                selected={!filters.favorite && filters.status === null}
+              />
+              <FilterChip
+                href={hrefFor({ favorite: true, status: null })}
+                label="お気に入り"
+                selected={filters.favorite}
+              />
+              <FilterChip
+                href={hrefFor({ favorite: false, status: "candidate" })}
+                label="手放し候補"
+                selected={filters.status === "candidate"}
+              />
+            </FilterGroup>
+          </div>
+        </details>
+        {hasActiveClosetFilters(filters) && (
+          <Link
+            href={CLOSET_FILTER_PATH}
+            scroll={false}
+            className="flex min-h-10 items-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            すべて解除
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
@@ -190,7 +244,7 @@ async function ClothingItemsList({
     }
     if (countError || (count ?? 0) > 0) {
       return (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center">
+        <div className={EMPTY_STATE_CLASS}>
           <p className="font-medium">条件に合う服がありません</p>
           <Button asChild variant="outline" size="sm">
             <Link href={CLOSET_FILTER_PATH} scroll={false}>
@@ -204,14 +258,23 @@ async function ClothingItemsList({
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center">
+      <div className={EMPTY_STATE_CLASS}>
         <p className="font-medium">まだ服が登録されていません</p>
         <p className="text-sm text-muted-foreground">
           手持ちの服を登録すると、ここに並びます。
         </p>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/protected/items/new">服を登録する</Link>
+        <Button asChild size="sm">
+          <Link href="/protected/items/new?mode=photo">
+            <Camera aria-hidden="true" />
+            写真だけで登録
+          </Link>
         </Button>
+        <Link
+          href="/protected/items/new"
+          className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        >
+          1着ずつ詳しく登録する
+        </Link>
       </div>
     );
   }
@@ -229,7 +292,7 @@ async function ClothingItemsList({
   );
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
       {items.map((item) => {
         const representativePath = item.clothing_images[0]?.image_path ?? null;
         const imageUrl = representativePath
@@ -386,9 +449,9 @@ async function ReviewSuggestions() {
   );
 }
 
-// 下書きがあるときだけ、「下書き N」ボタンを出す。
+// 下書きがあるときだけ、「下書き N」の小さなボタンを出す。
 // 件数を取得できない場合（下書きテーブルの適用前など）は何も出さない。
-// 「服を登録」の横に出すため、読み込み後に下の内容を押し下げない
+// 見出しの横に出すため、読み込み後に下の内容を押し下げない
 async function DraftsButton() {
   const supabase = await createClient();
   const { count, error } = await supabase
@@ -396,7 +459,7 @@ async function DraftsButton() {
     .select("*", { count: "exact", head: true });
   if (error || !count) return null;
   return (
-    <Button asChild variant="outline" className="min-h-11 flex-1 sm:min-h-9 sm:flex-none">
+    <Button asChild variant="outline" size="sm" className="h-9 shrink-0 rounded-full px-3">
       <Link href="/protected/items/drafts">
         <FileText aria-hidden="true" />
         下書き
@@ -415,49 +478,63 @@ export default function ClothingItemsPage({
 }) {
   return (
     <div className="w-full flex flex-col gap-6">
-      {/* 登録の導線は重要度順に並べる：写真だけで登録（主）→ クイック仕分け → 服を登録・下書き。
-          狭い画面では縦に積み、広い画面では見出しの下に1行で並べる */}
-      <div className="flex flex-col gap-3">
-        <h1 className="text-2xl font-bold">クローゼット一覧</h1>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          {/* 写真を選ぶだけで、1着でもまとめてでも登録できる入口（いちばん手軽な始め方） */}
-          <Button
-            asChild
-            size="lg"
-            className="h-12 w-full px-6 text-base sm:h-10 sm:w-auto sm:text-sm"
-          >
-            <Link href="/protected/items/new?mode=photo">
-              <Camera aria-hidden="true" />
-              写真だけで登録
-            </Link>
-          </Button>
-          {/* 写真だけで登録した服などに、カテゴリ・季節をカードで付けていく入口 */}
-          <Button
-            asChild
-            variant="outline"
-            className="h-auto min-h-12 w-full justify-start gap-3 whitespace-normal px-4 py-2 text-left sm:min-h-10 sm:w-auto"
-          >
-            <Link href="/protected/items/classify">
-              <Tags aria-hidden="true" />
-              <span className="flex flex-col">
-                <span>クイック仕分け</span>
-                <span className="text-xs font-normal text-muted-foreground">
-                  カテゴリや季節をサクッと整理
-                </span>
-              </span>
-            </Link>
-          </Button>
-          <div className="flex gap-2">
-            <Button asChild variant="outline" className="min-h-11 flex-1 sm:min-h-9 sm:flex-none">
-              <Link href="/protected/items/new">
-                <Plus aria-hidden="true" />
-                服を登録
+      {/* 主要な操作は「写真だけで登録」と「まとめて見直す」の2つを横に並べる。
+          スマホで服の写真が早く見えるよう、クイック仕分け・1着ずつの登録は
+          「その他の登録方法」に折りたたむ。下書きがあるときは見出しの横に小さく出す */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold">クローゼット</h1>
+          <Suspense fallback={null}>
+            <DraftsButton />
+          </Suspense>
+        </div>
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            {/* 写真を選ぶだけで、1着でもまとめてでも登録できる入口（いちばん手軽な始め方） */}
+            <Button asChild size="lg" className="h-12 px-3 sm:h-10 sm:px-6">
+              <Link href="/protected/items/new?mode=photo">
+                <Camera aria-hidden="true" />
+                写真だけで登録
               </Link>
             </Button>
-            <Suspense fallback={null}>
-              <DraftsButton />
-            </Suspense>
+            {/* 1着ずつスワイプで見直す（最大10着。開始・再開は見直しの画面で選ぶ） */}
+            <Button asChild variant="outline" size="lg" className="h-12 px-3 sm:h-10 sm:px-6">
+              <Link href="/protected/review">
+                <Layers aria-hidden="true" />
+                まとめて見直す
+              </Link>
+            </Button>
           </div>
+          <details className="group/more sm:relative">
+            <summary className="flex min-h-10 w-fit cursor-pointer list-none items-center gap-1 rounded-lg px-1 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+              その他の登録方法
+              <ChevronDown
+                className="h-4 w-4 transition-transform group-open/more:rotate-180"
+                aria-hidden="true"
+              />
+            </summary>
+            <div className="mt-1 flex flex-col rounded-xl border border-border/70 bg-card p-1 sm:absolute sm:left-0 sm:z-20 sm:w-72 sm:shadow-lg">
+              {/* 写真だけで登録した服などに、カテゴリ・季節をカードで付けていく入口 */}
+              <Link href="/protected/items/classify" className={MORE_REGISTER_LINK_CLASS}>
+                <Tags className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <span className="flex flex-col">
+                  <span className="font-medium">クイック仕分け</span>
+                  <span className="text-xs text-muted-foreground">
+                    カテゴリや季節をサクッと整理
+                  </span>
+                </span>
+              </Link>
+              <Link href="/protected/items/new" className={MORE_REGISTER_LINK_CLASS}>
+                <Plus className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <span className="flex flex-col">
+                  <span className="font-medium">服を登録</span>
+                  <span className="text-xs text-muted-foreground">
+                    1着ずつ、詳しく入力して登録
+                  </span>
+                </span>
+              </Link>
+            </div>
+          </details>
         </div>
       </div>
 

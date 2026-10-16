@@ -72,7 +72,7 @@ export function ClosetNotice() {
   return (
     <p
       role="status"
-      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
+      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-primary/10 px-4 py-2.5 text-sm text-foreground"
     >
       {notice.kind === "draft-saved" ? (
         <span>下書きを保存しました</span>

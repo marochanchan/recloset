@@ -6,11 +6,7 @@ import { cn } from "@/lib/utils";
 // 正方形の画像枠）に合わせ、読み込み完了時にレイアウトが大きく動かないようにする。
 
 const GRID_VARIANTS = {
-  // /protected/items（ClothingItemCard。スマホは2列・余白小さめ）
-  closet: {
-    grid: "grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4",
-    body: "p-3",
-  },
+  // /protected/items は枠なしの縦長カード（ClosetGridSkeleton）を使う
   // /discover（PublicClothingItemCard。スマホは2列・余白小さめ）
   discover: {
     grid: "grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4",
@@ -23,8 +19,9 @@ const GRID_SKELETON_COUNT = 6;
 export function ItemGridSkeleton({
   variant,
 }: {
-  variant: keyof typeof GRID_VARIANTS;
+  variant: keyof typeof GRID_VARIANTS | "closet";
 }) {
+  if (variant === "closet") return <ClosetGridSkeleton />;
   const { grid, body } = GRID_VARIANTS[variant];
 
   return (
@@ -41,6 +38,25 @@ export function ItemGridSkeleton({
             </div>
           </div>
         </Card>
+      ))}
+    </div>
+  );
+}
+
+// /protected/items（ClothingItemCard。枠なし・縦長4:5の写真。スマホ2列 → 3列 → 4列）
+function ClosetGridSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="読み込み中"
+      className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4"
+    >
+      {Array.from({ length: GRID_SKELETON_COUNT }, (_, index) => (
+        <div key={index} className="flex flex-col gap-2">
+          <Skeleton className="aspect-[4/5] w-full rounded-xl" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-3 w-1/2" />
+        </div>
       ))}
     </div>
   );
@@ -73,92 +89,98 @@ export function ItemDetailSkeleton() {
   );
 }
 
-// Closet「今日見直す3着」（ReviewSuggestionsCard と同じ枠。スマホは横スクロール・広い画面は3列）
+// Closet「今日見直す3着」（ReviewSuggestionsCard と同じ並び。スマホは横スクロール・広い画面は3列）
 export function ReviewSuggestionsSkeleton() {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-muted/30 p-4">
+    <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
         <Skeleton className="h-5 w-32" />
         <Skeleton className="h-3 w-3/4" />
       </div>
-      <div className="-mx-4 flex gap-3 overflow-hidden px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:px-0 sm:pb-0">
+      <div className="-mx-5 flex gap-3 overflow-hidden px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:px-0 sm:pb-0">
         {Array.from({ length: 3 }, (_, index) => (
-          <Card
+          <div
             key={index}
-            className="flex w-[40%] min-w-[8.5rem] shrink-0 flex-col overflow-hidden sm:w-auto sm:min-w-0"
+            className="flex w-[36%] min-w-[7.5rem] shrink-0 flex-col gap-2 sm:w-auto sm:min-w-0"
           >
-            <Skeleton className="aspect-square w-full rounded-none" />
-            <div className="flex flex-col gap-2 p-2.5">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-3 w-2/3" />
-              <Skeleton className="h-8 w-full" />
-            </div>
-          </Card>
+            <Skeleton className="aspect-square w-full rounded-xl" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
-// Closet の絞り込み（カテゴリ・シーズン・絞り込みの3グループ）
-const FILTER_SKELETON_CHIPS = [8, 6, 3];
-
+// Closet の絞り込み（カテゴリの横並び＋「季節・状態」の折りたたみ）
 export function ClosetFilterBarSkeleton() {
   return (
-    <div className="flex flex-col gap-4">
-      {FILTER_SKELETON_CHIPS.map((count, group) => (
-        <div key={group} className="flex flex-col gap-2">
-          <Skeleton className="h-3 w-14" />
-          <div className="flex flex-wrap gap-2">
-            {Array.from({ length: count }, (_, index) => (
-              <Skeleton key={index} className="h-8 w-16 rounded-full" />
-            ))}
-          </div>
-        </div>
-      ))}
+    <div className="flex flex-col gap-2">
+      <div className="-mx-5 flex gap-2 overflow-hidden px-5 py-1 sm:mx-0 sm:px-0">
+        {Array.from({ length: 7 }, (_, index) => (
+          <Skeleton key={index} className="h-9 w-16 shrink-0 rounded-full" />
+        ))}
+      </div>
+      <Skeleton className="my-2.5 h-5 w-40" />
     </div>
   );
 }
 
-// Today（挨拶・天気・今日のRe:try 3着・サマリー・導線）
+// Today（日付・挨拶・天気のヘッダー → 今日のRe:try → サマリー → 導線）
 export function TodaySkeleton() {
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-10">
-      <div className="flex flex-col gap-6">
-        <Skeleton className="h-7 w-2/3" />
-        <div className="flex flex-col gap-3">
-          <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-16 w-full" />
-          <div className="grid gap-3 sm:grid-cols-3">
-            {Array.from({ length: 3 }, (_, index) => (
-              <Card key={index} className="flex gap-3 p-3 sm:flex-col">
-                <Skeleton className="h-32 w-32 shrink-0 sm:aspect-square sm:h-auto sm:w-full" />
-                <div className="flex flex-1 flex-col gap-2">
-                  <Skeleton className="h-5 w-16" />
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-8 w-24" />
-                </div>
-              </Card>
-            ))}
+    <div className="flex w-full max-w-3xl flex-col gap-12">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-8 w-3/4" />
+        </div>
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-10 w-10 rounded-full" />
+          <div className="flex flex-col gap-1.5">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-4 w-44" />
           </div>
         </div>
       </div>
-      {/* 今週のRe:Closetは服が0着のときは表示しないため、全体のスケルトンには含めない
-          （0着のユーザーに一瞬だけカードの枠が出るのを防ぐ）。服がある場合は
-          カードの位置で WeeklyProgressSkeleton を表示する */}
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-6 w-40" />
-        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-4 w-full" />
+        </div>
+        <div className="-mx-4 flex gap-3 overflow-hidden px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
           {Array.from({ length: 3 }, (_, index) => (
-            <Skeleton key={index} className="h-[5.5rem] rounded-xl" />
+            <div
+              key={index}
+              className="flex w-[46%] min-w-[9.5rem] shrink-0 flex-col gap-2.5 sm:w-auto sm:min-w-0"
+            >
+              <Skeleton className="aspect-[4/5] w-full rounded-xl" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-8 w-24" />
+            </div>
           ))}
         </div>
       </div>
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-12 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
+      {/* 今週のRe:Closetは服が0着のときは表示しないため、全体のスケルトンには含めない
+          （0着のユーザーに一瞬だけ枠が出るのを防ぐ）。服がある場合は
+          その位置で WeeklyProgressSkeleton を表示する */}
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-6 w-40" />
+        <div className="grid grid-cols-3 divide-x divide-border border-y border-border">
+          {Array.from({ length: 3 }, (_, index) => (
+            <div key={index} className="flex min-h-[5.5rem] flex-col items-center justify-center gap-2">
+              <Skeleton className="h-7 w-8" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col divide-y divide-border border-y border-border">
+        <Skeleton className="my-4 h-6 w-2/3" />
+        <Skeleton className="my-4 h-6 w-3/4" />
       </div>
     </div>
   );
@@ -167,21 +189,27 @@ export function TodaySkeleton() {
 // Todayの「今日のRe:Quest」（components/re-quest-card.tsx）
 export function ReQuestSkeleton() {
   return (
-    <Card className="flex flex-col gap-3 p-4">
-      <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
         <Skeleton className="h-6 w-36" />
         <Skeleton className="h-4 w-3/4" />
       </div>
       <div className="flex flex-col gap-2">
         {Array.from({ length: 3 }, (_, index) => (
-          <Skeleton key={index} className="h-12 w-full rounded-lg" />
+          <Skeleton key={index} className="h-12 w-full rounded-xl" />
         ))}
       </div>
-      <div className="flex flex-col gap-2 border-t pt-3">
+      <div className="flex flex-col gap-2.5 pt-1">
         <Skeleton className="h-4 w-1/2" />
-        <Skeleton className="h-8 w-full" />
+        <div className="grid grid-cols-7 gap-1">
+          {Array.from({ length: 7 }, (_, index) => (
+            <div key={index} className="flex justify-center">
+              <Skeleton className="h-9 w-9 rounded-full" />
+            </div>
+          ))}
+        </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -224,52 +252,52 @@ export function ReStorySkeleton() {
 // Todayの「Re:Garden」（components/garden-card.tsx）
 export function GardenSkeleton() {
   return (
-    <Card className="flex flex-col gap-3 p-4">
-      <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-4 rounded-3xl bg-gradient-to-b from-primary/5 to-primary/15 px-5 pb-5 pt-6">
+      <div className="flex flex-col gap-1.5">
         <Skeleton className="h-6 w-28" />
         <Skeleton className="h-3 w-3/4" />
       </div>
-      <div className="flex flex-col items-center gap-2 rounded-xl bg-muted/40 py-5">
-        <Skeleton className="h-40 w-40 rounded-full" />
-        <Skeleton className="h-5 w-12" />
-        <Skeleton className="h-7 w-24" />
+      <div className="flex flex-col items-center gap-2">
+        <Skeleton className="h-40 w-40 rounded-full bg-card/70" />
+        <Skeleton className="h-7 w-32 bg-card/70" />
       </div>
-      <Skeleton className="h-2 w-full rounded-full" />
-      <Skeleton className="h-4 w-2/3" />
-      <div className="hidden grid-cols-5 gap-1 border-t pt-3 sm:grid">
+      <Skeleton className="h-2 w-full rounded-full bg-card/70" />
+      <Skeleton className="mx-auto h-4 w-2/3 bg-card/70" />
+      <div className="hidden grid-cols-5 gap-1 sm:grid">
         {Array.from({ length: 5 }, (_, index) => (
-          <Skeleton key={index} className="h-12" />
+          <Skeleton key={index} className="h-12 rounded-xl bg-card/70" />
         ))}
       </div>
-      <Skeleton className="h-10 w-full" />
-    </Card>
+      <Skeleton className="h-11 w-full rounded-xl bg-card/70" />
+    </div>
   );
 }
 
 // Todayの「今週のRe:Closet」（components/weekly-progress-card.tsx）
 export function WeeklyProgressSkeleton() {
   return (
-    <Card className="flex flex-col gap-3 p-4">
+    <div className="flex flex-col gap-4">
       <div className="flex items-baseline justify-between">
         <Skeleton className="h-6 w-36" />
         <Skeleton className="h-3 w-14" />
       </div>
-      <div className="flex items-baseline justify-between">
-        <Skeleton className="h-4 w-20" />
-        <Skeleton className="h-7 w-24" />
+      <div className="grid grid-cols-2 divide-x divide-border border-y border-border py-4">
+        <div className="flex flex-col gap-2 pr-4">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-8 w-24" />
+        </div>
+        <div className="flex flex-col gap-2 pl-4">
+          <Skeleton className="h-3 w-14" />
+          <Skeleton className="h-8 w-16" />
+        </div>
       </div>
       <Skeleton className="h-2 w-full rounded-full" />
       <Skeleton className="h-4 w-3/4" />
-      <div className="flex items-baseline justify-between border-t pt-3">
-        <Skeleton className="h-4 w-16" />
-        <Skeleton className="h-5 w-10" />
-      </div>
-      <Skeleton className="h-3 w-2/3" />
       <div className="grid grid-cols-2 gap-2">
         <Skeleton className="h-10" />
         <Skeleton className="h-10" />
       </div>
-    </Card>
+    </div>
   );
 }
 

@@ -249,7 +249,7 @@ export default function ClothingClassifyPage({
         href="/protected/items"
         className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
       >
-        ← クローゼット一覧に戻る
+        ← クローゼットに戻る
       </Link>
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-bold">クイック仕分け</h1>

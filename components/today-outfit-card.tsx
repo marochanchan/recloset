@@ -1,6 +1,4 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { WearTodayButton } from "@/components/wear-today-button";
 import { WeatherRegionSetting } from "@/components/weather-region-setting";
 import type { OutfitPick, OutfitSuggestion } from "@/lib/outfit-suggestion";
@@ -24,11 +22,16 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 
-type TodayOutfitCardProps = {
+type TodayWeatherProps = {
   /** 設定した地域（Cookieをサーバーで検証済み。未設定・不正ならnull） */
   region: WeatherRegion | null;
   /** 設定した地域の今日の天気（未設定・取得失敗ならnull） */
   weather: DailyWeather | null;
+};
+
+type TodayOutfitCardProps = {
+  /** 設定した地域（説明文の地域名に使う） */
+  region: WeatherRegion | null;
   suggestion: OutfitSuggestion;
   /** 候補の服ID → 代表画像の署名付きURL */
   imageUrls: Map<string, string>;
@@ -67,18 +70,19 @@ function OutfitPickCard({
 }) {
   const { item } = pick;
   return (
-    <Card className="flex gap-3 overflow-hidden p-3 sm:flex-col">
+    // 枠のないカードで写真を主役にする（縦長の生成りの枠にobject-containで収める）
+    <div className="flex h-full flex-col gap-2.5">
       <Link
         href={`/protected/items/${item.id}`}
-        className="relative h-32 w-32 shrink-0 overflow-hidden rounded-md bg-muted outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring active:opacity-80 sm:aspect-square sm:h-auto sm:w-full"
+        className="group relative block aspect-[4/5] w-full shrink-0 overflow-hidden rounded-xl bg-photo outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:opacity-90"
       >
         {imageUrl ? (
           <Image
             src={imageUrl}
             alt={item.title}
             fill
-            sizes="(min-width: 640px) 240px, 128px"
-            className="object-contain"
+            sizes="(min-width: 640px) 240px, 50vw"
+            className="object-contain motion-safe:transition-transform motion-safe:duration-300 group-hover:scale-[1.03]"
             style={{ objectFit: "contain" }}
           />
         ) : (
@@ -86,15 +90,15 @@ function OutfitPickCard({
             画像なし
           </div>
         )}
+        <span className="absolute left-2 top-2 rounded-full bg-card/90 px-2 py-0.5 text-[11px] font-medium leading-4 backdrop-blur-sm">
+          {getSlotLabel(pick)}
+        </span>
       </Link>
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 px-0.5">
         <div className="flex min-w-0 flex-col gap-1">
-          <Badge variant="secondary" className="w-fit">
-            {getSlotLabel(pick)}
-          </Badge>
           <Link
             href={`/protected/items/${item.id}`}
-            className="line-clamp-2 text-sm font-medium hover:underline"
+            className="line-clamp-2 text-sm font-medium leading-snug hover:underline"
           >
             {item.title}
           </Link>
@@ -113,31 +117,71 @@ function OutfitPickCard({
           />
         </div>
       </div>
-    </Card>
+    </div>
+  );
+}
+
+/**
+ * Todayのヘッダーに置く、設定した地域の今日の天気と地域の設定。
+ * 地域が未設定なら、設定欄を開いて案内する（候補は月ベースの季節で選ぶ）。
+ */
+export function TodayWeather({ region, weather }: TodayWeatherProps) {
+  const weatherLabel = weather ? getWeatherLabel(weather.weatherCode) : null;
+
+  return (
+    <div className="flex flex-col gap-1">
+      {region && (
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-primary">
+            <WeatherIcon code={weather?.weatherCode ?? null} />
+          </span>
+          <div className="flex min-w-0 flex-col">
+            <p className="text-xs text-muted-foreground">{region.name}の天気</p>
+            {weather ? (
+              <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                {weatherLabel && <span className="font-medium">{weatherLabel}</span>}
+                <span className="tabular-nums">
+                  最高{Math.round(weather.maxTemp)}℃ / 最低
+                  {Math.round(weather.minTemp)}℃
+                </span>
+                {weather.precipitationProbability !== null && (
+                  <span className="text-muted-foreground">
+                    降水{weather.precipitationProbability}%
+                  </span>
+                )}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                天気を取得できませんでした。今の季節から候補を選んでいます。
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+      {/* 未設定なら設定欄を開いて案内し、設定済みなら「地域を変更」を出す */}
+      <WeatherRegionSetting currentRegionKey={region?.key ?? null} />
+    </div>
   );
 }
 
 /**
  * ログイン中トップの「今日のRe:try」（天気ベースのコーデ候補）。
- * 設定した地域の今日の天気と、自分のクローゼットからカテゴリごとに選んだ候補を表示する。
- * 地域が未設定なら、天気の枠で地域の設定を案内する（候補は月ベースの季節で選ぶ）。
+ * 自分のクローゼットからカテゴリごとに選んだ候補を、写真を主役に表示する。
+ * 天気は TodayWeather（ページのヘッダー）に表示する。
  * 服同士の色や形の相性を判断したものではない。
  */
 export function TodayOutfitCard({
   region,
-  weather,
   suggestion,
   imageUrls,
 }: TodayOutfitCardProps) {
-  const weatherLabel = weather ? getWeatherLabel(weather.weatherCode) : null;
-
   return (
     <section
       aria-labelledby="today-outfit-title"
-      className="flex flex-col gap-3"
+      className="flex flex-col gap-4"
     >
       <div className="flex flex-col gap-1">
-        <h2 id="today-outfit-title" className="text-lg font-semibold">
+        <h2 id="today-outfit-title" className="text-xl font-bold">
           今日のRe:try
         </h2>
         <p className="text-sm text-muted-foreground">
@@ -147,49 +191,23 @@ export function TodayOutfitCard({
         </p>
       </div>
 
-      <div className="flex flex-col gap-1 rounded-md border px-3 py-2 text-sm">
-        {region && (
-          <>
-            <p className="text-xs text-muted-foreground">
-              {region.name}の天気
-            </p>
-            {weather ? (
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <WeatherIcon code={weather.weatherCode} />
-                {weatherLabel && <span>{weatherLabel}</span>}
-                <span>
-                  最高{Math.round(weather.maxTemp)}℃ / 最低
-                  {Math.round(weather.minTemp)}℃
-                </span>
-                {weather.precipitationProbability !== null && (
-                  <span className="text-muted-foreground">
-                    ・降水{weather.precipitationProbability}%
-                  </span>
-                )}
-              </p>
-            ) : (
-              <p className="text-muted-foreground">
-                天気を取得できませんでした。今の季節から候補を選んでいます。
-              </p>
-            )}
-          </>
-        )}
-        {/* 未設定なら設定欄を開いて案内し、設定済みなら「地域を変更」を出す */}
-        <WeatherRegionSetting currentRegionKey={region?.key ?? null} />
-      </div>
-
       {suggestion.picks.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-3">
+        // スマホは画面の端まで横スクロール（2着目の先が少し見える幅）、広い画面は3列
+        <ul className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
           {suggestion.picks.map((pick) => (
-            <OutfitPickCard
+            <li
               key={pick.slot}
-              pick={pick}
-              imageUrl={imageUrls.get(pick.item.id) ?? null}
-            />
+              className="w-[46%] min-w-[9.5rem] shrink-0 snap-start sm:w-auto sm:min-w-0"
+            >
+              <OutfitPickCard
+                pick={pick}
+                imageUrl={imageUrls.get(pick.item.id) ?? null}
+              />
+            </li>
           ))}
-        </div>
+        </ul>
       ) : (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-8 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-10 text-center">
           <p className="text-sm text-muted-foreground">
             {suggestion.basis === "weather"
               ? "今日の気温に合う服がまだ登録されていません"

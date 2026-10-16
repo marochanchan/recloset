@@ -10,6 +10,7 @@ import { OnboardingSteps } from "@/components/onboarding-steps";
 import { ReQuestCard, ReQuestError } from "@/components/re-quest-card";
 import {
   TodayOutfitCard,
+  TodayWeather,
   WeatherAttribution,
 } from "@/components/today-outfit-card";
 import {
@@ -50,6 +51,14 @@ import { Suspense } from "react";
 export const metadata: Metadata = {
   title: "Today | Re:Closet",
 };
+
+// 日付の見出し（例：10月16日(木)）。日本時間で表示する
+const TODAY_DATE_FORMAT = new Intl.DateTimeFormat("ja-JP", {
+  timeZone: "Asia/Tokyo",
+  month: "long",
+  day: "numeric",
+  weekday: "short",
+});
 
 // Today下部の主要導線（同じ見た目で並べる）。
 // クローゼット一覧へはサマリーの「登録している服」から開けるため置かない。
@@ -155,6 +164,7 @@ async function TodayContent() {
   // 件数の取得に成功し、かつ0件のときだけ初回向けの案内を出す
   // （取得失敗を0件扱いして既存ユーザーに表示しないため）
   const isClosetEmpty = !totalResult.error && totalResult.count === 0;
+  const now = new Date();
 
   // 今日のコーデ候補（服の取得に失敗した場合はカードごと表示しない）
   let outfit: {
@@ -163,7 +173,6 @@ async function TodayContent() {
   } | null = null;
 
   if (!isClosetEmpty && !outfitItemsResult.error) {
-    const now = new Date();
     const outfitItems: OutfitItemInput[] = outfitItemsResult.data.map(
       (item) => ({
         id: item.id,
@@ -208,34 +217,42 @@ async function TodayContent() {
   }
 
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-10">
-      <div className="flex flex-col gap-6">
-        <h1 className="text-xl font-semibold">
-          {displayName
-            ? `${displayName}さん、今日は何を着る？`
-            : "今日は何を着る？"}
-        </h1>
-
-        {/* 服が0件ならオンボーディング、それ以外は今日のRe:try */}
-        {isClosetEmpty ? (
-          <OnboardingSteps showRegisterCta />
-        ) : (
-          outfit && (
-            <TodayOutfitCard
-              region={region}
-              weather={weather}
-              suggestion={outfit.suggestion}
-              imageUrls={outfit.imageUrls}
-            />
-          )
+    <div className="flex w-full max-w-3xl flex-col gap-12">
+      {/* 誌面風のヘッダー（日付・挨拶・天気）。天気は今日のRe:tryを出すときだけ表示する */}
+      <header className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs font-medium tracking-[0.2em] text-primary">
+            {TODAY_DATE_FORMAT.format(now)}
+          </p>
+          <h1 className="text-2xl font-bold leading-snug sm:text-3xl">
+            {displayName
+              ? `${displayName}さん、今日は何を着る？`
+              : "今日は何を着る？"}
+          </h1>
+        </div>
+        {!isClosetEmpty && outfit && (
+          <TodayWeather region={region} weather={weather} />
         )}
-      </div>
+      </header>
+
+      {/* 服が0件ならオンボーディング、それ以外は今日のRe:try */}
+      {isClosetEmpty ? (
+        <OnboardingSteps showRegisterCta />
+      ) : (
+        outfit && (
+          <TodayOutfitCard
+            region={region}
+            suggestion={outfit.suggestion}
+            imageUrls={outfit.imageUrls}
+          />
+        )
+      )}
 
       {/* 服が0着のときはオンボーディングを優先し、クエスト・進捗は出さない。
           今日のRe:Quest（今日、何か1つ）→ Re:Garden（行動で育つ植物）
           → 今週のRe:Closet（週の見直し目標）の順 */}
       {!isClosetEmpty && (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-12">
           <Suspense fallback={<ReQuestSkeleton />}>
             <ReQuestSection resultPromise={reQuestPromise} />
           </Suspense>
@@ -248,8 +265,10 @@ async function TodayContent() {
         </div>
       )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">クローゼットサマリー</h2>
+      <section aria-labelledby="closet-summary-title" className="flex flex-col gap-3">
+        <h2 id="closet-summary-title" className="text-lg font-bold">
+          クローゼットサマリー
+        </h2>
         <ClosetSummary
           totalCount={totalResult.count ?? 0}
           favoriteCount={favoriteResult.count ?? 0}
@@ -257,17 +276,17 @@ async function TodayContent() {
         />
       </section>
 
-      <nav aria-label="次にすること" className="flex flex-col gap-2">
+      <nav aria-label="次にすること" className="flex flex-col divide-y divide-border border-y border-border">
         {NEXT_LINKS.map((link) => {
           const Icon = link.icon;
           return (
             <Link
               key={link.href}
               href={link.href}
-              className="flex min-h-12 items-center gap-3 rounded-lg border px-4 py-3 text-sm transition-colors hover:bg-accent"
+              className="flex min-h-14 items-center gap-3 px-1 py-3 text-sm outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent"
             >
               <Icon
-                className="h-5 w-5 shrink-0 text-muted-foreground"
+                className="h-5 w-5 shrink-0 text-primary"
                 aria-hidden="true"
               />
               <span className="flex-1 font-medium">{link.label}</span>

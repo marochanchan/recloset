@@ -108,7 +108,7 @@ export default function ClothingDraftsPage() {
         href="/protected/items"
         className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
       >
-        ← クローゼット一覧に戻る
+        ← クローゼットに戻る
       </Link>
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold">下書き</h1>
