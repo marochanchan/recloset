@@ -1,11 +1,5 @@
 import { ClothingImageGallery } from "@/components/clothing-image-gallery";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { StatusSelector } from "@/components/status-selector";
 import { Button } from "@/components/ui/button";
 import { DeleteItemButton } from "@/components/delete-item-button";
@@ -24,6 +18,7 @@ import { getMarketplaceLinks } from "@/lib/marketplace-urls";
 import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { formatJstDate, hasWornToday } from "@/lib/wear-logs";
+import { Heart, Pencil, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -99,72 +94,133 @@ async function ClothingItemDetail({
     }
   }
 
-  return (
-    <div className="flex flex-col gap-4">
-      <ClothingImageGallery images={imageUrls} alt={item.title} />
+  const tags = [
+    getCategoryLabel(item.category),
+    item.subcategory ? getSubcategoryLabel(item.subcategory) : null,
+    item.main_color ? getColorLabel(item.main_color) : null,
+    formatSeasons(item.seasons) || null,
+  ].filter((tag): tag is string => Boolean(tag));
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-2">
-            <CardTitle className="text-2xl">{item.title}</CardTitle>
-            {item.favorite && <Badge>お気に入り</Badge>}
+  // 写真 → 名前 → 「今日着た」を最初に置き、そのあとを意味ごとのまとまり
+  // （どうする？／記録／AI診断／公開・出品）に分ける。削除は最後に控えめに置く
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-5">
+        <ClothingImageGallery images={imageUrls} alt={item.title} />
+
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-col gap-1">
+              {item.brand && (
+                <p className="truncate text-xs font-medium tracking-[0.15em] text-muted-foreground">
+                  {item.brand}
+                </p>
+              )}
+              <h1 className="break-words text-2xl font-bold leading-snug">
+                {item.title}
+              </h1>
+            </div>
+            <Button asChild variant="outline" size="sm" className="h-9 shrink-0 rounded-full px-3">
+              <Link href={`/protected/items/${item.id}/edit`}>
+                <Pencil aria-hidden="true" />
+                編集する
+              </Link>
+            </Button>
           </div>
-          {item.brand && (
-            <p className="text-sm text-muted-foreground">{item.brand}</p>
-          )}
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">
-              {getCategoryLabel(item.category)}
-            </Badge>
-            {item.subcategory && (
-              <Badge variant="secondary">
-                {getSubcategoryLabel(item.subcategory)}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {item.favorite && (
+              <Badge className="gap-1 border-transparent bg-blush/20 text-blush-foreground hover:bg-blush/20">
+                <Heart className="h-3 w-3 fill-current" aria-hidden="true" />
+                お気に入り
               </Badge>
             )}
-            {item.main_color && (
-              <Badge variant="secondary">{getColorLabel(item.main_color)}</Badge>
-            )}
-            {formatSeasons(item.seasons) && (
-              <Badge variant="secondary">{formatSeasons(item.seasons)}</Badge>
-            )}
+            {tags.map((tag) => (
+              <Badge key={tag} variant="secondary">
+                {tag}
+              </Badge>
+            ))}
             <Badge variant="outline">{getStatusLabel(item.status)}</Badge>
           </div>
+        </div>
 
-          <WearTodayButton
-            itemId={item.id}
-            alreadyLoggedToday={alreadyLoggedToday}
-          />
+        <WearTodayButton
+          itemId={item.id}
+          alreadyLoggedToday={alreadyLoggedToday}
+        />
+      </div>
 
-          <StatusSelector itemId={item.id} currentStatus={item.status} />
+      <section className="flex flex-col gap-3">
+        <StatusSelector itemId={item.id} currentStatus={item.status} />
+      </section>
 
-          <Button asChild variant="outline" className="w-full">
-            <Link href={`/protected/items/${item.id}/edit`}>編集する</Link>
-          </Button>
-
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <dt className="text-muted-foreground">購入日</dt>
-            <dd>{item.purchase_date ?? "未登録"}</dd>
-
-            <dt className="text-muted-foreground">購入価格</dt>
-            <dd>
-              {item.purchase_price !== null
-                ? `¥${item.purchase_price}`
-                : "未登録"}
+      <section aria-labelledby="item-records-title" className="flex flex-col gap-3">
+        <h2 id="item-records-title" className="text-base font-bold">
+          記録
+        </h2>
+        <dl className="flex flex-col divide-y divide-border rounded-2xl border border-border/70 bg-card px-4 text-sm">
+          <div className="flex items-baseline justify-between gap-4 py-3">
+            <dt className="shrink-0 text-muted-foreground">Re:Closetでの着用記録</dt>
+            <dd className="text-right">
+              <span className="text-lg font-bold tabular-nums">{item.wear_count}</span>回
             </dd>
-
-            <dt className="text-muted-foreground">Re:Closetでの着用記録</dt>
-            <dd>{item.wear_count}回</dd>
-
-            <dt className="text-muted-foreground">最後に着た日</dt>
-            <dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-4 py-3">
+            <dt className="shrink-0 text-muted-foreground">最後に着た日</dt>
+            <dd className="text-right">
               {item.last_worn_at
                 ? formatJstDate(item.last_worn_at)
                 : "まだRe:Closetでの着用記録がありません"}
             </dd>
-          </dl>
+          </div>
+          <div className="flex items-baseline justify-between gap-4 py-3">
+            <dt className="shrink-0 text-muted-foreground">購入日</dt>
+            <dd className="text-right">{item.purchase_date ?? "未登録"}</dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-4 py-3">
+            <dt className="shrink-0 text-muted-foreground">購入価格</dt>
+            <dd className="text-right">
+              {item.purchase_price !== null
+                ? `¥${item.purchase_price}`
+                : "未登録"}
+            </dd>
+          </div>
+        </dl>
+      </section>
 
+      {/* AI診断は「一緒に考える」入口として、淡い色の面で目立たせる */}
+      <section
+        aria-labelledby="item-diagnosis-title"
+        className="flex flex-col gap-3 rounded-3xl bg-gradient-to-br from-primary/10 to-blush/20 p-5"
+      >
+        <div className="flex flex-col gap-1">
+          <h2 id="item-diagnosis-title" className="flex items-center gap-2 text-base font-bold">
+            <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
+            AIと一緒に見直す
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            着用データと今の気持ちから、次の一歩を一緒に考えます
+          </p>
+        </div>
+        <Button asChild variant="outline" className="w-full">
+          <Link href={`/protected/items/${item.id}/diagnosis`}>
+            AI診断
+          </Link>
+        </Button>
+      </section>
+
+      <section aria-labelledby="item-share-title" className="flex flex-col gap-3">
+        <h2 id="item-share-title" className="text-base font-bold">
+          公開・出品
+        </h2>
+        <div className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4">
+          <PublishToggle
+            itemId={item.id}
+            isPublic={item.is_public}
+            displayName={displayName}
+            publishedAtLabel={
+              item.published_at ? formatJstDate(item.published_at) : null
+            }
+          />
           {marketplaceLinks.length > 0 && (
             <div className="flex flex-col gap-2 border-t pt-4">
               <p className="text-sm font-medium">出品先</p>
@@ -176,34 +232,12 @@ async function ClothingItemDetail({
               )}
             </div>
           )}
+        </div>
+      </section>
 
-          <div className="flex flex-col gap-2 border-t pt-4">
-            <PublishToggle
-              itemId={item.id}
-              isPublic={item.is_public}
-              displayName={displayName}
-              publishedAtLabel={
-                item.published_at ? formatJstDate(item.published_at) : null
-              }
-            />
-          </div>
-
-          <div className="flex flex-col gap-2 border-t pt-4">
-            <p className="text-sm text-muted-foreground">
-              着用データと今の気持ちから、次の一歩を一緒に考えます
-            </p>
-            <Button asChild variant="outline" className="w-full">
-              <Link href={`/protected/items/${item.id}/diagnosis`}>
-                AI診断
-              </Link>
-            </Button>
-          </div>
-
-          <div className="flex flex-col gap-2 border-t pt-4">
-            <DeleteItemButton itemId={item.id} />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col gap-2 border-t pt-6">
+        <DeleteItemButton itemId={item.id} />
+      </div>
     </div>
   );
 }
@@ -219,7 +253,7 @@ export default function ClothingItemDetailPage({
         href="/protected/items"
         className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
       >
-        ← 一覧に戻る
+        ← クローゼットに戻る
       </Link>
 
       <Suspense fallback={<ItemDetailSkeleton />}>

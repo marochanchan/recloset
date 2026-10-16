@@ -10,7 +10,7 @@ import {
   RE_QUEST_LOAD_ERROR_MESSAGE,
 } from "@/lib/re-quest-copy";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, ChevronRight, Circle, Sprout } from "lucide-react";
+import { Check, ChevronRight, Sprout } from "lucide-react";
 import Link from "next/link";
 
 // Todayの「今日のRe:Quest」。今日、何か1つ行動できたかを見せる
@@ -22,9 +22,22 @@ export function ReQuestCard({ progress }: { progress: ReQuestProgress }) {
     <section aria-labelledby="re-quest-title">
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <h2 id="re-quest-title" className="text-lg font-bold">
-            {RE_QUEST_CARD_TITLE}
-          </h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="re-quest-title" className="text-lg font-bold">
+              {RE_QUEST_CARD_TITLE}
+            </h2>
+            {/* 今日の達成状況をひと目で（達成していない日も責めない言葉にする） */}
+            {progress.achievedToday ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blush/20 px-2.5 py-1 text-xs font-medium text-blush-foreground">
+                <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                今日は達成
+              </span>
+            ) : (
+              <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs text-muted-foreground">
+                1つでOK
+              </span>
+            )}
+          </div>
           <ReQuestCelebration
             achievedToday={progress.achievedToday}
             todayDateKey={progress.todayDateKey}
@@ -38,7 +51,6 @@ export function ReQuestCard({ progress }: { progress: ReQuestProgress }) {
         <ul className="flex flex-col gap-2">
           {progress.quests.map((quest) => {
             const copy = DAILY_QUEST_COPY[quest.kind];
-            const Icon = quest.done ? CheckCircle2 : Circle;
             return (
               <li key={quest.kind}>
                 <Link
@@ -50,17 +62,22 @@ export function ReQuestCard({ progress }: { progress: ReQuestProgress }) {
                       : "bg-secondary/70 hover:bg-accent active:bg-accent",
                   )}
                 >
-                  <Icon
+                  {/* できたクエストはセージの丸にチェック、まだのものは点線の丸（否定の印は使わない） */}
+                  <span
                     className={cn(
-                      "h-5 w-5 shrink-0",
-                      quest.done ? "text-primary" : "text-muted-foreground",
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full",
+                      quest.done
+                        ? "bg-primary text-primary-foreground"
+                        : "border border-dashed border-muted-foreground/50",
                     )}
                     aria-hidden="true"
-                  />
+                  >
+                    {quest.done && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                  </span>
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="font-medium">{copy.label}</span>
                     {quest.done && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-primary">
                         {copy.doneLabel(quest.count)}
                       </span>
                     )}
@@ -77,7 +94,7 @@ export function ReQuestCard({ progress }: { progress: ReQuestProgress }) {
         </ul>
 
         <p className="flex items-center gap-1.5 break-words text-xs text-muted-foreground">
-          <Sprout className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <Sprout className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
           {RE_QUEST_GARDEN_NOTE}
         </p>
 

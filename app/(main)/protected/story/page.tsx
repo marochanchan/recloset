@@ -3,7 +3,6 @@ import { ReStoryMonthNav } from "@/components/re-story-month-nav";
 import { ReStoryMonthSummary } from "@/components/re-story-month-summary";
 import { ReStoryTimeline } from "@/components/re-story-timeline";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { PHOTO_ONLY_TITLE } from "@/lib/clothing-options";
 import {
   RE_STORY_EMPTY_MONTH_MESSAGE,
@@ -46,13 +45,14 @@ async function ReStoryContent({ requestedMonth }: { requestedMonth: string | und
     return (
       <div className="flex flex-col gap-4">
         {result.nav && <ReStoryMonthNav nav={result.nav} />}
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground" role="alert">
-            {result.reason === "over_limit"
-              ? RE_STORY_OVER_LIMIT_MESSAGE
-              : RE_STORY_LOAD_ERROR_MESSAGE}
-          </p>
-        </Card>
+        <p
+          className="rounded-2xl bg-secondary/60 px-4 py-3 text-sm text-muted-foreground"
+          role="alert"
+        >
+          {result.reason === "over_limit"
+            ? RE_STORY_OVER_LIMIT_MESSAGE
+            : RE_STORY_LOAD_ERROR_MESSAGE}
+        </p>
       </div>
     );
   }
@@ -62,7 +62,7 @@ async function ReStoryContent({ requestedMonth }: { requestedMonth: string | und
   // まだ行動が1件もない人には、始め方を案内する
   if (!hasAnyEvents) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center">
+      <div className="flex flex-col items-center gap-3 rounded-3xl bg-gradient-to-b from-blush/20 to-secondary/40 px-6 py-12 text-center">
         <p className="text-sm text-muted-foreground">{RE_STORY_NO_EVENTS_MESSAGE}</p>
         <Button asChild variant="outline">
           <Link href="/protected/items">クローゼットを見る</Link>
@@ -72,13 +72,13 @@ async function ReStoryContent({ requestedMonth }: { requestedMonth: string | und
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <ReStoryMonthNav nav={nav} />
       <ReStoryMonthSummary summary={summary} showTrackingNote={showTrackingNote} />
       {timeline.length > 0 ? (
         <ReStoryTimeline days={timeline} photoOnlyTitle={PHOTO_ONLY_TITLE} />
       ) : (
-        <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+        <p className="rounded-2xl bg-secondary/60 px-4 py-8 text-center text-sm text-muted-foreground">
           {RE_STORY_EMPTY_MONTH_MESSAGE}
         </p>
       )}
@@ -105,8 +105,8 @@ export default function ReStoryPage({ searchParams }: { searchParams: SearchPara
         ← My Pageに戻る
       </Link>
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-bold">{RE_STORY_TITLE}</h1>
-        <p className="text-xs text-muted-foreground">{RE_STORY_LEAD}</p>
+        <h1 className="text-2xl font-bold">{RE_STORY_TITLE}</h1>
+        <p className="text-sm text-muted-foreground">{RE_STORY_LEAD}</p>
       </div>
       <Suspense fallback={<ReStorySkeleton />}>
         <ReStoryPageContent searchParams={searchParams} />

@@ -8,13 +8,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   CURRENT_FEELING_OPTIONS,
   NOT_WORN_REASON_OPTIONS,
   WANT_TO_WEAR_AGAIN_OPTIONS,
@@ -26,7 +19,8 @@ import {
 import { getStatusLabel } from "@/lib/clothing-options";
 import { DIAGNOSIS_TYPE_LABELS } from "@/lib/decision-hints";
 import type { NextAction } from "@/lib/next-action";
-import { Check, Sprout } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Check, Heart, Sprout } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
@@ -145,7 +139,7 @@ function ElaborationAction({ diagnosisId }: { diagnosisId: string }) {
   // 見出しは外側のブロック（「もう少し考えたいときは」）が担うため、本文だけを出す
   if (elaboration) {
     return (
-      <p className="whitespace-pre-line text-sm leading-relaxed">
+      <p className="whitespace-pre-line border-l-2 border-blush pl-4 text-sm leading-relaxed">
         {elaboration}
       </p>
     );
@@ -174,6 +168,37 @@ function ElaborationAction({ diagnosisId }: { diagnosisId: string }) {
 
 const MAX_NOT_WORN_REASONS = 2;
 
+// 回答の選択肢（丸いチップ）。選んだものはセージで塗り、チェックを添える
+function OptionChip({
+  label,
+  selected,
+  disabled = false,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "inline-flex min-h-10 items-center gap-1.5 rounded-full border px-4 py-2 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-40",
+        selected
+          ? "border-primary bg-primary font-medium text-primary-foreground"
+          : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent",
+      )}
+    >
+      {selected && <Check className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden="true" />}
+      {label}
+    </button>
+  );
+}
+
 function OptionButtons<T extends string>({
   options,
   value,
@@ -186,17 +211,52 @@ function OptionButtons<T extends string>({
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((option) => (
-        <Button
+        <OptionChip
           key={option.value}
-          type="button"
-          size="sm"
-          variant={value === option.value ? "default" : "outline"}
+          label={option.label}
+          selected={value === option.value}
           onClick={() => onChange(option.value)}
-        >
-          {option.label}
-        </Button>
+        />
       ))}
     </div>
+  );
+}
+
+// 質問の見出し（番号の丸＋問い）。答えたらセージの丸にチェックを出す
+function QuestionBlock({
+  number,
+  question,
+  note,
+  answered,
+  children,
+}: {
+  number: number;
+  question: string;
+  note?: string;
+  answered: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="flex items-start gap-3">
+        <span
+          className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold tabular-nums",
+            answered
+              ? "bg-primary text-primary-foreground"
+              : "bg-secondary text-foreground",
+          )}
+          aria-hidden="true"
+        >
+          {answered ? <Check className="h-4 w-4" strokeWidth={2.5} /> : number}
+        </span>
+        <span className="flex flex-col gap-0.5 pt-0.5">
+          <span className="font-medium leading-snug">{question}</span>
+          {note && <span className="text-xs text-muted-foreground">{note}</span>}
+        </span>
+      </legend>
+      <div className="pl-10">{children}</div>
+    </fieldset>
   );
 }
 
@@ -246,16 +306,13 @@ function NotWornReasonButtons({
             .length >= MAX_NOT_WORN_REASONS;
 
         return (
-          <Button
+          <OptionChip
             key={option.value}
-            type="button"
-            size="sm"
-            variant={isSelected ? "default" : "outline"}
+            label={option.label}
+            selected={isSelected}
             disabled={isAtLimit}
             onClick={() => handleToggle(option.value)}
-          >
-            {option.label}
-          </Button>
+          />
         );
       })}
     </div>
@@ -281,12 +338,12 @@ function DiagnosisNextLinks({
 }) {
   return (
     <section aria-labelledby="diagnosis-next-title" className="flex flex-col gap-3">
-      <h2 id="diagnosis-next-title" className="text-base font-semibold">
+      <h2 id="diagnosis-next-title" className="text-base font-bold">
         次にできること
       </h2>
       {recorded && (
-        <p className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm">
-          <Sprout className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <p className="flex items-start gap-2 rounded-xl bg-primary/10 px-3.5 py-2.5 text-sm">
+          <Sprout className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <span>
             今回の見直しは、今日のRe:Questに記録されました。Re:Gardenも、見直しをした日ごとに育ちます。
           </span>
@@ -354,148 +411,181 @@ export function AiDiagnosisFlow({
     });
   };
 
+  const answeredCount =
+    (currentFeeling !== null ? 1 : 0) +
+    (wantToWearAgain !== null ? 1 : 0) +
+    (notWornReasons.length > 0 ? 1 : 0);
+
   return (
-    <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-2">
-            <CardTitle className="text-xl">{title}</CardTitle>
-            {favorite && <Badge>お気に入り</Badge>}
+    <div className="flex flex-col gap-8">
+      {/* 見直す服（名前・ブランド・カテゴリ） */}
+      <div className="flex flex-col gap-2 rounded-2xl bg-secondary/60 px-4 py-3.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            {brand && (
+              <p className="truncate text-xs tracking-[0.15em] text-muted-foreground">
+                {brand}
+              </p>
+            )}
+            <p className="break-words text-lg font-bold leading-snug">{title}</p>
           </div>
-          {brand && <p className="text-sm text-muted-foreground">{brand}</p>}
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Badge variant="secondary">{categoryLabel}</Badge>
-          {seasonLabel && <Badge variant="secondary">{seasonLabel}</Badge>}
-        </CardContent>
-      </Card>
+          {favorite && (
+            <Badge className="shrink-0 gap-1 border-transparent bg-blush/20 text-blush-foreground hover:bg-blush/20">
+              <Heart className="h-3 w-3 fill-current" aria-hidden="true" />
+              お気に入り
+            </Badge>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Badge variant="outline" className="bg-card">{categoryLabel}</Badge>
+          {seasonLabel && (
+            <Badge variant="outline" className="bg-card">{seasonLabel}</Badge>
+          )}
+        </div>
+      </div>
 
       {!result && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">3つの質問</CardTitle>
-            <CardDescription>
+        <section aria-labelledby="diagnosis-questions-title" className="flex flex-col gap-6">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 id="diagnosis-questions-title" className="text-lg font-bold">
+                3つの質問
+              </h2>
+              <p className="shrink-0 text-xs tabular-nums text-muted-foreground" aria-live="polite">
+                {answeredCount} / 3 回答
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
               これは判定ではなく、あなたが考えるためのヒントを見つける質問です。
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-6">
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium">
-                今、この服をどれくらい気に入っていますか？
-              </p>
-              <OptionButtons
-                options={CURRENT_FEELING_OPTIONS}
-                value={currentFeeling}
-                onChange={setCurrentFeeling}
-              />
-            </div>
+            </p>
+          </div>
 
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium">
-                もう一度、この服を着たいと思いますか？
-              </p>
-              <OptionButtons
-                options={WANT_TO_WEAR_AGAIN_OPTIONS}
-                value={wantToWearAgain}
-                onChange={setWantToWearAgain}
-              />
-            </div>
+          <QuestionBlock
+            number={1}
+            question="今、この服をどれくらい気に入っていますか？"
+            answered={currentFeeling !== null}
+          >
+            <OptionButtons
+              options={CURRENT_FEELING_OPTIONS}
+              value={currentFeeling}
+              onChange={setCurrentFeeling}
+            />
+          </QuestionBlock>
 
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium">
-                この服を着る機会や、着るときに気になることは？（最大2つ）
-              </p>
-              <NotWornReasonButtons
-                options={NOT_WORN_REASON_OPTIONS}
-                value={notWornReasons}
-                onChange={setNotWornReasons}
-              />
-            </div>
+          <QuestionBlock
+            number={2}
+            question="もう一度、この服を着たいと思いますか？"
+            answered={wantToWearAgain !== null}
+          >
+            <OptionButtons
+              options={WANT_TO_WEAR_AGAIN_OPTIONS}
+              value={wantToWearAgain}
+              onChange={setWantToWearAgain}
+            />
+          </QuestionBlock>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+          <QuestionBlock
+            number={3}
+            question="この服を着る機会や、着るときに気になることは？"
+            note="最大2つまで選べます"
+            answered={notWornReasons.length > 0}
+          >
+            <NotWornReasonButtons
+              options={NOT_WORN_REASON_OPTIONS}
+              value={notWornReasons}
+              onChange={setNotWornReasons}
+            />
+          </QuestionBlock>
 
-            <Button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!canSubmit || isPending}
-            >
-              {isPending ? "考えています..." : "提案を見る"}
-            </Button>
-          </CardContent>
-        </Card>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
+          <Button
+            type="button"
+            size="lg"
+            className="h-12 w-full text-base"
+            onClick={handleSubmit}
+            disabled={!canSubmit || isPending}
+          >
+            {isPending ? "考えています..." : "提案を見る"}
+          </Button>
+        </section>
       )}
 
       {result && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">今回の提案</CardTitle>
-            <CardDescription>
-              これは手放す・残すを決める答えではなく、あなたが考えるためのヒントです。最終的に決めるのはあなたです。
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-6">
-            {/* 提案（日本語）を主役に、診断タイプ（英語）は小さく添える */}
-            <div className="flex flex-col items-start gap-2 rounded-lg bg-muted/50 p-4">
-              <Badge variant="outline" className="bg-background">
+        <section aria-labelledby="diagnosis-result-title" className="flex flex-col gap-6">
+          {/* 今回の提案は特別なカードに。決めるのはあなた、という前提を同じカードの中で伝える */}
+          <div className="flex flex-col gap-4 rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-blush/20 px-5 py-6">
+            <div className="flex items-center justify-between gap-3">
+              <h2 id="diagnosis-result-title" className="text-sm font-bold text-muted-foreground">
+                今回の提案
+              </h2>
+              {/* 提案（日本語）を主役に、診断タイプ（英語）は小さく添える */}
+              <Badge variant="outline" className="border-primary/30 bg-card tracking-[0.15em] text-primary">
                 {DIAGNOSIS_TYPE_LABELS[result.decision.choice].badge}
               </Badge>
-              <p className="text-2xl font-bold leading-snug">
-                {DIAGNOSIS_TYPE_LABELS[result.decision.choice].caption}
+            </div>
+            <p className="text-2xl font-bold leading-snug">
+              {DIAGNOSIS_TYPE_LABELS[result.decision.choice].caption}
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              これは手放す・残すを決める答えではなく、あなたが考えるためのヒントです。最終的に決めるのはあなたです。
+            </p>
+          </div>
+
+          {/* 着用記録とあなたの回答のうち、今回の診断に関係が深いものを
+              ルールベースで選んで表示する（lib/decision-hints.ts） */}
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-0.5">
+              <h3 className="text-base font-bold">この提案につながったこと</h3>
+              <p className="text-xs text-muted-foreground">
+                あなたの回答と、Re:Closetでの着用記録の有無をもとに考えました。
               </p>
             </div>
+            <ul className="flex flex-col gap-2">
+              {result.decisionHints.map((hint) => (
+                <li key={hint} className="flex items-start gap-2.5 text-sm">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                    <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
+                  </span>
+                  <span className="break-words">{hint}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-            {/* 着用記録とあなたの回答のうち、今回の診断に関係が深いものを
-                ルールベースで選んで表示する（lib/decision-hints.ts） */}
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-col gap-0.5">
-                <p className="text-sm font-medium">この提案につながったこと</p>
-                <p className="text-xs text-muted-foreground">
-                  あなたの回答と、Re:Closetでの着用記録の有無をもとに考えました。
-                </p>
+          <div className="flex flex-col gap-2 rounded-2xl border border-border/70 bg-card p-4">
+            <p className="text-xs font-medium tracking-[0.15em] text-primary">次の一歩</p>
+            <p className="font-bold">{result.nextAction.title}</p>
+            <p className="text-sm text-muted-foreground">
+              {result.nextAction.message}
+            </p>
+
+            {result.decision.choice === "REBYE" && (
+              <div className="flex flex-col gap-2 border-t pt-3">
+                <RebyeCandidateAction
+                  itemId={itemId}
+                  initialStatus={currentStatus}
+                />
               </div>
-              <ul className="flex flex-col gap-2">
-                {result.decisionHints.map((hint) => (
-                  <li key={hint} className="flex items-start gap-2 text-sm">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted">
-                      <Check className="h-3 w-3" aria-hidden="true" />
-                    </span>
-                    <span className="break-words">{hint}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="flex flex-col gap-2 rounded-md border p-4">
-              <p className="text-sm font-medium">次の一歩</p>
-              <p className="font-medium">{result.nextAction.title}</p>
-              <p className="text-sm text-muted-foreground">
-                {result.nextAction.message}
-              </p>
-
-              {result.decision.choice === "REBYE" && (
-                <div className="flex flex-col gap-2 border-t pt-3">
-                  <RebyeCandidateAction
-                    itemId={itemId}
-                    initialStatus={currentStatus}
-                  />
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            )}
+          </div>
+        </section>
       )}
 
       {/* Geminiは独立したブロック。押したときだけ、1診断1回まで（履歴の保存に成功したときだけ出す） */}
       {result?.diagnosisId && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">もう少し考えたいときは</CardTitle>
-            <CardDescription>AIが、考えるための問いを1つ返します</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ElaborationAction diagnosisId={result.diagnosisId} />
-          </CardContent>
-        </Card>
+        <section
+          aria-labelledby="diagnosis-elaboration-title"
+          className="flex flex-col gap-3 rounded-2xl bg-secondary/60 p-4"
+        >
+          <div className="flex flex-col gap-0.5">
+            <h2 id="diagnosis-elaboration-title" className="text-base font-bold">
+              もう少し考えたいときは
+            </h2>
+            <p className="text-sm text-muted-foreground">AIが、考えるための問いを1つ返します</p>
+          </div>
+          <ElaborationAction diagnosisId={result.diagnosisId} />
+        </section>
       )}
 
       {result && (

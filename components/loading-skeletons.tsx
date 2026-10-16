@@ -64,27 +64,37 @@ function ClosetGridSkeleton() {
 
 export function ItemDetailSkeleton() {
   return (
-    <div role="status" aria-label="読み込み中" className="flex flex-col gap-4">
-      <Skeleton className="aspect-square w-full rounded-lg" />
-
-      <Card>
-        <div className="flex flex-col gap-3 p-6">
-          <Skeleton className="h-7 w-2/3" />
-          <Skeleton className="h-4 w-1/3" />
-        </div>
-        <div className="flex flex-col gap-4 p-6 pt-0">
-          <div className="flex gap-2">
-            <Skeleton className="h-5 w-16" />
-            <Skeleton className="h-5 w-12" />
+    <div role="status" aria-label="読み込み中" className="flex flex-col gap-8">
+      <div className="flex flex-col gap-5">
+        <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-7 w-2/3" />
+            </div>
+            <Skeleton className="h-9 w-24 rounded-full" />
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-4 w-20" />
+          <div className="flex gap-1.5">
+            <Skeleton className="h-5 w-16 rounded-full" />
+            <Skeleton className="h-5 w-12 rounded-full" />
+            <Skeleton className="h-5 w-14 rounded-full" />
           </div>
         </div>
-      </Card>
+        <Skeleton className="h-9 w-full" />
+      </div>
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-5 w-32" />
+        <div className="grid grid-cols-2 gap-2">
+          {Array.from({ length: 4 }, (_, index) => (
+            <Skeleton key={index} className="h-9" />
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-5 w-12" />
+        <Skeleton className="h-44 w-full rounded-2xl" />
+      </div>
     </div>
   );
 }
@@ -216,32 +226,32 @@ export function ReQuestSkeleton() {
 // Re:Story（app/(main)/protected/story/page.tsx。月の切り替え・まとめ・タイムライン）
 export function ReStorySkeleton() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
-        <Skeleton className="h-8 w-20" />
-        <Skeleton className="h-6 w-28" />
-        <Skeleton className="h-8 w-20" />
+        <Skeleton className="h-11 w-11 rounded-full" />
+        <div className="flex flex-col items-center gap-1.5">
+          <Skeleton className="h-3 w-10" />
+          <Skeleton className="h-8 w-14" />
+        </div>
+        <Skeleton className="h-11 w-11 rounded-full" />
       </div>
-      <Card className="flex flex-col gap-3 p-4">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-7 w-24 self-end" />
-        <div className="grid grid-cols-5 gap-1">
+      <div className="flex flex-col gap-5 rounded-3xl bg-gradient-to-b from-blush/20 to-secondary/40 px-5 pb-5 pt-6">
+        <div className="flex items-end gap-4">
+          <Skeleton className="h-12 w-16 bg-card/70" />
+          <Skeleton className="h-10 flex-1 bg-card/70" />
+        </div>
+        <div className="flex flex-col gap-2">
           {Array.from({ length: 5 }, (_, index) => (
-            <Skeleton key={index} className="h-12" />
+            <Skeleton key={index} className="h-3 w-full bg-card/70" />
           ))}
         </div>
-        <div className="grid grid-cols-5 gap-1 border-t pt-3">
-          {Array.from({ length: 5 }, (_, index) => (
-            <Skeleton key={index} className="h-10" />
-          ))}
-        </div>
-      </Card>
-      <div className="flex flex-col gap-3">
+      </div>
+      <div className="flex flex-col gap-4">
         <Skeleton className="h-5 w-32" />
         {Array.from({ length: 3 }, (_, index) => (
-          <div key={index} className="flex flex-col gap-2">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-10 w-full" />
+          <div key={index} className="grid grid-cols-[3rem_1fr] gap-3">
+            <Skeleton className="mx-auto h-8 w-8" />
+            <Skeleton className="h-16 w-full rounded-xl" />
           </div>
         ))}
       </div>
@@ -261,8 +271,15 @@ export function GardenSkeleton() {
         <Skeleton className="h-40 w-40 rounded-full bg-card/70" />
         <Skeleton className="h-7 w-32 bg-card/70" />
       </div>
-      <Skeleton className="h-2 w-full rounded-full bg-card/70" />
-      <Skeleton className="mx-auto h-4 w-2/3 bg-card/70" />
+      <Skeleton className="h-16 w-full rounded-2xl bg-card/70" />
+      <div className="grid grid-cols-6 gap-1">
+        {Array.from({ length: 6 }, (_, index) => (
+          <div key={index} className="flex flex-col items-center gap-1.5">
+            <Skeleton className="h-3 w-3 rounded-full bg-card/70" />
+            <Skeleton className="h-3 w-6 bg-card/70" />
+          </div>
+        ))}
+      </div>
       <div className="hidden grid-cols-5 gap-1 sm:grid">
         {Array.from({ length: 5 }, (_, index) => (
           <Skeleton key={index} className="h-12 rounded-xl bg-card/70" />

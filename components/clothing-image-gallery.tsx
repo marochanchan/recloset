@@ -60,7 +60,7 @@ export function ClothingImageGallery({
 
   if (images.length === 0) {
     return (
-      <div className="relative aspect-square w-full rounded-lg bg-muted flex items-center justify-center">
+      <div className="relative aspect-[4/5] w-full rounded-2xl bg-photo flex items-center justify-center">
         <p className="text-sm text-muted-foreground">画像なし</p>
       </div>
     );
@@ -69,7 +69,7 @@ export function ClothingImageGallery({
   return (
     <div className="flex flex-col gap-3">
       <div
-        className="relative aspect-square w-full touch-pan-y overflow-hidden rounded-lg bg-muted"
+        className="relative aspect-[4/5] w-full touch-pan-y overflow-hidden rounded-2xl bg-photo"
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
@@ -91,7 +91,7 @@ export function ClothingImageGallery({
               type="button"
               onClick={goToPrevious}
               aria-label="前の画像"
-              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-background/80 p-1.5 shadow hover:bg-background"
+              className="absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-card/85 shadow-sm backdrop-blur-sm outline-none hover:bg-card focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -99,16 +99,20 @@ export function ClothingImageGallery({
               type="button"
               onClick={goToNext}
               aria-label="次の画像"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-background/80 p-1.5 shadow hover:bg-background"
+              className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-card/85 shadow-sm backdrop-blur-sm outline-none hover:bg-card focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
+            {/* 何枚目かを右下に小さく示す */}
+            <span className="absolute bottom-2 right-2 rounded-full bg-card/85 px-2 py-0.5 text-[11px] tabular-nums backdrop-blur-sm" aria-hidden="true">
+              {currentIndex + 1} / {images.length}
+            </span>
           </>
         )}
       </div>
 
       {hasMultiple && (
-        <div className="flex gap-2 overflow-x-auto">
+        <div className="-m-1 flex gap-2 overflow-x-auto p-1">
           {images.map((url, index) => (
             <button
               key={url}
@@ -117,7 +121,7 @@ export function ClothingImageGallery({
               aria-label={`${index + 1}枚目の画像を表示`}
               aria-current={index === currentIndex}
               className={cn(
-                "relative h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 bg-muted",
+                "relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-photo outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 index === currentIndex
                   ? "border-primary"
                   : "border-transparent",

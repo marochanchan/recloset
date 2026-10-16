@@ -2,6 +2,7 @@
 
 import { deleteClothingItem } from "@/app/(main)/protected/items/[id]/actions";
 import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -29,19 +30,21 @@ export function DeleteItemButton({ itemId }: DeleteItemButtonProps) {
 
   if (!isConfirming) {
     return (
+      // 危険な操作のため、ふだんは控えめな文字のボタンにする（確認の手順は変えない）
       <Button
         type="button"
-        variant="destructive"
-        className="w-full"
+        variant="ghost"
+        className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
         onClick={() => setIsConfirming(true)}
       >
-        削除する
+        <Trash2 aria-hidden="true" />
+        この服を削除する
       </Button>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-destructive/50 p-3">
+    <div className="flex flex-col gap-3 rounded-2xl border border-destructive/40 bg-destructive/5 p-4">
       <p className="text-sm text-destructive">
         この服を削除します。画像・着用記録も含めて元に戻せません。本当に削除しますか？
       </p>

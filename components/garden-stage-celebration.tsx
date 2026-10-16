@@ -40,11 +40,11 @@ export function GardenStageCelebration({
     <p
       role="status"
       className={cn(
-        "flex items-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-sm font-medium",
+        "flex items-center gap-2 rounded-xl bg-blush/20 px-3.5 py-2.5 text-sm font-medium",
         WEEKLY_GOAL_CELEBRATION_MOTION_CLASS,
       )}
     >
-      <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+      <Sparkles className="h-4 w-4 shrink-0 text-blush-foreground" aria-hidden="true" />
       {getGardenCelebrationMessage(stageKey)}
     </p>
   );

@@ -1,6 +1,6 @@
 import { GardenCharacter } from "@/components/garden-character";
 import { GardenStageCelebration } from "@/components/garden-stage-celebration";
-import { GARDEN_GROWTH_KINDS, type GardenGrowth } from "@/lib/garden";
+import { GARDEN_GROWTH_KINDS, GARDEN_STAGES, type GardenGrowth } from "@/lib/garden";
 import {
   GARDEN_CARD_TITLE,
   GARDEN_KIND_LABELS,
@@ -10,6 +10,7 @@ import {
   GARDEN_STORY_LINK_LABEL,
   getGardenNextStageMessage,
 } from "@/lib/garden-copy";
+import { cn } from "@/lib/utils";
 import { BookOpen } from "lucide-react";
 import Link from "next/link";
 
@@ -44,9 +45,17 @@ export function GardenCard({
           stageKey={growth.stage.key}
         />
 
-        {/* キャラクターを主役に、段階名と累計ポイントを添える */}
+        {/* キャラクターを主役に、足もとに淡い土の影を敷いて「庭に立つ」ように見せる */}
         <div className="flex flex-col items-center gap-1">
-          <GardenCharacter stageIndex={growth.stageIndex} />
+          <div className="relative flex justify-center">
+            <span
+              className="absolute bottom-2 h-5 w-32 rounded-[50%] bg-primary/15 blur-[2px]"
+              aria-hidden="true"
+            />
+            <div className="relative">
+              <GardenCharacter stageIndex={growth.stageIndex} />
+            </div>
+          </div>
           <p className="flex items-baseline gap-3">
             <span className="text-lg font-bold">{stageLabel}</span>
             <span className="text-sm text-muted-foreground">
@@ -59,7 +68,9 @@ export function GardenCard({
           </p>
         </div>
 
-        <div className="flex flex-col gap-2">
+        {/* 次の段階までの進み具合（最後の段階では、育ち続けることだけを伝える） */}
+        <div className="flex flex-col gap-2 rounded-2xl bg-card/80 px-4 py-3">
+          <p className="break-words text-center text-sm">{getGardenNextStageMessage(growth)}</p>
           {growth.nextStage && (
             <div
               role="progressbar"
@@ -67,7 +78,7 @@ export function GardenCard({
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={percent}
-              className="h-2 w-full overflow-hidden rounded-full bg-card"
+              className="h-2 w-full overflow-hidden rounded-full bg-secondary"
             >
               <div
                 className="h-full rounded-full bg-primary motion-safe:transition-[width] motion-safe:duration-500"
@@ -75,8 +86,49 @@ export function GardenCard({
               />
             </div>
           )}
-          <p className="break-words text-center text-sm">{getGardenNextStageMessage(growth)}</p>
         </div>
+
+        {/* 6つの段階の道のり。育った段階はセージで塗り、今の段階を大きく示す */}
+        <ol aria-label="成長の段階" className="relative grid grid-cols-6">
+          <span
+            className="absolute left-[8.33%] right-[8.33%] top-[7px] h-px bg-primary/25"
+            aria-hidden="true"
+          />
+          {GARDEN_STAGES.map((stage, index) => {
+            const isCurrent = index === growth.stageIndex;
+            const isReached = index <= growth.stageIndex;
+            return (
+              <li
+                key={stage.key}
+                aria-current={isCurrent ? "step" : undefined}
+                className="relative flex flex-col items-center gap-1.5"
+              >
+                <span
+                  className={cn(
+                    "rounded-full",
+                    isCurrent
+                      ? "h-4 w-4 bg-primary ring-4 ring-primary/20"
+                      : isReached
+                        ? "mt-0.5 h-3 w-3 bg-primary/60"
+                        : "mt-0.5 h-3 w-3 border border-primary/40 bg-card",
+                  )}
+                  aria-hidden="true"
+                />
+                <span
+                  className={cn(
+                    "text-[11px]",
+                    isCurrent ? "font-bold text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {GARDEN_STAGE_LABELS[stage.key]}
+                  <span className="sr-only">
+                    {isCurrent ? "（今の段階）" : isReached ? "（育った段階）" : ""}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
 
         {/* 行動の種類ごとの内訳。スマホではキャラクターと進捗を優先して省く */}
         <dl className="hidden grid-cols-5 gap-1 text-center sm:grid">

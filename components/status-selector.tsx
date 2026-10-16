@@ -33,7 +33,7 @@ export function StatusSelector({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">この服、どうする？</p>
+      <h2 className="text-base font-bold">この服、どうする？</h2>
       <div className="grid grid-cols-2 gap-2">
         {STATUS_OPTIONS.map((option) => {
           const isCurrent = option.value === currentStatus;
