@@ -5,6 +5,12 @@ import {
   runAiDiagnosis,
   updateClothingItemStatus,
 } from "@/app/(main)/protected/items/[id]/actions";
+import {
+  DoodleHanger,
+  DoodleSparkle,
+  DoodleSprout,
+  DoodleTag,
+} from "@/components/doodle-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +26,8 @@ import { getStatusLabel } from "@/lib/clothing-options";
 import { DIAGNOSIS_TYPE_LABELS } from "@/lib/decision-hints";
 import type { NextAction } from "@/lib/next-action";
 import { cn } from "@/lib/utils";
-import { Check, Heart, Sprout } from "lucide-react";
+import { ArrowRight, Check, Heart } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
@@ -32,7 +39,42 @@ type AiDiagnosisFlowProps = {
   seasonLabel: string | null;
   favorite: boolean;
   currentStatus: string;
+  /** 代表画像の署名付きURL（写真なし・取得失敗ならnull） */
+  imageUrl: string | null;
 };
+
+// 見直す服の写真（生成りの枠にobject-containで収める。写真なしでも同じ枠を保つ）
+function ItemPhoto({
+  imageUrl,
+  alt,
+  className,
+  sizes,
+}: {
+  imageUrl: string | null;
+  alt: string;
+  className: string;
+  sizes: string;
+}) {
+  return (
+    <div className={cn("relative shrink-0 overflow-hidden bg-photo", className)}>
+      {imageUrl ? (
+        <Image
+          src={imageUrl}
+          alt={alt}
+          fill
+          sizes={sizes}
+          className="object-contain"
+          style={{ objectFit: "contain" }}
+        />
+      ) : (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] text-muted-foreground">
+          <DoodleHanger size={28} className="text-primary/50" />
+          写真なし
+        </div>
+      )}
+    </div>
+  );
+}
 
 const CANDIDATE_STATUS = "candidate";
 
@@ -139,7 +181,7 @@ function ElaborationAction({ diagnosisId }: { diagnosisId: string }) {
   // 見出しは外側のブロック（「もう少し考えたいときは」）が担うため、本文だけを出す
   if (elaboration) {
     return (
-      <p className="whitespace-pre-line border-l-2 border-blush pl-4 text-sm leading-relaxed">
+      <p className="whitespace-pre-line border-l-2 border-blush pl-4 text-[15px] leading-loose">
         {elaboration}
       </p>
     );
@@ -151,10 +193,11 @@ function ElaborationAction({ diagnosisId }: { diagnosisId: string }) {
         type="button"
         variant="outline"
         size="sm"
-        className="w-fit"
+        className="w-fit bg-card"
         disabled={isPending}
         onClick={handleClick}
       >
+        <DoodleSparkle size={16} className="text-blush-foreground" />
         {isPending
           ? "言葉にしています..."
           : error
@@ -343,9 +386,9 @@ function DiagnosisNextLinks({
       </h2>
       {recorded && (
         <p className="flex items-start gap-2 rounded-xl bg-primary/10 px-3.5 py-2.5 text-sm">
-          <Sprout className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <DoodleSprout size={18} className="shrink-0 text-primary" />
           <span>
-            今回の見直しは、今日のRe:Questに記録されました。Re:Gardenも、見直しをした日ごとに育ちます。
+            今日のRe:Questに記録しました。Re:Gardenも、見直しをした日ごとに育ちます。
           </span>
         </p>
       )}
@@ -354,7 +397,10 @@ function DiagnosisNextLinks({
       </Button>
       <div className="grid gap-2 sm:grid-cols-2">
         <Button asChild variant="outline" className={NEXT_LINK_BUTTON_CLASS}>
-          <Link href="/protected/items#review-suggestions-title">次の1着を見直す</Link>
+          <Link href="/protected/items#review-suggestions-title">
+            <DoodleTag className="text-primary" />
+            次の1着を見直す
+          </Link>
         </Button>
         <Button asChild variant="outline" className={NEXT_LINK_BUTTON_CLASS}>
           <Link href="/today">Todayで今日の記録を見る</Link>
@@ -372,6 +418,7 @@ export function AiDiagnosisFlow({
   seasonLabel,
   favorite,
   currentStatus,
+  imageUrl,
 }: AiDiagnosisFlowProps) {
   const [currentFeeling, setCurrentFeeling] = useState<CurrentFeeling | null>(
     null,
@@ -416,33 +463,39 @@ export function AiDiagnosisFlow({
     (wantToWearAgain !== null ? 1 : 0) +
     (notWornReasons.length > 0 ? 1 : 0);
 
+  const typeLabel = result ? DIAGNOSIS_TYPE_LABELS[result.decision.choice] : null;
+
   return (
     <div className="flex flex-col gap-8">
-      {/* 見直す服（名前・ブランド・カテゴリ） */}
-      <div className="flex flex-col gap-2 rounded-2xl bg-secondary/60 px-4 py-3.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 flex-col gap-0.5">
+      {/* 見直す服（質問中は写真＋名前。結果では提案のカードの中で写真を大きく見せる） */}
+      {!result && (
+        <div className="flex items-center gap-4">
+          <ItemPhoto
+            imageUrl={imageUrl}
+            alt={title}
+            sizes="112px"
+            className="aspect-[3/4] w-28 rounded-2xl"
+          />
+          <div className="flex min-w-0 flex-col gap-1.5">
             {brand && (
               <p className="truncate text-xs tracking-[0.15em] text-muted-foreground">
                 {brand}
               </p>
             )}
             <p className="break-words text-lg font-semibold leading-snug">{title}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {favorite && (
+                <Badge className="gap-1 border-transparent bg-blush/20 text-blush-foreground hover:bg-blush/20">
+                  <Heart className="h-3 w-3 fill-current" aria-hidden="true" />
+                  お気に入り
+                </Badge>
+              )}
+              <Badge variant="secondary">{categoryLabel}</Badge>
+              {seasonLabel && <Badge variant="secondary">{seasonLabel}</Badge>}
+            </div>
           </div>
-          {favorite && (
-            <Badge className="shrink-0 gap-1 border-transparent bg-blush/20 text-blush-foreground hover:bg-blush/20">
-              <Heart className="h-3 w-3 fill-current" aria-hidden="true" />
-              お気に入り
-            </Badge>
-          )}
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <Badge variant="outline" className="bg-card">{categoryLabel}</Badge>
-          {seasonLabel && (
-            <Badge variant="outline" className="bg-card">{seasonLabel}</Badge>
-          )}
-        </div>
-      </div>
+      )}
 
       {!result && (
         <section aria-labelledby="diagnosis-questions-title" className="flex flex-col gap-6">
@@ -456,7 +509,7 @@ export function AiDiagnosisFlow({
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
-              これは判定ではなく、あなたが考えるためのヒントを見つける質問です。
+              判定ではなく、考えるためのヒントを見つける質問です。
             </p>
           </div>
 
@@ -511,52 +564,39 @@ export function AiDiagnosisFlow({
         </section>
       )}
 
-      {result && (
-        <section aria-labelledby="diagnosis-result-title" className="flex flex-col gap-6">
-          {/* 今回の提案は特別なカードに。決めるのはあなた、という前提を同じカードの中で伝える */}
-          <div className="flex flex-col gap-4 rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-blush/20 px-5 py-6">
-            <div className="flex items-center justify-between gap-3">
-              <h2 id="diagnosis-result-title" className="text-sm font-semibold text-muted-foreground">
+      {result && typeLabel && (
+        <section aria-labelledby="diagnosis-result-title" className="flex flex-col gap-5">
+          {/* 今回の提案は写真と並べた特別なカードに。決めるのはあなた、という前提を同じカードの中で伝える */}
+          <div className="flex flex-col items-center gap-4 rounded-3xl bg-gradient-to-b from-primary/10 via-card to-blush/20 px-5 pb-6 pt-5 text-center">
+            <ItemPhoto
+              imageUrl={imageUrl}
+              alt={title}
+              sizes="160px"
+              className="aspect-[3/4] w-40 rounded-2xl"
+            />
+            <div className="flex flex-col items-center gap-2">
+              <h2 id="diagnosis-result-title" className="text-xs font-medium text-muted-foreground">
                 今回の提案
               </h2>
               {/* 提案（日本語）を主役に、診断タイプ（英語）は小さく添える */}
               <Badge variant="outline" className="border-primary/30 bg-card tracking-[0.15em] text-primary">
-                {DIAGNOSIS_TYPE_LABELS[result.decision.choice].badge}
+                {typeLabel.badge}
               </Badge>
-            </div>
-            <p className="text-2xl font-semibold leading-snug">
-              {DIAGNOSIS_TYPE_LABELS[result.decision.choice].caption}
-            </p>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              これは手放す・残すを決める答えではなく、あなたが考えるためのヒントです。最終的に決めるのはあなたです。
-            </p>
-          </div>
-
-          {/* 着用記録とあなたの回答のうち、今回の診断に関係が深いものを
-              ルールベースで選んで表示する（lib/decision-hints.ts） */}
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-0.5">
-              <h3 className="text-base font-semibold">この提案につながったこと</h3>
-              <p className="text-xs text-muted-foreground">
-                あなたの回答と、Re:Closetでの着用記録の有無をもとに考えました。
+              <p className="text-2xl font-semibold leading-snug">{typeLabel.caption}</p>
+              <p className="max-w-[18rem] text-xs leading-relaxed text-muted-foreground">
+                答えではなく、考えるためのヒントです。決めるのはあなたです。
               </p>
             </div>
-            <ul className="flex flex-col gap-2">
-              {result.decisionHints.map((hint) => (
-                <li key={hint} className="flex items-start gap-2.5 text-sm">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                    <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
-                  </span>
-                  <span className="break-words">{hint}</span>
-                </li>
-              ))}
-            </ul>
           </div>
 
-          <div className="flex flex-col gap-2 rounded-2xl border border-border/70 bg-card p-4">
-            <p className="text-xs font-medium tracking-[0.15em] text-primary">次の一歩</p>
-            <p className="font-semibold">{result.nextAction.title}</p>
-            <p className="text-sm text-muted-foreground">
+          {/* 次の一歩（ルールベース）。提案のすぐ下に置き、いちばん目立つ行動として示す */}
+          <div className="flex flex-col gap-2 rounded-2xl border border-primary/25 bg-card p-4">
+            <p className="flex items-center gap-1.5 text-xs font-medium tracking-[0.15em] text-primary">
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              次の一歩
+            </p>
+            <p className="text-lg font-semibold leading-snug">{result.nextAction.title}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">
               {result.nextAction.message}
             </p>
 
@@ -569,6 +609,27 @@ export function AiDiagnosisFlow({
               </div>
             )}
           </div>
+
+          {/* 着用記録とあなたの回答のうち、今回の診断に関係が深いものを
+              ルールベースで選んで表示する（lib/decision-hints.ts）。補足なので控えめに置く */}
+          <div className="flex flex-col gap-2.5 px-1">
+            <h3 className="text-sm font-semibold">
+              この提案につながったこと
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                回答と着用記録から
+              </span>
+            </h3>
+            <ul className="flex flex-col gap-2">
+              {result.decisionHints.map((hint) => (
+                <li key={hint} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                    <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
+                  </span>
+                  <span className="break-words">{hint}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
       )}
 
@@ -576,13 +637,21 @@ export function AiDiagnosisFlow({
       {result?.diagnosisId && (
         <section
           aria-labelledby="diagnosis-elaboration-title"
-          className="flex flex-col gap-3 rounded-2xl bg-secondary/60 p-4"
+          className="flex flex-col gap-3 rounded-2xl bg-blush/15 p-4"
         >
-          <div className="flex flex-col gap-0.5">
-            <h2 id="diagnosis-elaboration-title" className="text-base font-semibold">
-              もう少し考えたいときは
-            </h2>
-            <p className="text-sm text-muted-foreground">AIが、考えるための問いを1つ返します</p>
+          {/* 生成AI（Gemini）の言葉は、ルールベースの提案・次の一歩と区別できるよう
+              「AIの言葉」と明示した独立したブロックにする */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-2">
+              <h2 id="diagnosis-elaboration-title" className="text-base font-semibold">
+                もう少し考えたいときは
+              </h2>
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-card px-2 py-0.5 text-[11px] font-medium text-blush-foreground">
+                <DoodleSparkle size={12} />
+                AIの言葉
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">考えるための問いを1つ返します</p>
           </div>
           <ElaborationAction diagnosisId={result.diagnosisId} />
         </section>

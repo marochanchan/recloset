@@ -5,7 +5,8 @@ import type {
   AutofillField,
   AutofillStatus,
 } from "@/components/use-image-autofill";
-import { Loader2, Sparkles } from "lucide-react";
+import { DoodleSparkle } from "@/components/doodle-icons";
+import { Loader2 } from "lucide-react";
 
 const FIELD_LABELS: Record<AutofillField, string> = {
   title: "タイトル",
@@ -54,7 +55,7 @@ export function ImageAutofillStatus({
   return (
     <div
       aria-live="polite"
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-primary/10 px-3.5 py-2.5 text-sm"
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-blush/15 px-3.5 py-2.5 text-sm"
     >
       {message && (
         <p
@@ -67,13 +68,14 @@ export function ImageAutofillStatus({
           {status.kind === "analyzing" ? (
             <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
           ) : (
-            <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <DoodleSparkle size={18} className="text-blush-foreground" />
           )}
           {message}
         </p>
       )}
       {canAnalyze && (
-        <Button type="button" variant="outline" size="sm" onClick={onAnalyze}>
+        <Button type="button" variant="outline" size="sm" className="bg-card" onClick={onAnalyze}>
+          <DoodleSparkle className="text-blush-foreground" />
           {status.kind === "error"
             ? "もう一度読み取る"
             : "この写真から読み取る"}

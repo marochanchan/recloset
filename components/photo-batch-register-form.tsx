@@ -1,13 +1,17 @@
 "use client";
 
 import { rememberPhotoRegisteredNotice } from "@/components/draft-saved-notice";
+import {
+  DoodleHanger,
+  DoodleHangerPlus,
+  DoodleTag,
+} from "@/components/doodle-icons";
 import { EntryModeSelector } from "@/components/entry-mode-selector";
 import { LeaveConfirmDialog } from "@/components/leave-confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -345,8 +349,10 @@ export function PhotoBatchRegisterForm({
       />
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">服を登録</CardTitle>
-          <CardDescription>クローゼットに新しいアイテムを追加します</CardDescription>
+          <CardTitle className="flex items-center gap-2 text-2xl">
+            <DoodleHangerPlus size={28} className="text-primary" />
+            服を登録
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <EntryModeSelector
@@ -357,7 +363,7 @@ export function PhotoBatchRegisterForm({
             disabled={isBusy}
           />
           <p className="-mt-2 text-xs text-muted-foreground">
-            写真1枚につき1着として登録します（{MAX_PHOTO_BATCH_SIZE}枚まで）。あとから情報や写真を追加できます
+            写真1枚＝1着として登録します（{MAX_PHOTO_BATCH_SIZE}枚まで）。情報はあとから追加できます
           </p>
 
           <input
@@ -370,18 +376,31 @@ export function PhotoBatchRegisterForm({
             aria-hidden="true"
             onChange={handleFilesChange}
           />
-          <Button
-            type="button"
-            variant={photos.length === 0 ? "default" : "outline"}
-            className="min-h-11"
-            disabled={!canAddMore}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <ImagePlus className="h-4 w-4" aria-hidden="true" />
-            {photos.length === 0
-              ? "写真を選ぶ"
-              : `写真を追加（${photos.length}/${MAX_PHOTO_BATCH_SIZE}枚）`}
-          </Button>
+          {/* 写真がまだないときは、生成りの大きな枠にして写真を主役にする（登録フォームの写真欄とそろえる） */}
+          {photos.length === 0 ? (
+            <button
+              type="button"
+              disabled={!canAddMore}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex min-h-52 w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-primary/30 bg-photo px-4 py-8 text-sm font-medium outline-none transition-colors hover:border-primary/50 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-card text-primary">
+                <ImagePlus className="h-6 w-6" aria-hidden="true" />
+              </span>
+              写真を選ぶ
+            </button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11"
+              disabled={!canAddMore}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <ImagePlus className="h-4 w-4" aria-hidden="true" />
+              {`写真を追加（${photos.length}/${MAX_PHOTO_BATCH_SIZE}枚）`}
+            </Button>
+          )}
 
           {/* 変換できなかった写真・枚数の上限は、写真が多くても見えるよう一覧の上に出す */}
           {notices.length > 0 && (
@@ -453,11 +472,15 @@ export function PhotoBatchRegisterForm({
                 {/* 写真だけで登録した服に、続けてカテゴリ・季節を付けられる */}
                 <Button asChild className="min-h-11">
                   <Link href="/protected/items/classify">
+                    <DoodleTag />
                     クイック仕分けでカテゴリ・季節を付ける
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="min-h-11">
-                  <Link href="/protected/items">Closetで登録した服を見る</Link>
+                  <Link href="/protected/items">
+                    <DoodleHanger className="text-primary" />
+                    Closetで登録した服を見る
+                  </Link>
                 </Button>
               </div>
             )

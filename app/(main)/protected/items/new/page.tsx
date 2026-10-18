@@ -9,6 +9,7 @@ import {
 } from "@/lib/clothing-drafts";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -129,6 +130,11 @@ export default function NewClothingItemPage({
 }) {
   return (
     <div className="w-full max-w-md mx-auto">
+      {/* 戻るリンクでの移動にも、フォーム側の未保存時の離脱確認がそのまま効く */}
+      <Link href="/protected/items" className="-ml-1 flex min-h-10 w-fit items-center gap-1 rounded-lg pr-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring mb-2">
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        クローゼット
+      </Link>
       <Suspense fallback={null}>
         <DraftsNotice searchParams={searchParams} />
       </Suspense>

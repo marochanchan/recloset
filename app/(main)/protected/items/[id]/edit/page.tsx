@@ -2,6 +2,7 @@ import { ClothingItemForm } from "@/components/clothing-item-form";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -65,9 +66,10 @@ async function EditClothingItemContent({
     <div className="flex flex-col gap-6">
       <Link
         href={`/protected/items/${item.id}`}
-        className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
+        className="-ml-1 flex min-h-10 w-fit items-center gap-1 rounded-lg pr-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
-        ← 服の詳細に戻る
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        服の詳細
       </Link>
 
       <ClothingItemForm

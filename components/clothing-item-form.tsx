@@ -6,10 +6,14 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  DoodleHanger,
+  DoodleHangerPlus,
+  DoodleSparkle,
+} from "@/components/doodle-icons";
 import { ClothingImageSection } from "@/components/clothing-image-section";
 import {
   rememberDraftSavedNotice,
@@ -59,7 +63,7 @@ import {
   validateMarketplaceUrl,
   type MarketplaceService,
 } from "@/lib/marketplace-urls";
-import { ChevronDown } from "lucide-react";
+import { Check, ChevronDown, FileText } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -651,11 +655,18 @@ export function ClothingItemForm({
       <div className={cn("flex flex-col gap-6", className)} {...props}>
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">
+            <CardTitle className="flex items-center gap-2 text-2xl">
+              <DoodleHangerPlus size={28} className="text-primary" />
               {isEdit ? "服を編集" : "服を登録"}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+              </span>
+              {isEdit ? "保存しました" : "クローゼットに登録しました"}
+            </p>
             {savedItem.failedImages > 0 && (
               <p className="text-sm text-amber-800 dark:text-amber-300">
                 {isEdit ? "服の情報は保存されましたが、" : "服は登録されましたが、"}
@@ -671,26 +682,25 @@ export function ClothingItemForm({
                 （もう一度登録する必要はありません）
               </p>
             )}
-            <div className="flex flex-col gap-2 text-sm">
-              <Link
-                href={`/protected/items/${savedItem.id}`}
-                className="underline underline-offset-4"
-              >
-                {isEdit ? "服の詳細に戻る" : "登録済みの服を見る"}
-              </Link>
-              <Link
-                href="/protected/items"
-                className="underline underline-offset-4"
-              >
-                クローゼットに戻る
-              </Link>
-              {(savedItem.draftKept || savedItem.draftCleanupFailed) && (
-                <Link
-                  href="/protected/items/drafts"
-                  className="underline underline-offset-4"
-                >
-                  下書き一覧へ
+            <div className="flex flex-col gap-2">
+              <Button asChild className="min-h-11">
+                <Link href={`/protected/items/${savedItem.id}`}>
+                  {isEdit ? "服の詳細に戻る" : "登録済みの服を見る"}
                 </Link>
+              </Button>
+              <Button asChild variant="outline" className="min-h-11">
+                <Link href="/protected/items">
+                  <DoodleHanger className="text-primary" />
+                  クローゼットに戻る
+                </Link>
+              </Button>
+              {(savedItem.draftKept || savedItem.draftCleanupFailed) && (
+                <Button asChild variant="outline" className="min-h-11">
+                  <Link href="/protected/items/drafts">
+                    <FileText aria-hidden="true" />
+                    下書き一覧へ
+                  </Link>
+                </Button>
               )}
             </div>
           </CardContent>
@@ -714,14 +724,10 @@ export function ClothingItemForm({
       />
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">
+          <CardTitle className="flex items-center gap-2 text-2xl">
+            <DoodleHangerPlus size={28} className="text-primary" />
             {isEdit ? "服を編集" : "服を登録"}
           </CardTitle>
-          {!isEdit && (
-            <CardDescription>
-              クローゼットに新しいアイテムを追加します
-            </CardDescription>
-          )}
         </CardHeader>
         <CardContent>
           {canChooseEntryMode && (
@@ -750,8 +756,8 @@ export function ClothingItemForm({
                 imageState={imageState}
                 description={
                   isEdit
-                    ? "写真を追加・並べ替え・削除できます"
-                    : "写真からタイトルとカテゴリーを自動入力できます。写真なしでも登録できます"
+                    ? "追加・並べ替え・削除できます"
+                    : "写真から名前とカテゴリーを自動で入力します"
                 }
                 autofillStatus={
                   isEdit ? undefined : (
@@ -765,6 +771,7 @@ export function ClothingItemForm({
               />
 
               <>
+                  <FormSectionTitle>アイテム情報</FormSectionTitle>
                   <div className="grid gap-2">
                     <Label htmlFor="title" className="flex items-center gap-2">
                       タイトル
@@ -873,19 +880,20 @@ export function ClothingItemForm({
                     <p id="seasons-description" className="text-sm text-muted-foreground">
                       {autofill.needsCheck("seasons")
                         ? "季節は写真だけでは判断しにくいため、確認してください"
-                        : "着られる季節をすべて選べます（未選択でも登録できます）"}
+                        : "複数選べます（未選択でもOK）"}
                     </p>
                   </div>
 
                   <FavoriteToggle checked={favorite} onCheckedChange={setFavorite} />
 
+                  <FormSectionTitle>その他（任意）</FormSectionTitle>
                   <details
                     className={DETAILS_CLASS}
                     open={isDetailsOpen}
                     onToggle={(e) => setIsDetailsOpen(e.currentTarget.open)}
                   >
                     <summary className={SUMMARY_CLASS}>
-                      詳しく入力（任意）
+                      購入日・購入価格
                       <ChevronDown
                         className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open/details:rotate-180"
                         aria-hidden="true"
@@ -900,9 +908,6 @@ export function ClothingItemForm({
                           value={purchaseDate}
                           onChange={(e) => setPurchaseDate(e.target.value)}
                         />
-                        <p className="text-sm text-muted-foreground">
-                          わからない場合は空欄でOKです
-                        </p>
                       </div>
 
                       <div className="grid gap-2">
@@ -916,7 +921,7 @@ export function ClothingItemForm({
                           onChange={(e) => setPurchasePrice(e.target.value)}
                         />
                         <p className="text-sm text-muted-foreground">
-                          税込価格。わからない場合は空欄でOKです
+                          わからない場合は空欄でOKです
                         </p>
                       </div>
                     </div>
@@ -928,7 +933,7 @@ export function ClothingItemForm({
                     onToggle={(e) => setIsMarketplaceOpen(e.currentTarget.open)}
                   >
                     <summary className={SUMMARY_CLASS}>
-                      出品先URL（任意）
+                      出品先URL
                       <ChevronDown
                         className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open/details:rotate-180"
                         aria-hidden="true"
@@ -984,7 +989,8 @@ export function ClothingItemForm({
               )}
               <Button
                 type="submit"
-                className="w-full"
+                size="lg"
+                className="h-12 w-full text-base"
                 disabled={
                   isLoading ||
                   isPreparingImages ||
@@ -998,9 +1004,12 @@ export function ClothingItemForm({
                   ? isEdit
                     ? "保存中..."
                     : "登録中..."
-                  : isEdit
-                    ? "保存する"
-                    : "登録する"}
+                  : (
+                    <>
+                      <Check aria-hidden="true" />
+                      {isEdit ? "保存する" : "登録する"}
+                    </>
+                  )}
               </Button>
               {!isEdit && (
                 <div className="flex flex-col gap-1">
@@ -1023,9 +1032,14 @@ export function ClothingItemForm({
                       isDraftBlocking
                     }
                   >
-                    {clothingDraft.isSavingDraft
-                      ? "下書きを保存中..."
-                      : "下書きとして保存"}
+                    {clothingDraft.isSavingDraft ? (
+                      "下書きを保存中..."
+                    ) : (
+                      <>
+                        <FileText aria-hidden="true" />
+                        下書きとして保存
+                      </>
+                    )}
                   </Button>
                   {clothingDraft.draftMessage && (
                     <p
@@ -1051,9 +1065,19 @@ export function ClothingItemForm({
 // 写真からAIが入力した値の目印（ユーザーが修正すると消える）
 function AiBadge() {
   return (
-    <span className="rounded-full bg-blush/20 px-2 py-0.5 text-[10px] font-medium text-blush-foreground">
+    <span className="inline-flex items-center gap-0.5 rounded-full bg-blush/20 px-2 py-0.5 text-[10px] font-medium text-blush-foreground">
+      <DoodleSparkle size={11} />
       写真から入力
     </span>
+  );
+}
+
+// フォームの中のまとまりの見出し（写真／アイテム情報／その他）
+function FormSectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="-mb-2 border-t border-border/70 pt-5 text-base font-semibold">
+      {children}
+    </h2>
   );
 }
 

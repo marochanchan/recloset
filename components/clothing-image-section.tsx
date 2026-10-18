@@ -76,7 +76,7 @@ export function ClothingImageSection({
           htmlFor="images"
           className={cn(
             "flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary/30 bg-photo px-4 text-sm font-medium transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring",
-            images.length === 0 ? "min-h-36 flex-col py-6" : "min-h-14 py-3",
+            images.length === 0 ? "min-h-52 flex-col gap-3 py-8" : "min-h-14 py-3",
             isFull
               ? "cursor-not-allowed text-muted-foreground opacity-60"
               : "cursor-pointer hover:border-primary/50 hover:bg-accent",
@@ -85,10 +85,13 @@ export function ClothingImageSection({
           <span
             className={cn(
               "flex items-center justify-center rounded-full bg-card text-primary",
-              images.length === 0 ? "h-12 w-12" : "h-8 w-8",
+              images.length === 0 ? "h-14 w-14" : "h-8 w-8",
             )}
           >
-            <ImagePlus className="h-5 w-5" aria-hidden="true" />
+            <ImagePlus
+              className={images.length === 0 ? "h-6 w-6" : "h-5 w-5"}
+              aria-hidden="true"
+            />
           </span>
           {isFull ? `写真は${maxImages}枚まで追加済みです` : "写真を追加"}
         </label>
@@ -138,8 +141,7 @@ export function ClothingImageSection({
 
       {images.length > 0 && maxImages > 1 && (
         <p className="text-xs text-muted-foreground">
-          先頭がメイン画像です。画像を押すと拡大・回転できます（残り{remaining}
-          枚）
+          先頭がメイン画像。押すと拡大・回転できます（残り{remaining}枚）
         </p>
       )}
 
