@@ -1,3 +1,4 @@
+import { DoodleLoop } from "@/components/doodle-icons";
 import { LikeButton } from "@/components/like-button";
 import { PublicClothingItemCard } from "@/components/public-clothing-item-card";
 import { getMyLoopItemStates } from "@/lib/loop-likes";
@@ -41,6 +42,7 @@ export async function LoopFeed() {
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center gap-1 rounded-2xl bg-secondary/60 px-6 py-12 text-center">
+        <DoodleLoop size={40} className="mb-2 text-primary/60" />
         <p className="font-medium">まだ公開されている服はありません</p>
         <p className="text-sm text-muted-foreground">
           ユーザーが服を公開すると、ここに並びます。
@@ -71,7 +73,7 @@ export async function LoopFeed() {
     : new Map();
 
   return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
       {items.map((item) => {
         const imageUrl = item.cover_image_path
           ? (signedUrlMap.get(item.cover_image_path) ?? null)
@@ -86,7 +88,7 @@ export async function LoopFeed() {
                 「気になる」ボタンの位置がずれないよう、カード全体の拡大縮小はしない */}
             <Link
               href={`/discover/${item.id}`}
-              className="group block h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:opacity-80"
+              className="group block h-full rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:opacity-80"
             >
               <PublicClothingItemCard
                 title={item.title}

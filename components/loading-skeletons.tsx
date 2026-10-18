@@ -6,8 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const GRID_SKELETON_COUNT = 6;
 
-// /protected/items（ClothingItemCard）は縦長3:4、/discover（PublicClothingItemCard）は縦長4:5の
-// 枠なしの写真（どちらもスマホ2列 → 3列 → 4列）
+// /protected/items（ClothingItemCard）・/discover（PublicClothingItemCard）は、
+// どちらも枠なし・縦長3:4の写真（スマホ2列 → 3列 → 4列）
 export function ItemGridSkeleton({
   variant,
 }: {
@@ -18,21 +18,11 @@ export function ItemGridSkeleton({
       role="status"
       aria-label="読み込み中"
       data-variant={variant}
-      className={
-        variant === "closet"
-          ? "grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4"
-          : "grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4"
-      }
+      className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4"
     >
       {Array.from({ length: GRID_SKELETON_COUNT }, (_, index) => (
         <div key={index} className="flex flex-col gap-2">
-          <Skeleton
-            className={
-              variant === "closet"
-                ? "aspect-[3/4] w-full rounded-2xl"
-                : "aspect-[4/5] w-full rounded-xl"
-            }
-          />
+          <Skeleton className="aspect-[3/4] w-full rounded-2xl" />
           <Skeleton className="h-4 w-3/4" />
           <Skeleton className="h-3 w-1/2" />
         </div>
@@ -299,8 +289,8 @@ export function DraftListSkeleton() {
   return (
     <div className="flex flex-col gap-3">
       {Array.from({ length: 3 }, (_, index) => (
-        <Card key={index} className="flex items-center gap-3 p-3">
-          <Skeleton className="h-16 w-16 shrink-0" />
+        <Card key={index} className="flex items-center gap-3 rounded-2xl p-3">
+          <Skeleton className="aspect-[3/4] w-20 shrink-0 rounded-xl" />
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <Skeleton className="h-4 w-1/2" />
             <Skeleton className="h-3 w-3/4" />

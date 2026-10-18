@@ -2,6 +2,11 @@ import {
   ClothingClassifySession,
   type ClassifyItem,
 } from "@/components/clothing-classify-session";
+import {
+  DoodleBox,
+  DoodleHanger,
+  DoodleSunCloud,
+} from "@/components/doodle-icons";
 import { ReviewSessionSkeleton } from "@/components/loading-skeletons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -23,6 +28,7 @@ import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import type { Metadata } from "next";
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -79,29 +85,49 @@ async function ClassifyMenu() {
     mode: ClassifyMode;
     count: number | null;
     description: string;
+    icon: React.ReactNode;
   }[] = [
     {
       mode: "category",
       count: categoryCount,
-      description: "写真だけで登録した服に、トップス・ボトムスなどを付けます",
+      description: "トップス・ボトムスなどを付けます",
+      icon: <DoodleHanger size={28} />,
     },
     {
       mode: "season",
       count: seasonCount,
-      description: "季節が未設定の服に、春・夏・秋・冬を付けます",
+      description: "春・夏・秋・冬を付けます",
+      icon: <DoodleSunCloud size={28} />,
     },
   ];
 
   return (
     <div className="flex flex-col gap-3">
-      {modes.map(({ mode, count, description }) => (
-        <Card key={mode} className="flex flex-col gap-3 p-4">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-base font-semibold">{CLASSIFY_MODE_LABELS[mode]}</h2>
-            <p className="text-sm text-muted-foreground">{description}</p>
+      {modes.map(({ mode, count, description, icon }) => (
+        <Card key={mode} className="flex flex-col gap-3 rounded-2xl p-4">
+          <div className="flex items-center gap-3">
+            <span
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-secondary text-primary"
+              aria-hidden="true"
+            >
+              {icon}
+            </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <h2 className="text-base font-semibold">{CLASSIFY_MODE_LABELS[mode]}</h2>
+              <p className="text-sm text-muted-foreground">{description}</p>
+            </div>
+            {/* 未分類の数は大きな数字で（0着は短い言葉で） */}
             {count !== null && (
-              <p className="text-sm">
-                {count > 0 ? `未分類 ${count}着` : "未分類の服はありません"}
+              <p className="shrink-0 text-right">
+                {count > 0 ? (
+                  <>
+                    <span className="sr-only">未分類 </span>
+                    <span className="text-2xl font-semibold tabular-nums">{count}</span>
+                    <span className="text-xs text-muted-foreground">着</span>
+                  </>
+                ) : (
+                  <span className="text-xs text-muted-foreground">未分類なし</span>
+                )}
               </p>
             )}
           </div>
@@ -168,6 +194,7 @@ async function ClassifyContent({ mode }: { mode: ClassifyMode }) {
   if (itemIds.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-12 text-center">
+        <DoodleBox size={40} className="text-primary/60" />
         <p className="text-sm text-muted-foreground">
           {mode === "category"
             ? "カテゴリが未分類の服はありません"
@@ -245,16 +272,17 @@ export default function ClothingClassifyPage({
 }) {
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-4">
-      <Link
-        href="/protected/items"
-        className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
-      >
-        ← クローゼットに戻る
+      <Link href="/protected/items" className="-ml-1 flex min-h-10 w-fit items-center gap-1 rounded-lg pr-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        クローゼット
       </Link>
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">クイック仕分け</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+          <DoodleBox size={28} className="text-primary" />
+          クイック仕分け
+        </h1>
         <p className="text-xs text-muted-foreground">
-          写真を見ながら、カテゴリや季節をタップで付けていきます。一度に全部やらなくて大丈夫です。
+          写真を見ながらタップで付けていきます。一度に全部やらなくて大丈夫です。
         </p>
       </div>
       <Suspense fallback={<ClassifyMenuSkeleton />}>

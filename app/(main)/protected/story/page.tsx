@@ -1,3 +1,4 @@
+import { DoodleBook } from "@/components/doodle-icons";
 import { ReStorySkeleton } from "@/components/loading-skeletons";
 import { ReStoryMonthNav } from "@/components/re-story-month-nav";
 import { ReStoryMonthSummary } from "@/components/re-story-month-summary";
@@ -16,6 +17,7 @@ import { fetchStoryPage } from "@/lib/re-story-query";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -63,6 +65,7 @@ async function ReStoryContent({ requestedMonth }: { requestedMonth: string | und
   if (!hasAnyEvents) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-3xl bg-gradient-to-b from-blush/20 to-secondary/40 px-6 py-12 text-center">
+        <DoodleBook size={44} className="text-primary/60" />
         <p className="text-sm text-muted-foreground">{RE_STORY_NO_EVENTS_MESSAGE}</p>
         <Button asChild variant="outline">
           <Link href="/protected/items">クローゼットを見る</Link>
@@ -98,14 +101,15 @@ async function ReStoryPageContent({ searchParams }: { searchParams: SearchParams
 export default function ReStoryPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-4">
-      <Link
-        href="/me"
-        className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
-      >
-        ← My Pageに戻る
+      <Link href="/me" className="-ml-1 flex min-h-10 w-fit items-center gap-1 rounded-lg pr-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        My Page
       </Link>
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">{RE_STORY_TITLE}</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+          <DoodleBook size={28} className="text-primary" />
+          {RE_STORY_TITLE}
+        </h1>
         <p className="text-sm text-muted-foreground">{RE_STORY_LEAD}</p>
       </div>
       <Suspense fallback={<ReStorySkeleton />}>

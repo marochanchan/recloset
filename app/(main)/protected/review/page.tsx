@@ -1,3 +1,4 @@
+import { DoodleHanger, DoodleTag } from "@/components/doodle-icons";
 import { StartClosetReviewButton } from "@/components/start-closet-review-button";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import {
 } from "@/lib/closet-review";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
+import { ArrowLeft, ArrowRight, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -78,6 +80,7 @@ async function ReviewHome() {
   } else if (reviewableCount === 0) {
     main = (
       <div className="flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-12 text-center">
+        <DoodleHanger size={40} className="text-primary/60" />
         <p className="font-medium">見直せる服がありません</p>
         <p className="text-sm text-muted-foreground">
           まずはクローゼットに服を登録してみましょう。写真だけで、1着でもまとめてでも登録できます。
@@ -92,8 +95,21 @@ async function ReviewHome() {
       <Card className="flex flex-col gap-3 p-4">
         <p className="text-sm text-muted-foreground">
           最近見直していない服から、最大{MAX_REVIEW_SESSION_ITEMS}着を1着ずつ見ていきます。
-          右にスワイプで「残す」、左で「迷う」。ボタンでも選べます。
         </p>
+        {/* スワイプの向きと判断を、絵で先に伝える */}
+        <div role="img" className="flex items-center justify-center gap-3 rounded-2xl bg-secondary/60 px-3 py-3 text-xs" aria-label="左にスワイプで迷う、右にスワイプで残す">
+          <span className="flex items-center gap-1 text-muted-foreground" aria-hidden="true">
+            <ArrowLeft className="h-4 w-4" />
+            迷う
+          </span>
+          <span className="flex h-12 w-9 items-center justify-center rounded-lg bg-card text-primary shadow-sm" aria-hidden="true">
+            <DoodleHanger size={22} />
+          </span>
+          <span className="flex items-center gap-1 font-medium text-primary" aria-hidden="true">
+            残す
+            <ArrowRight className="h-4 w-4" />
+          </span>
+        </div>
         <StartClosetReviewButton label="見直しを始める" />
       </Card>
     );
@@ -117,14 +133,15 @@ async function ReviewHome() {
 export default function ClosetReviewPage() {
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-6">
-      <Link
-        href="/protected/items"
-        className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
-      >
-        ← クローゼットに戻る
+      <Link href="/protected/items" className="-ml-1 flex min-h-10 w-fit items-center gap-1 rounded-lg pr-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        クローゼット
       </Link>
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">まとめて見直す</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+          <DoodleTag size={28} className="text-primary" />
+          まとめて見直す
+        </h1>
         <p className="text-sm text-muted-foreground">
           残す・迷う・手放し候補を、テンポよく選んでいきます。服の状態は変わりません。
         </p>

@@ -1,4 +1,5 @@
 import { ClothingDraftCard } from "@/components/clothing-draft-delete-button";
+import { DoodleHanger } from "@/components/doodle-icons";
 import { DraftListSkeleton } from "@/components/loading-skeletons";
 import { normalizeDraftFields } from "@/lib/clothing-drafts";
 import { getCategoryLabel } from "@/lib/clothing-options";
@@ -7,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { formatJstDate } from "@/lib/wear-logs";
 import type { Metadata } from "next";
+import { ChevronLeft, FileText } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -35,6 +37,7 @@ async function DraftList() {
   if (drafts.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-12 text-center">
+        <DoodleHanger size={40} className="text-primary/60" />
         <p className="font-medium">下書きはありません</p>
         <p className="text-sm text-muted-foreground">
           服の登録画面で「下書きとして保存」すると、ここに並びます。
@@ -68,18 +71,19 @@ async function DraftList() {
         return (
           <li key={draft.id}>
             <ClothingDraftCard draftId={draft.id}>
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-photo">
+              <div className="relative aspect-[3/4] w-20 shrink-0 overflow-hidden rounded-xl bg-photo">
                 {coverUrl ? (
                   <Image
                     src={coverUrl}
                     alt=""
                     fill
-                    sizes="64px"
+                    sizes="80px"
                     className="object-contain"
                     style={{ objectFit: "contain" }}
                   />
                 ) : (
-                  <span className="flex h-full items-center justify-center text-[10px] text-muted-foreground">
+                  <span className="flex h-full flex-col items-center justify-center gap-1 text-[10px] text-muted-foreground">
+                    <DoodleHanger size={22} className="text-primary/50" />
                     写真なし
                   </span>
                 )}
@@ -90,7 +94,10 @@ async function DraftList() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {fields.category ? getCategoryLabel(fields.category) : "カテゴリー未選択"}
-                  ・写真{paths.length}枚・{formatJstDate(draft.updated_at)}保存
+                  ・写真{paths.length}枚
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {formatJstDate(draft.updated_at)}保存
                 </p>
               </div>
             </ClothingDraftCard>
@@ -104,16 +111,17 @@ async function DraftList() {
 export default function ClothingDraftsPage() {
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-6">
-      <Link
-        href="/protected/items"
-        className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
-      >
-        ← クローゼットに戻る
+      <Link href="/protected/items" className="-ml-1 flex min-h-10 w-fit items-center gap-1 rounded-lg pr-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        クローゼット
       </Link>
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">下書き</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold">
+          <FileText className="h-6 w-6 text-primary" strokeWidth={1.7} aria-hidden="true" />
+          下書き
+        </h1>
         <p className="text-sm text-muted-foreground">
-          登録の途中で保存した服です。続きから入力して登録できます。
+          登録の途中で保存した服です。続きから登録できます。
         </p>
       </div>
       <Suspense fallback={<DraftListSkeleton />}>

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { deleteClothingDraft } from "@/lib/clothing-drafts";
 import { createClient } from "@/lib/supabase/client";
+import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLayoutEffect, useRef, useState, useTransition } from "react";
@@ -52,22 +53,25 @@ export function ClothingDraftCard({
   };
 
   return (
-    <Card className="flex flex-col gap-3 p-3">
+    <Card className="flex flex-col gap-3 rounded-2xl p-3">
       <div className="flex items-center gap-3">
         {children}
         <div className="flex shrink-0 flex-col items-end gap-1">
           <Button asChild size="sm">
             <Link href={`/protected/items/new?draft=${draftId}`}>
+              <Pencil aria-hidden="true" />
               続きから入力
             </Link>
           </Button>
           {!isConfirming && (
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="sm"
+              className="text-muted-foreground"
               onClick={() => setIsConfirming(true)}
             >
+              <Trash2 aria-hidden="true" />
               削除
             </Button>
           )}

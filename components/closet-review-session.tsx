@@ -8,7 +8,14 @@ import {
 import { PHOTO_ONLY_TITLE } from "@/lib/clothing-options";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { Undo2 } from "lucide-react";
+import { DoodleHanger, DoodleLoop } from "@/components/doodle-icons";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CircleHelp,
+  SkipForward,
+  Undo2,
+} from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -316,7 +323,8 @@ export function ClosetReviewSession({
                 style={{ objectFit: "contain" }}
               />
             ) : (
-              <span className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              <span className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+                <DoodleHanger size={44} className="text-primary/50" />
                 写真なし
               </span>
             )}
@@ -324,7 +332,7 @@ export function ClosetReviewSession({
             {dragX !== 0 && (
               <span
                 className={cn(
-                  "absolute top-4 rounded-lg border-2 bg-card/90 px-3 py-1 text-lg font-semibold",
+                  "absolute top-4 flex items-center gap-1.5 rounded-full border-2 bg-card/90 px-3.5 py-1 text-lg font-semibold",
                   dragX > 0
                     ? "left-4 border-primary text-primary"
                     : "right-4 border-muted-foreground text-muted-foreground",
@@ -332,7 +340,17 @@ export function ClosetReviewSession({
                 style={{ opacity: swipeStrength }}
                 aria-hidden="true"
               >
-                {dragX > 0 ? "残す" : "迷う"}
+                {dragX > 0 ? (
+                  <>
+                    <DoodleHanger size={22} />
+                    {REVIEW_SESSION_DECISION_LABELS.keep}
+                  </>
+                ) : (
+                  <>
+                    <CircleHelp className="h-5 w-5" />
+                    {REVIEW_SESSION_DECISION_LABELS.unsure}
+                  </>
+                )}
               </span>
             )}
           </div>
@@ -349,42 +367,53 @@ export function ClosetReviewSession({
         </div>
       </div>
       <p className="text-center text-xs text-muted-foreground">
-        ← 迷う ・ 残す → （スワイプかボタンで選べます）
+        左右にスワイプしても選べます
       </p>
 
+      {/* 判断ボタン。スワイプと同じ向き（左＝迷う、右＝残す）に置き、アイコンで意味を示す */}
       <div className="grid grid-cols-2 gap-2">
         <Button
           type="button"
           variant="outline"
           size="lg"
+          className="h-12"
           onClick={() => decide("unsure")}
           disabled={isBusy}
         >
-          ← {REVIEW_SESSION_DECISION_LABELS.unsure}
+          <ArrowLeft aria-hidden="true" />
+          <CircleHelp aria-hidden="true" />
+          {REVIEW_SESSION_DECISION_LABELS.unsure}
         </Button>
         <Button
           type="button"
           size="lg"
+          className="h-12"
           onClick={() => decide("keep")}
           disabled={isBusy}
         >
-          {REVIEW_SESSION_DECISION_LABELS.keep} →
+          <DoodleHanger />
+          {REVIEW_SESSION_DECISION_LABELS.keep}
+          <ArrowRight aria-hidden="true" />
         </Button>
         <Button
           type="button"
           variant="outline"
+          className="min-h-11"
           onClick={() => decide("let_go_candidate")}
           disabled={isBusy}
         >
+          <DoodleLoop className="text-primary" />
           {REVIEW_SESSION_DECISION_LABELS.let_go_candidate}
         </Button>
         <Button
           type="button"
           variant="ghost"
+          className="min-h-11 text-muted-foreground"
           onClick={() => decide("skip")}
           disabled={isBusy}
         >
           {REVIEW_SESSION_DECISION_LABELS.skip}
+          <SkipForward aria-hidden="true" />
         </Button>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}

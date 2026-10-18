@@ -1,3 +1,4 @@
+import { DoodleHanger } from "@/components/doodle-icons";
 import { getCategoryLabel } from "@/lib/clothing-options";
 import Image from "next/image";
 
@@ -20,11 +21,12 @@ export function PublicClothingItemCard({
   imageUrl,
 }: PublicClothingItemCardProps) {
   return (
-    // 枠のないカードで写真を主役にする（Closetのカードと同じ縦長4:5・生成りの背景）。
+    // 枠のないカードで写真を主役にする（Closetのカードと同じ縦長3:4・生成りの背景）。
+    // 文字は「ブランド → 名前（1行） → 公開した人」に絞る。
     // Loopではリンク（group）の中に置き、hoverで写真を少しだけ寄せて押せることを示す。
     // 季節は詳細ページで確認できるため、カードには出さない
     <div className="flex h-full flex-col gap-2">
-      <div className="relative aspect-[4/5] w-full shrink-0 overflow-hidden rounded-xl bg-photo">
+      <div className="relative aspect-[3/4] w-full shrink-0 overflow-hidden rounded-2xl bg-photo">
         {imageUrl ? (
           <Image
             src={imageUrl}
@@ -35,7 +37,8 @@ export function PublicClothingItemCard({
             style={{ objectFit: "contain" }}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
+            <DoodleHanger size={32} className="text-primary/50" />
             画像なし
           </div>
         )}
@@ -44,13 +47,14 @@ export function PublicClothingItemCard({
         </span>
       </div>
       <div className="flex min-w-0 flex-col gap-0.5 px-0.5">
-        <p className="line-clamp-2 break-words text-sm font-medium leading-snug">
-          {title}
-        </p>
         {brand && (
-          <p className="truncate text-xs text-muted-foreground">{brand}</p>
+          <p className="truncate text-[11px] font-medium tracking-[0.08em] text-muted-foreground">
+            {brand}
+          </p>
         )}
+        <p className="truncate text-sm leading-snug">{title}</p>
         <p className="truncate text-[11px] text-muted-foreground">
+          <span className="sr-only">公開した人：</span>
           {ownerDisplayName}
         </p>
       </div>

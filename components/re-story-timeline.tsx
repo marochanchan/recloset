@@ -5,16 +5,35 @@ import {
   getStoryItemsDescription,
   STORY_KIND_LABELS,
 } from "@/lib/re-story-copy";
+import {
+  DoodleBox,
+  DoodleHangerPlus,
+  DoodleLoop,
+  DoodleShirt,
+  DoodleTag,
+} from "@/components/doodle-icons";
 import { cn } from "@/lib/utils";
+import type { ComponentType } from "react";
 
-// 種類ごとの小さな印（色だけに頼らず、種類名も文字で添える）。
-// セージとくすみピンクを交互に使い、少しだけ華やかにする
-const KIND_DOT_CLASS: Record<StoryKind, string> = {
-  register: "bg-primary",
-  wear: "bg-blush-foreground",
-  review: "bg-primary/60",
-  organize: "bg-blush",
-  circulate: "bg-muted-foreground/60",
+// 種類ごとの手描きアイコン（Today・Re:Questと同じ意味で使う。種類名も文字で添える）
+export const STORY_KIND_ICONS: Record<
+  StoryKind,
+  ComponentType<{ size?: number; className?: string }>
+> = {
+  register: DoodleHangerPlus,
+  wear: DoodleShirt,
+  review: DoodleTag,
+  organize: DoodleBox,
+  circulate: DoodleLoop,
+};
+
+// アイコンの丸の色。セージとくすみピンクを交互に使い、少しだけ華やかにする
+const KIND_ICON_CLASS: Record<StoryKind, string> = {
+  register: "bg-primary/10 text-primary",
+  wear: "bg-blush/25 text-blush-foreground",
+  review: "bg-primary/10 text-primary",
+  organize: "bg-blush/25 text-blush-foreground",
+  circulate: "bg-secondary text-primary",
 };
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"] as const;
@@ -28,7 +47,8 @@ function getDayParts(dateKey: string) {
 
 // 日付ごとのタイムライン。「日付 × 具体的な行動」でまとめ、
 // 一括登録なども件数と代表的な服の名前（最大2着）で1行にする。
-// 左に日にち、右にその日のできごとを、細い線でつないで並べる
+// 左に日にち、右にその日のできごとを、細い線でつないで並べる。
+// できごとは種類のアイコンを先頭に置き、文字を読まなくても流れが見えるようにする
 export function ReStoryTimeline({
   days,
   photoOnlyTitle,
@@ -66,31 +86,36 @@ export function ReStoryTimeline({
               >
                 {day.groups.map((group) => {
                   const items = getStoryItemsDescription(group, photoOnlyTitle);
+                  const Icon = STORY_KIND_ICONS[group.kind];
                   return (
                     <li
                       key={group.action}
-                      className="relative flex flex-col gap-1 rounded-xl border border-border/60 bg-card px-3.5 py-2.5"
+                      className="relative flex items-start gap-3 rounded-2xl bg-card px-3 py-2.5 shadow-[0_1px_0_hsl(var(--border))]"
                     >
                       <span
-                        className={cn(
-                          "absolute -left-[1.3rem] top-4 h-2.5 w-2.5 rounded-full ring-4 ring-background",
-                          KIND_DOT_CLASS[group.kind],
-                        )}
+                        className="absolute -left-[1.2rem] top-5 h-2 w-2 rounded-full bg-primary/40 ring-4 ring-background"
                         aria-hidden="true"
                       />
-                      <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <span
-                          className={cn("h-1.5 w-1.5 rounded-full", KIND_DOT_CLASS[group.kind])}
-                          aria-hidden="true"
-                        />
-                        {STORY_KIND_LABELS[group.kind]}
+                      <span
+                        className={cn(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+                          KIND_ICON_CLASS[group.kind],
+                        )}
+                        aria-hidden="true"
+                      >
+                        <Icon size={20} />
                       </span>
-                      <p className="break-words text-sm leading-relaxed">
-                        {getStoryActionSentence(group)}
-                      </p>
-                      {items && (
-                        <p className="break-words text-xs text-muted-foreground">{items}</p>
-                      )}
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-[11px] text-muted-foreground">
+                          {STORY_KIND_LABELS[group.kind]}
+                        </span>
+                        <span className="break-words text-sm leading-relaxed">
+                          {getStoryActionSentence(group)}
+                        </span>
+                        {items && (
+                          <span className="break-words text-xs text-muted-foreground">{items}</span>
+                        )}
+                      </span>
                     </li>
                   );
                 })}

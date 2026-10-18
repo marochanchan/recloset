@@ -1,4 +1,5 @@
 import { ClothingImageGallery } from "@/components/clothing-image-gallery";
+import { DoodleLoop, DoodleUser } from "@/components/doodle-icons";
 import { LikeButton, LoginToLikeLink } from "@/components/like-button";
 import { ItemDetailSkeleton } from "@/components/loading-skeletons";
 import { MarketplaceLinks } from "@/components/marketplace-links";
@@ -12,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPublicSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { formatJstDate } from "@/lib/wear-logs";
 import type { Metadata } from "next";
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
@@ -172,26 +174,36 @@ async function PublicClothingItemDetail({
         )}
       </div>
 
-      {/* 公開した人・公開日 */}
-      <dl className="flex flex-col divide-y divide-border rounded-2xl border border-border/70 bg-card px-4 text-sm">
-        <div className="flex items-baseline justify-between gap-4 py-3">
-          <dt className="shrink-0 text-muted-foreground">公開した人</dt>
-          <dd className="min-w-0 break-words text-right font-medium">
+      {/* 公開した人・公開日（人のアイコンと並べて1つにまとめる） */}
+      <div className="flex items-center gap-3 rounded-2xl bg-secondary/60 px-4 py-3 text-sm">
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-card text-primary"
+          aria-hidden="true"
+        >
+          <DoodleUser size={22} />
+        </span>
+        <dl className="flex min-w-0 flex-1 flex-col">
+          <dt className="sr-only">公開した人</dt>
+          <dd className="min-w-0 break-words font-medium">
             {item.owner_display_name ?? "Re:Closetユーザー"}
           </dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-4 py-3">
-          <dt className="shrink-0 text-muted-foreground">公開日</dt>
-          <dd className="text-right">{formatJstDate(item.published_at)}</dd>
-        </div>
-      </dl>
+          <dt className="sr-only">公開日</dt>
+          <dd className="text-xs text-muted-foreground">
+            {formatJstDate(item.published_at)}に公開
+          </dd>
+        </dl>
+      </div>
 
       {marketplaceLinks.length > 0 && (
         <section
           aria-labelledby="loop-marketplace-title"
           className="flex flex-col gap-3 rounded-3xl bg-gradient-to-br from-primary/10 to-blush/20 p-5"
         >
-          <h2 id="loop-marketplace-title" className="text-base font-semibold">
+          <h2
+            id="loop-marketplace-title"
+            className="flex items-center gap-2 text-base font-semibold"
+          >
+            <DoodleLoop size={20} className="text-primary" />
             この服が気になったら
           </h2>
           <MarketplaceLinks links={marketplaceLinks} />
@@ -209,11 +221,9 @@ async function PublicClothingItemDetail({
 async function BackToLoopLink() {
   const user = await getCurrentClaims();
   return (
-    <Link
-      href={user ? "/discover" : "/"}
-      className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
-    >
-      ← Re:Closet Loopに戻る
+    <Link href={user ? "/discover" : "/"} className="-ml-1 flex min-h-10 w-fit items-center gap-1 rounded-lg pr-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+      <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+      Re:Closet Loop
     </Link>
   );
 }
@@ -227,8 +237,9 @@ export default function PublicClothingItemPage({
     <div className="w-full max-w-md mx-auto flex flex-col gap-6">
       <Suspense
         fallback={
-          <span className="text-sm text-muted-foreground">
-            ← Re:Closet Loopに戻る
+          <span className="flex min-h-10 items-center gap-1 text-sm text-muted-foreground">
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+            Re:Closet Loop
           </span>
         }
       >

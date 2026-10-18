@@ -1,3 +1,4 @@
+import { STORY_KIND_ICONS } from "@/components/re-story-timeline";
 import { STORY_KINDS, type StoryMonthSummary } from "@/lib/re-story";
 import {
   getStoryMonthMessage,
@@ -54,9 +55,13 @@ export function ReStoryMonthSummary({
           <dl className="flex flex-col gap-1.5">
             {STORY_KINDS.map((kind) => {
               const days = summary.daysByKind[kind];
+              const Icon = STORY_KIND_ICONS[kind];
               return (
-                <div key={kind} className="grid grid-cols-[3.5rem_1fr_2.5rem] items-center gap-2">
-                  <dt className="text-xs">{STORY_KIND_LABELS[kind]}</dt>
+                <div key={kind} className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2">
+                  <dt className="flex items-center gap-1.5 text-xs">
+                    <Icon size={16} className="text-primary" />
+                    {STORY_KIND_LABELS[kind]}
+                  </dt>
                   <div className="h-1.5 overflow-hidden rounded-full bg-card" aria-hidden="true">
                     <div
                       className="h-full rounded-full bg-primary/70"

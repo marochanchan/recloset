@@ -20,6 +20,7 @@ import {
 } from "@/lib/clothing-options";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { DoodleBox, DoodleHanger } from "@/components/doodle-icons";
 import { ChevronLeft } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -308,7 +309,8 @@ export function ClothingClassifySession({
                 style={{ objectFit: "contain" }}
               />
             ) : (
-              <span className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              <span className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+                <DoodleHanger size={44} className="text-primary/50" />
                 写真なし
               </span>
             )}
@@ -413,7 +415,7 @@ function CategoryChoices({
   return (
     <div className="flex flex-col gap-2">
       <p id="classify-category-label" className="text-sm font-medium">
-        カテゴリをタップ（すぐに保存して次へ進みます）
+        カテゴリをタップ（保存して次へ）
       </p>
       <div
         role="group"
@@ -453,7 +455,7 @@ function SeasonChoices({
   return (
     <div className="flex flex-col gap-3">
       <p id="classify-season-label" className="text-sm font-medium">
-        着る季節を選ぶ（複数選べます）
+        着る季節を選ぶ（複数OK）
       </p>
       <SeasonSelector
         value={seasons}
@@ -488,7 +490,8 @@ function ClassifyDone({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1 rounded-3xl bg-gradient-to-b from-primary/10 to-blush/20 px-5 py-8 text-center">
+      <div className="flex flex-col items-center gap-1 rounded-3xl bg-gradient-to-b from-primary/10 to-blush/20 px-5 py-8 text-center">
+        <DoodleBox size={40} className="mb-2 text-primary" />
         <p className="text-lg font-semibold">
           {savedCount > 0 ? "おつかれさまでした" : "ここまでにしました"}
         </p>
@@ -498,7 +501,10 @@ function ClassifyDone({
       </div>
       <div className="flex flex-col gap-2">
         <Button asChild className="min-h-11">
-          <Link href="/protected/items">クローゼットに戻る</Link>
+          <Link href="/protected/items">
+            <DoodleHanger />
+            クローゼットに戻る
+          </Link>
         </Button>
         <Button
           type="button"

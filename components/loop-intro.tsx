@@ -1,3 +1,4 @@
+import { DoodleLoop } from "@/components/doodle-icons";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { Heart } from "lucide-react";
 import Link from "next/link";
@@ -36,14 +37,15 @@ export function LoopIntro({
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <p className="text-xs font-medium tracking-[0.2em] text-primary">
+        <p className="flex items-center gap-1.5 text-xs font-medium tracking-[0.2em] text-primary">
+          <DoodleLoop size={18} />
           Re:Closet Loop
         </p>
         <Heading className="text-2xl font-semibold sm:text-3xl">
           誰かのクローゼットをのぞいてみる
         </Heading>
         <p className="text-sm text-muted-foreground">
-          Re:Closetで服を見直した持ち主が、「次の誰かへつなぎたい」と公開した服です。
+          服を見直した持ち主が、次の誰かへつなぎたいと公開した服です。
         </p>
       </div>
       <Suspense fallback={null}>

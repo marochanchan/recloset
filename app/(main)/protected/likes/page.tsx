@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { getPublicSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import type { Metadata } from "next";
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -64,7 +65,7 @@ async function LikedClothingItemsList() {
   );
 
   return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
       {items.map((item) => {
         const imageUrl = item.cover_image_path
           ? (signedUrlMap.get(item.cover_image_path) ?? null)
@@ -76,7 +77,7 @@ async function LikedClothingItemsList() {
           <div key={item.id} className="relative h-full">
             <Link
               href={`/discover/${item.id}`}
-              className="group block h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:opacity-80"
+              className="group block h-full rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:opacity-80"
             >
               <PublicClothingItemCard
                 title={item.title}
@@ -100,16 +101,14 @@ async function LikedClothingItemsList() {
 export default function LikedClothingItemsPage() {
   return (
     <div className="w-full flex flex-col gap-6">
-      <Link
-        href="/discover"
-        className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
-      >
-        ← Re:Closet Loopに戻る
+      <Link href="/discover" className="-ml-1 flex min-h-10 w-fit items-center gap-1 rounded-lg pr-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        Re:Closet Loop
       </Link>
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">気になる服</h1>
         <p className="text-sm text-muted-foreground">
-          Re:Closet Loopで「気になる」に保存した服です。保存したことは、あなた以外には表示されません。公開が終了した服は一覧に表示されません（再公開された場合は、再び表示されることがあります）。
+          Loopで保存した服です。保存はあなたにしか見えません。公開が終わった服は表示されません（再公開されると再び表示されることがあります）。
         </p>
       </div>
 

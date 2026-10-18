@@ -6,6 +6,7 @@ import {
 import { ClosetReviewUndoLastButton } from "@/components/closet-review-undo-last-button";
 import { ReviewSessionSkeleton } from "@/components/loading-skeletons";
 import { Button } from "@/components/ui/button";
+import { DoodleHanger, DoodleTag } from "@/components/doodle-icons";
 import { Card } from "@/components/ui/card";
 import {
   isReviewSessionDecision,
@@ -19,6 +20,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import type { Metadata } from "next";
 import Image from "next/image";
+import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -244,10 +246,16 @@ function ReviewResult({
 
       <div className="flex flex-col gap-2">
         <Button asChild>
-          <Link href="/protected/items">クローゼットに戻る</Link>
+          <Link href="/protected/items">
+            <DoodleHanger />
+            クローゼットに戻る
+          </Link>
         </Button>
         <Button asChild variant="outline">
-          <Link href="/protected/review">ほかの服も見直す</Link>
+          <Link href="/protected/review">
+            <DoodleTag className="text-primary" />
+            ほかの服も見直す
+          </Link>
         </Button>
       </div>
     </div>
@@ -270,25 +278,27 @@ function ResultItemList({
         <h2 className="text-base font-semibold">{title}</h2>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
-      <ul className="flex flex-col gap-2">
+      {/* 写真を主役に3列で並べる。押すと服の詳細へ */}
+      <ul className="grid grid-cols-3 gap-x-2 gap-y-3">
         {items.map((item) => (
           <li key={item.id}>
             <Link
               href={`/protected/items/${item.id}`}
-              className="flex items-center gap-3 rounded-lg border p-2 transition-colors hover:bg-accent"
+              className="group flex flex-col gap-1.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-photo">
+              <span className="relative block aspect-[3/4] w-full overflow-hidden rounded-xl bg-photo">
                 {item.imageUrl ? (
                   <Image
                     src={item.imageUrl}
                     alt=""
                     fill
-                    sizes="56px"
-                    className="object-contain"
+                    sizes="(min-width: 448px) 140px, 33vw"
+                    className="object-contain motion-safe:transition-transform motion-safe:duration-300 group-hover:scale-[1.03]"
                     style={{ objectFit: "contain" }}
                   />
                 ) : (
-                  <span className="flex h-full items-center justify-center text-[10px] text-muted-foreground">
+                  <span className="flex h-full flex-col items-center justify-center gap-1 text-[10px] text-muted-foreground">
+                    <DoodleHanger size={24} className="text-primary/50" />
                     写真なし
                   </span>
                 )}
@@ -296,13 +306,12 @@ function ResultItemList({
               <span
                 className={
                   item.title === PHOTO_ONLY_TITLE
-                    ? "min-w-0 flex-1 truncate text-sm text-muted-foreground"
-                    : "min-w-0 flex-1 truncate text-sm font-medium"
+                    ? "truncate text-xs text-muted-foreground"
+                    : "truncate text-xs"
                 }
               >
                 {item.title}
               </span>
-              <span className="text-xs text-muted-foreground">詳細 →</span>
             </Link>
           </li>
         ))}
@@ -318,13 +327,14 @@ export default function ClosetReviewSessionPage({
 }) {
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-4">
-      <Link
-        href="/protected/items"
-        className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
-      >
-        ← クローゼットに戻る
+      <Link href="/protected/items" className="-ml-1 flex min-h-10 w-fit items-center gap-1 rounded-lg pr-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        クローゼット
       </Link>
-      <h1 className="text-2xl font-semibold">まとめて見直す</h1>
+      <h1 className="flex items-center gap-2 text-2xl font-semibold">
+        <DoodleTag size={28} className="text-primary" />
+        まとめて見直す
+      </h1>
       <Suspense fallback={<ReviewSessionSkeleton />}>
         <ReviewSessionContent params={params} />
       </Suspense>

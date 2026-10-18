@@ -1,7 +1,13 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { CloudSun, Recycle, Shirt, User, type LucideIcon } from "lucide-react";
+import {
+  DoodleHanger,
+  DoodleLoop,
+  DoodleSunCloud,
+  DoodleUser,
+} from "@/components/doodle-icons";
+import type { ComponentType, SVGProps } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -10,7 +16,7 @@ import { usePathname } from "next/navigation";
 type MainNavItem = {
   href: string;
   label: string;
-  icon: LucideIcon;
+  icon: ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
   match: (pathname: string) => boolean;
 };
 
@@ -22,7 +28,7 @@ const MAIN_NAV_ITEMS: MainNavItem[] = [
   {
     href: "/discover",
     label: "Loop",
-    icon: Recycle,
+    icon: DoodleLoop,
     // 気になる服はLoopのサブページとして扱う
     match: (pathname) =>
       isPathOrChild(pathname, "/discover") ||
@@ -31,19 +37,19 @@ const MAIN_NAV_ITEMS: MainNavItem[] = [
   {
     href: "/protected/items",
     label: "Closet",
-    icon: Shirt,
+    icon: DoodleHanger,
     match: (pathname) => isPathOrChild(pathname, "/protected/items"),
   },
   {
     href: "/today",
     label: "Today",
-    icon: CloudSun,
+    icon: DoodleSunCloud,
     match: (pathname) => isPathOrChild(pathname, "/today"),
   },
   {
     href: "/me",
     label: "My Page",
-    icon: User,
+    icon: DoodleUser,
     // 設定・Re:StoryはMy Pageから開く画面のため、My Pageを現在地とする
     match: (pathname) =>
       isPathOrChild(pathname, "/me") ||
@@ -115,11 +121,8 @@ export function BottomMainNav() {
                     isActive ? "bg-primary/10" : "group-hover:bg-accent",
                   )}
                 >
-                  <Icon
-                    className="h-5 w-5"
-                    strokeWidth={isActive ? 2.25 : 1.75}
-                    aria-hidden="true"
-                  />
+                  {/* 手描き風の線画アイコン（Todayの導線と同じ）。選択中は線を少し太くする */}
+                  <Icon size={24} strokeWidth={isActive ? 2.1 : 1.7} />
                 </span>
                 {item.label}
               </Link>
