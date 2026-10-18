@@ -105,7 +105,7 @@ export default function ReStoryPage({ searchParams }: { searchParams: SearchPara
         ← My Pageに戻る
       </Link>
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold">{RE_STORY_TITLE}</h1>
+        <h1 className="text-2xl font-semibold">{RE_STORY_TITLE}</h1>
         <p className="text-sm text-muted-foreground">{RE_STORY_LEAD}</p>
       </div>
       <Suspense fallback={<ReStorySkeleton />}>

@@ -38,7 +38,7 @@ export function ReStoryTimeline({
 }) {
   return (
     <section aria-labelledby="re-story-timeline-title" className="flex flex-col gap-4">
-      <h3 id="re-story-timeline-title" className="text-base font-bold">
+      <h3 id="re-story-timeline-title" className="text-base font-semibold">
         この月のできごと
       </h3>
       <ol className="flex flex-col">
@@ -51,7 +51,7 @@ export function ReStoryTimeline({
                 <time dateTime={day.dateKey} className="sr-only">
                   {formatStoryDate(day.dateKey)}
                 </time>
-                <span aria-hidden="true" className="text-2xl font-bold leading-none tabular-nums">
+                <span aria-hidden="true" className="text-2xl font-semibold leading-none tabular-nums">
                   {dayNumber}
                 </span>
                 <span aria-hidden="true" className="mt-1 text-[11px] text-muted-foreground">

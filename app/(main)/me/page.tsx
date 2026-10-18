@@ -75,13 +75,13 @@ async function ProfileSummary() {
   return (
     <div className="flex items-center gap-4">
       <span
-        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-card text-xl font-bold text-primary"
+        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-card text-xl font-semibold text-primary"
         aria-hidden="true"
       >
         {initial}
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
-        <p className="break-words text-lg font-bold">
+        <p className="break-words text-lg font-semibold">
           {displayName ?? (
             <span className="text-muted-foreground">公開名は未設定です</span>
           )}
@@ -147,7 +147,7 @@ async function MyPublicItems() {
 export default function MyPage() {
   return (
     <div className="w-full max-w-md flex flex-col gap-8 p-5">
-      <h1 className="text-2xl font-bold">My Page</h1>
+      <h1 className="text-2xl font-semibold">My Page</h1>
 
       <div className="rounded-3xl bg-gradient-to-br from-primary/10 to-blush/20 px-5 py-5">
         <Suspense
@@ -160,7 +160,7 @@ export default function MyPage() {
       </div>
 
       <section aria-labelledby="me-menu-title" className="flex flex-col gap-3">
-        <h2 id="me-menu-title" className="text-base font-bold">
+        <h2 id="me-menu-title" className="text-base font-semibold">
           メニュー
         </h2>
         <div className={LIST_PANEL_CLASS}>
@@ -192,7 +192,7 @@ export default function MyPage() {
 
       <section aria-labelledby="me-public-title" className="flex flex-col gap-3">
         <div className="flex flex-col gap-0.5">
-          <h2 id="me-public-title" className="text-base font-bold">
+          <h2 id="me-public-title" className="text-base font-semibold">
             公開中の服
           </h2>
           <p className="text-xs text-muted-foreground">

@@ -241,7 +241,7 @@ function QuestionBlock({
       <legend className="flex items-start gap-3">
         <span
           className={cn(
-            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold tabular-nums",
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold tabular-nums",
             answered
               ? "bg-primary text-primary-foreground"
               : "bg-secondary text-foreground",
@@ -338,7 +338,7 @@ function DiagnosisNextLinks({
 }) {
   return (
     <section aria-labelledby="diagnosis-next-title" className="flex flex-col gap-3">
-      <h2 id="diagnosis-next-title" className="text-base font-bold">
+      <h2 id="diagnosis-next-title" className="text-base font-semibold">
         次にできること
       </h2>
       {recorded && (
@@ -427,7 +427,7 @@ export function AiDiagnosisFlow({
                 {brand}
               </p>
             )}
-            <p className="break-words text-lg font-bold leading-snug">{title}</p>
+            <p className="break-words text-lg font-semibold leading-snug">{title}</p>
           </div>
           {favorite && (
             <Badge className="shrink-0 gap-1 border-transparent bg-blush/20 text-blush-foreground hover:bg-blush/20">
@@ -448,7 +448,7 @@ export function AiDiagnosisFlow({
         <section aria-labelledby="diagnosis-questions-title" className="flex flex-col gap-6">
           <div className="flex flex-col gap-1">
             <div className="flex items-baseline justify-between gap-3">
-              <h2 id="diagnosis-questions-title" className="text-lg font-bold">
+              <h2 id="diagnosis-questions-title" className="text-lg font-semibold">
                 3つの質問
               </h2>
               <p className="shrink-0 text-xs tabular-nums text-muted-foreground" aria-live="polite">
@@ -516,7 +516,7 @@ export function AiDiagnosisFlow({
           {/* 今回の提案は特別なカードに。決めるのはあなた、という前提を同じカードの中で伝える */}
           <div className="flex flex-col gap-4 rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card to-blush/20 px-5 py-6">
             <div className="flex items-center justify-between gap-3">
-              <h2 id="diagnosis-result-title" className="text-sm font-bold text-muted-foreground">
+              <h2 id="diagnosis-result-title" className="text-sm font-semibold text-muted-foreground">
                 今回の提案
               </h2>
               {/* 提案（日本語）を主役に、診断タイプ（英語）は小さく添える */}
@@ -524,7 +524,7 @@ export function AiDiagnosisFlow({
                 {DIAGNOSIS_TYPE_LABELS[result.decision.choice].badge}
               </Badge>
             </div>
-            <p className="text-2xl font-bold leading-snug">
+            <p className="text-2xl font-semibold leading-snug">
               {DIAGNOSIS_TYPE_LABELS[result.decision.choice].caption}
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
@@ -536,7 +536,7 @@ export function AiDiagnosisFlow({
               ルールベースで選んで表示する（lib/decision-hints.ts） */}
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-0.5">
-              <h3 className="text-base font-bold">この提案につながったこと</h3>
+              <h3 className="text-base font-semibold">この提案につながったこと</h3>
               <p className="text-xs text-muted-foreground">
                 あなたの回答と、Re:Closetでの着用記録の有無をもとに考えました。
               </p>
@@ -555,7 +555,7 @@ export function AiDiagnosisFlow({
 
           <div className="flex flex-col gap-2 rounded-2xl border border-border/70 bg-card p-4">
             <p className="text-xs font-medium tracking-[0.15em] text-primary">次の一歩</p>
-            <p className="font-bold">{result.nextAction.title}</p>
+            <p className="font-semibold">{result.nextAction.title}</p>
             <p className="text-sm text-muted-foreground">
               {result.nextAction.message}
             </p>
@@ -579,7 +579,7 @@ export function AiDiagnosisFlow({
           className="flex flex-col gap-3 rounded-2xl bg-secondary/60 p-4"
         >
           <div className="flex flex-col gap-0.5">
-            <h2 id="diagnosis-elaboration-title" className="text-base font-bold">
+            <h2 id="diagnosis-elaboration-title" className="text-base font-semibold">
               もう少し考えたいときは
             </h2>
             <p className="text-sm text-muted-foreground">AIが、考えるための問いを1つ返します</p>

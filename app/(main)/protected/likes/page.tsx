@@ -107,7 +107,7 @@ export default function LikedClothingItemsPage() {
         ← Re:Closet Loopに戻る
       </Link>
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold">気になる服</h1>
+        <h1 className="text-2xl font-semibold">気になる服</h1>
         <p className="text-sm text-muted-foreground">
           Re:Closet Loopで「気になる」に保存した服です。保存したことは、あなた以外には表示されません。公開が終了した服は一覧に表示されません（再公開された場合は、再び表示されることがあります）。
         </p>

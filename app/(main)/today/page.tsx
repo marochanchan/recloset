@@ -1,5 +1,11 @@
 import { ClosetSummary } from "@/components/closet-summary";
 import {
+  DoodleBook,
+  DoodleHangerPlus,
+  DoodleLoop,
+  DoodleTag,
+} from "@/components/doodle-icons";
+import {
   GardenSkeleton,
   ReQuestSkeleton,
   TodaySkeleton,
@@ -42,7 +48,6 @@ import {
   WEATHER_REGION_COOKIE,
 } from "@/lib/weather-regions";
 import { getCurrentSeasonJst, getDaysSinceLastWorn } from "@/lib/wear-logs";
-import { ChevronRight, Plus, Recycle } from "lucide-react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
@@ -60,39 +65,80 @@ const TODAY_DATE_FORMAT = new Intl.DateTimeFormat("ja-JP", {
   weekday: "short",
 });
 
-// Today下部の主要導線（同じ見た目で並べる）。
-// クローゼット一覧へはサマリーの「登録している服」から開けるため置かない。
-const NEXT_LINKS = [
-  { href: "/protected/items/new", label: "服を登録する", icon: Plus },
-  {
-    href: "/discover",
-    label: "Loopで誰かのクローゼットをのぞく",
-    icon: Recycle,
-  },
+// Todayの主要導線（コーデの下にアイコンで並べる）。
+// クローゼット一覧へはサマリーの「登録している服」と下部ナビから開けるため置かない。
+// Closetの「今日見直す3着」へは Re:Quest の「1着見直す」から開ける
+const QUICK_LINKS = [
+  { href: "/protected/items/new", label: "服を登録", icon: DoodleHangerPlus },
+  { href: "/protected/review", label: "まとめて見直す", icon: DoodleTag },
+  { href: "/protected/story", label: "Re:Story", icon: DoodleBook },
+  { href: "/discover", label: "Loop", icon: DoodleLoop },
 ];
+
+// アイコンの丸は少しずつ形を崩し、手描きの柔らかさを出す
+const QUICK_LINK_SHAPES = [
+  "rounded-[46%_54%_50%_50%/52%_48%_52%_48%] bg-secondary",
+  "rounded-[52%_48%_54%_46%/48%_52%_48%_52%] bg-accent",
+  "rounded-[50%_50%_46%_54%/54%_46%_52%_48%] bg-secondary",
+  "rounded-[48%_52%_50%_50%/46%_54%_48%_52%] bg-accent",
+];
+
+function QuickLinks() {
+  return (
+    <nav aria-label="すぐにできること">
+      <ul className="grid grid-cols-4 gap-1">
+        {QUICK_LINKS.map((link, index) => {
+          const Icon = link.icon;
+          return (
+            <li key={link.href}>
+              <Link
+                href={link.href}
+                className="group flex min-h-[5.5rem] flex-col items-center gap-2 rounded-2xl px-1 py-2 text-center outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span
+                  className={`flex h-14 w-14 items-center justify-center text-primary transition-transform motion-safe:group-hover:-translate-y-0.5 group-active:scale-95 ${QUICK_LINK_SHAPES[index % QUICK_LINK_SHAPES.length]}`}
+                  aria-hidden="true"
+                >
+                  <Icon size={28} />
+                </span>
+                <span className="text-[11px] font-medium leading-tight sm:text-xs">
+                  {link.label}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
 
 // 今週のRe:Closet（見直し・着用の週次進捗）。Todayの他の表示を待たせないよう、
 // 独立したSuspenseで表示する。取得はTodayContentの開始時に並行して始めておき
 // （取得の待ち時間が直列にならず、スケルトンの表示が短くなる）、ここで結果を待つ。
 // 取得に失敗したら0着ではなくエラーを表示する
+// 今週の行動日（曜日の丸）はRe:Questの集計を使う。Re:Questの取得に失敗しても週次の実績は出す
 async function WeeklyProgressSection({
   resultPromise,
+  reQuestPromise,
 }: {
   resultPromise: Promise<WeeklyProgressResult>;
+  reQuestPromise: Promise<ReQuestResult>;
 }) {
-  const result = await resultPromise;
+  const [result, reQuest] = await Promise.all([resultPromise, reQuestPromise]);
   return result.ok ? (
     <WeeklyProgressCard
       progress={result.progress}
       weekStartDateKey={result.range.weekStartDateKey}
       goalLoadFailed={result.goalLoadFailed}
+      week={reQuest.ok ? reQuest.progress : null}
     />
   ) : (
     <WeeklyProgressError />
   );
 }
 
-// ログイン後のトップ（天気・今日のRe:try・今週のRe:Closet・クローゼットサマリー）。
+// ログイン後のトップ（天気・今日のRe:try・導線・Re:Quest・Re:Garden・今週のRe:Closet・サマリー）。
 // 未ログインはproxyで/auth/loginへリダイレクトされる。
 async function ReQuestSection({
   resultPromise,
@@ -217,14 +263,14 @@ async function TodayContent() {
   }
 
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-12">
+    <div className="flex w-full max-w-3xl flex-col gap-10">
       {/* 誌面風のヘッダー（日付・挨拶・天気）。天気は今日のRe:tryを出すときだけ表示する */}
-      <header className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
           <p className="text-xs font-medium tracking-[0.2em] text-primary">
             {TODAY_DATE_FORMAT.format(now)}
           </p>
-          <h1 className="text-2xl font-bold leading-snug sm:text-3xl">
+          <h1 className="text-2xl font-semibold leading-snug sm:text-3xl">
             {displayName
               ? `${displayName}さん、今日は何を着る？`
               : "今日は何を着る？"}
@@ -235,38 +281,46 @@ async function TodayContent() {
         )}
       </header>
 
-      {/* 服が0件ならオンボーディング、それ以外は今日のRe:try */}
-      {isClosetEmpty ? (
-        <OnboardingSteps showRegisterCta />
-      ) : (
-        outfit && (
-          <TodayOutfitCard
-            region={region}
-            suggestion={outfit.suggestion}
-            imageUrls={outfit.imageUrls}
-          />
-        )
-      )}
+      {/* 服が0件ならオンボーディング、それ以外は今日のRe:try。
+          スマホのファーストビューに、コーデの写真とアイコンの導線が入るように近づけて置く */}
+      <div className="flex flex-col gap-6">
+        {isClosetEmpty ? (
+          <OnboardingSteps showRegisterCta />
+        ) : (
+          outfit && (
+            <TodayOutfitCard
+              suggestion={outfit.suggestion}
+              imageUrls={outfit.imageUrls}
+            />
+          )
+        )}
+        <QuickLinks />
+      </div>
 
       {/* 服が0着のときはオンボーディングを優先し、クエスト・進捗は出さない。
-          今日のRe:Quest（今日、何か1つ）→ Re:Garden（行動で育つ植物）
-          → 今週のRe:Closet（週の見直し目標）の順 */}
+          今日のRe:Quest（今日、何か1つ）のすぐ下にRe:Garden（行動で育つ植物）を置き、
+          つながりを配置で見せる → 今週のRe:Closet（週の行動日と見直し目標） */}
       {!isClosetEmpty && (
-        <div className="flex flex-col gap-12">
-          <Suspense fallback={<ReQuestSkeleton />}>
-            <ReQuestSection resultPromise={reQuestPromise} />
-          </Suspense>
-          <Suspense fallback={<GardenSkeleton />}>
-            <GardenSection resultPromise={gardenPromise} />
-          </Suspense>
+        <>
+          <div className="flex flex-col gap-4">
+            <Suspense fallback={<ReQuestSkeleton />}>
+              <ReQuestSection resultPromise={reQuestPromise} />
+            </Suspense>
+            <Suspense fallback={<GardenSkeleton />}>
+              <GardenSection resultPromise={gardenPromise} />
+            </Suspense>
+          </div>
           <Suspense fallback={<WeeklyProgressSkeleton />}>
-            <WeeklyProgressSection resultPromise={weeklyProgressPromise} />
+            <WeeklyProgressSection
+              resultPromise={weeklyProgressPromise}
+              reQuestPromise={reQuestPromise}
+            />
           </Suspense>
-        </div>
+        </>
       )}
 
       <section aria-labelledby="closet-summary-title" className="flex flex-col gap-3">
-        <h2 id="closet-summary-title" className="text-lg font-bold">
+        <h2 id="closet-summary-title" className="text-lg font-semibold">
           クローゼットサマリー
         </h2>
         <ClosetSummary
@@ -275,29 +329,6 @@ async function TodayContent() {
           candidateCount={candidateResult.count ?? 0}
         />
       </section>
-
-      <nav aria-label="次にすること" className="flex flex-col divide-y divide-border border-y border-border">
-        {NEXT_LINKS.map((link) => {
-          const Icon = link.icon;
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="flex min-h-14 items-center gap-3 px-1 py-3 text-sm outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent"
-            >
-              <Icon
-                className="h-5 w-5 shrink-0 text-primary"
-                aria-hidden="true"
-              />
-              <span className="flex-1 font-medium">{link.label}</span>
-              <ChevronRight
-                className="h-4 w-4 shrink-0 text-muted-foreground"
-                aria-hidden="true"
-              />
-            </Link>
-          );
-        })}
-      </nav>
 
       {/* 天気を表示したときだけ、出典（CC BY 4.0）をページ末尾に小さく示す */}
       {weather && outfit && !isClosetEmpty && <WeatherAttribution />}

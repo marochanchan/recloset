@@ -61,7 +61,7 @@ export function LeaveConfirmDialog({
     >
       <div className="flex flex-col gap-4 p-5">
         <div className="flex flex-col gap-2">
-          <h2 id="leave-confirm-title" className="text-lg font-bold">
+          <h2 id="leave-confirm-title" className="text-lg font-semibold">
             {title}
           </h2>
           <p

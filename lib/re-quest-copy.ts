@@ -19,21 +19,30 @@ export const RE_QUEST_CELEBRATION_MESSAGE = "今日のクエスト、達成し�
 
 export const DAILY_QUEST_COPY: Record<
   DailyQuestKind,
-  { label: string; href: string; doneLabel: (count: number) => string }
+  {
+    label: string;
+    /** Todayのアイコンタイル用の短い言葉 */
+    shortLabel: string;
+    href: string;
+    doneLabel: (count: number) => string;
+  }
 > = {
   register: {
     label: "服を1着登録する",
+    shortLabel: "1着登録",
     href: "/protected/items/new",
     doneLabel: (count) => `今日${count}着登録しました`,
   },
   review: {
     label: "服を1着見直す",
+    shortLabel: "1着見直す",
     // Closetの「今日見直す3着」（WeeklyProgressCardと同じ導線）
     href: "/protected/items#review-suggestions-title",
     doneLabel: (count) => `今日${count}着見直しました`,
   },
   wear: {
     label: "着た服を1件記録する",
+    shortLabel: "着た服を記録",
     // 着用記録は服の詳細ページから。一覧から着た服を選ぶ
     href: "/protected/items",
     doneLabel: (count) => `今日${count}件記録しました`,

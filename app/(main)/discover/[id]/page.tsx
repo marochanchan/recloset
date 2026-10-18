@@ -157,7 +157,7 @@ async function PublicClothingItemDetail({
               {item.brand}
             </p>
           )}
-          <h1 className="break-words text-2xl font-bold leading-snug">{item.title}</h1>
+          <h1 className="break-words text-2xl font-semibold leading-snug">{item.title}</h1>
         </div>
         <div className="flex flex-wrap gap-1.5">
           <Badge variant="secondary">{getCategoryLabel(item.category)}</Badge>
@@ -191,7 +191,7 @@ async function PublicClothingItemDetail({
           aria-labelledby="loop-marketplace-title"
           className="flex flex-col gap-3 rounded-3xl bg-gradient-to-br from-primary/10 to-blush/20 p-5"
         >
-          <h2 id="loop-marketplace-title" className="text-base font-bold">
+          <h2 id="loop-marketplace-title" className="text-base font-semibold">
             この服が気になったら
           </h2>
           <MarketplaceLinks links={marketplaceLinks} />

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Zen_Kaku_Gothic_New, Zen_Maru_Gothic } from "next/font/google";
+import { Inter, Noto_Sans_JP } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
@@ -26,28 +26,17 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-// 英数字（Geist）。フォントの指定順は tailwind.config.ts の fontFamily を参照
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// 英数字（Inter）。フォントの指定順は tailwind.config.ts の fontFamily を参照
+const inter = Inter({
+  variable: "--font-inter",
   display: "swap",
   subsets: ["latin"],
 });
 
-// 日本語の本文（ゴシック）。日本語の文字は使う範囲（unicode-range）だけが
-// 読み込まれるため、プリロードはせず、太さも本文で使う3つに絞る
-const zenKakuGothic = Zen_Kaku_Gothic_New({
-  variable: "--font-zen-kaku",
-  weight: ["400", "500", "700"],
-  display: "swap",
-  subsets: ["latin"],
-  preload: false,
-});
-
-// ロゴの「Re:Closet」だけに使う丸ゴシック。英字だけなので、実際に読み込まれるのは
-// 英字の範囲（unicode-range）の小さなファイルだけ。太さも1つに絞る
-const zenMaruGothic = Zen_Maru_Gothic({
-  variable: "--font-zen-maru",
-  weight: "700",
+// 日本語（Noto Sans JP）。可変フォントのため太さ（本文400・見出し500〜600）は1つのファイルで扱える。
+// 日本語の文字は使う範囲（unicode-range）だけが読み込まれるため、プリロードはしない
+const notoSansJp = Noto_Sans_JP({
+  variable: "--font-noto-sans-jp",
   display: "swap",
   subsets: ["latin"],
   preload: false,
@@ -62,7 +51,7 @@ export default function RootLayout({
     <html
       lang="ja"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${zenKakuGothic.variable} ${zenMaruGothic.variable}`}
+      className={`${inter.variable} ${notoSansJp.variable}`}
     >
       <body className="antialiased">
         <ThemeProvider

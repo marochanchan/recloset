@@ -1,132 +1,94 @@
+import { DoodleHangerPlus, DoodleShirt, DoodleTag } from "@/components/doodle-icons";
 import { ReQuestCelebration } from "@/components/re-quest-celebration";
-import type { ReQuestProgress } from "@/lib/re-quest";
+import type { DailyQuestKind, ReQuestProgress } from "@/lib/re-quest";
 import {
   DAILY_QUEST_COPY,
-  getActiveDaysMessage,
-  getReQuestMessage,
-  getWeekdayLabel,
   RE_QUEST_CARD_TITLE,
-  RE_QUEST_GARDEN_NOTE,
   RE_QUEST_LOAD_ERROR_MESSAGE,
 } from "@/lib/re-quest-copy";
 import { cn } from "@/lib/utils";
-import { Check, ChevronRight, Sprout } from "lucide-react";
+import { Check } from "lucide-react";
 import Link from "next/link";
+import type { ComponentType } from "react";
 
-// Todayの「今日のRe:Quest」。今日、何か1つ行動できたかを見せる
-// （週の見直し目標は「今週のRe:Closet」＝WeeklyProgressCardが担当する）。
+// クエストの種類ごとのアイコン（Todayの導線・Re:Gardenと同じ意味で使う）
+const QUEST_ICONS: Record<DailyQuestKind, ComponentType<{ size?: number; className?: string }>> = {
+  register: DoodleHangerPlus,
+  review: DoodleTag,
+  wear: DoodleShirt,
+};
+
+// Todayの「今日のRe:Quest」。今日、何か1つ行動できたかを3つのアイコンタイルで見せる
+// （今週の行動日は「今週のRe:Closet」＝WeeklyProgressCardにまとめて表示する）。
 // 達成はふだんの記録から自動で判定する。できていないクエストは中立の表示にして、責めない。
-// 枠で囲まず、クエストの行と今週の行動日だけを並べる
+// すぐ下にRe:Gardenを並べ、ここでの行動が庭を育てることを配置で伝える
 export function ReQuestCard({ progress }: { progress: ReQuestProgress }) {
   return (
     <section aria-labelledby="re-quest-title">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-3">
-            <h2 id="re-quest-title" className="text-lg font-bold">
-              {RE_QUEST_CARD_TITLE}
-            </h2>
-            {/* 今日の達成状況をひと目で（達成していない日も責めない言葉にする） */}
-            {progress.achievedToday ? (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blush/20 px-2.5 py-1 text-xs font-medium text-blush-foreground">
-                <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                今日は達成
-              </span>
-            ) : (
-              <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs text-muted-foreground">
-                1つでOK
-              </span>
-            )}
-          </div>
-          <ReQuestCelebration
-            achievedToday={progress.achievedToday}
-            todayDateKey={progress.todayDateKey}
-          >
-            <p className="break-words text-sm text-muted-foreground">
-              {getReQuestMessage(progress)}
-            </p>
-          </ReQuestCelebration>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="re-quest-title" className="text-lg font-semibold">
+            {RE_QUEST_CARD_TITLE}
+          </h2>
+          {/* 今日の達成状況をひと目で（達成していない日も責めない言葉にする） */}
+          {progress.achievedToday ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blush/20 px-2.5 py-1 text-xs font-medium text-blush-foreground">
+              <Check className="h-3.5 w-3.5" aria-hidden="true" />
+              今日は達成
+            </span>
+          ) : (
+            <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs text-muted-foreground">
+              1つでOK
+            </span>
+          )}
         </div>
+        {/* 達成した日に一度だけ、お祝いの言葉を出す（ふだんは言葉を置かない） */}
+        <ReQuestCelebration
+          achievedToday={progress.achievedToday}
+          todayDateKey={progress.todayDateKey}
+        >
+          {null}
+        </ReQuestCelebration>
 
-        <ul className="flex flex-col gap-2">
+        <ul className="grid grid-cols-3 gap-2">
           {progress.quests.map((quest) => {
             const copy = DAILY_QUEST_COPY[quest.kind];
+            const Icon = QUEST_ICONS[quest.kind];
             return (
               <li key={quest.kind}>
                 <Link
                   href={copy.href}
                   className={cn(
-                    "flex min-h-12 items-center gap-3 rounded-xl px-3.5 py-2 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex h-full min-h-[6.25rem] flex-col items-center justify-center gap-2 rounded-2xl px-1.5 py-3 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                     quest.done
                       ? "bg-primary/10 hover:bg-primary/15"
                       : "bg-secondary/70 hover:bg-accent active:bg-accent",
                   )}
                 >
-                  {/* できたクエストはセージの丸にチェック、まだのものは点線の丸（否定の印は使わない） */}
                   <span
-                    className={cn(
-                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full",
-                      quest.done
-                        ? "bg-primary text-primary-foreground"
-                        : "border border-dashed border-muted-foreground/50",
-                    )}
+                    className="relative flex h-12 w-12 items-center justify-center rounded-full bg-card text-primary"
                     aria-hidden="true"
                   >
-                    {quest.done && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-                  </span>
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="font-medium">{copy.label}</span>
+                    <Icon size={28} />
+                    {/* できたクエストはセージの丸にチェック（まだのものに否定の印は付けない） */}
                     {quest.done && (
-                      <span className="text-xs text-primary">
-                        {copy.doneLabel(quest.count)}
+                      <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background">
+                        <Check className="h-3 w-3" strokeWidth={3} />
                       </span>
                     )}
                   </span>
-                  <span className="sr-only">{quest.done ? "（達成）" : ""}</span>
-                  <ChevronRight
-                    className="h-4 w-4 shrink-0 text-muted-foreground"
-                    aria-hidden="true"
-                  />
+                  <span className="text-xs font-medium leading-tight" aria-hidden="true">
+                    {copy.shortLabel}
+                  </span>
+                  <span className="sr-only">
+                    {copy.label}
+                    {quest.done ? `（達成：${copy.doneLabel(quest.count)}）` : ""}
+                  </span>
                 </Link>
               </li>
             );
           })}
         </ul>
-
-        <p className="flex items-center gap-1.5 break-words text-xs text-muted-foreground">
-          <Sprout className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-          {RE_QUEST_GARDEN_NOTE}
-        </p>
-
-        <div className="flex flex-col gap-2.5 pt-1">
-          <p className="break-words text-sm">
-            {getActiveDaysMessage(progress.activeDaysThisWeek)}
-          </p>
-          {/* 行動した日だけを塗る。行動のない日は控えめな枠だけ（否定的な印は付けない） */}
-          <ol className="grid grid-cols-7 gap-1" aria-label="今週行動した日">
-            {progress.week.map((day, index) => (
-              <li key={day.dateKey} className="flex justify-center">
-                {/* 曜日を丸の中に置き、行動した日はセージで塗る。今日は淡いピンクの輪で示す */}
-                <span
-                  className={cn(
-                    "flex h-9 w-9 items-center justify-center rounded-full text-xs tabular-nums",
-                    day.active
-                      ? "bg-primary font-medium text-primary-foreground"
-                      : "border border-border bg-card text-muted-foreground",
-                    day.isToday &&
-                      "font-semibold ring-2 ring-blush ring-offset-2 ring-offset-background",
-                  )}
-                >
-                  {getWeekdayLabel(index)}
-                  <span className="sr-only">
-                    {day.isToday ? "（今日）" : ""}
-                    {day.active ? "行動した日" : ""}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ol>
-        </div>
       </div>
     </section>
   );
@@ -137,7 +99,7 @@ export function ReQuestError() {
   return (
     <section aria-labelledby="re-quest-title">
       <div className="flex flex-col gap-3">
-        <h2 id="re-quest-title" className="text-lg font-bold">
+        <h2 id="re-quest-title" className="text-lg font-semibold">
           {RE_QUEST_CARD_TITLE}
         </h2>
         <p className="rounded-xl bg-secondary/60 px-4 py-3 text-sm text-muted-foreground">

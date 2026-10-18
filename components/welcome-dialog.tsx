@@ -94,7 +94,7 @@ export function WelcomeDialog() {
         </button>
 
         <div className="flex flex-col gap-2 pr-8">
-          <h2 id="welcome-dialog-title" className="text-lg font-bold">
+          <h2 id="welcome-dialog-title" className="text-lg font-semibold">
             Re:Closetをはじめてみる？
           </h2>
           <p

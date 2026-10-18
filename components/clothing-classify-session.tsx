@@ -259,7 +259,7 @@ export function ClothingClassifySession({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm" aria-live="polite">
-          <span className="text-lg font-bold tabular-nums">{progress.index + 1}</span>
+          <span className="text-lg font-semibold tabular-nums">{progress.index + 1}</span>
           <span className="text-muted-foreground"> / {total}着</span>
         </p>
         <p className="text-xs text-muted-foreground">
@@ -314,7 +314,7 @@ export function ClothingClassifySession({
             )}
             {dragX !== 0 && (
               <span
-                className="absolute right-4 top-4 rounded-lg border-2 border-muted-foreground bg-card/90 px-3 py-1 text-lg font-bold text-muted-foreground"
+                className="absolute right-4 top-4 rounded-lg border-2 border-muted-foreground bg-card/90 px-3 py-1 text-lg font-semibold text-muted-foreground"
                 style={{ opacity: swipeStrength }}
                 aria-hidden="true"
               >
@@ -489,7 +489,7 @@ function ClassifyDone({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1 rounded-3xl bg-gradient-to-b from-primary/10 to-blush/20 px-5 py-8 text-center">
-        <p className="text-lg font-bold">
+        <p className="text-lg font-semibold">
           {savedCount > 0 ? "おつかれさまでした" : "ここまでにしました"}
         </p>
         <p className="text-sm text-muted-foreground" aria-live="polite">

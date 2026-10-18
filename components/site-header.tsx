@@ -12,7 +12,7 @@ export function HeaderLogo({ href }: { href: string }) {
   return (
     <Link
       href={href}
-      className="flex items-center gap-2 rounded-lg font-logo text-lg font-bold tracking-wide outline-none [font-feature-settings:'palt'] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="flex items-center gap-2 rounded-lg font-logo text-lg font-semibold tracking-wide outline-none [font-feature-settings:'palt'] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       <BrandMark size={22} className="text-primary" />
       Re:Closet

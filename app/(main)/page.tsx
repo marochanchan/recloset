@@ -26,7 +26,7 @@ function HomeIntro() {
     >
       <h1
         id="home-intro-title"
-        className="text-2xl font-bold leading-snug sm:text-3xl"
+        className="text-2xl font-semibold leading-snug sm:text-3xl"
       >
         <span className="inline-block">着る、残す、手放す。</span>
         <span className="inline-block">服とのこれからを考える。</span>

@@ -78,7 +78,7 @@ export function SignUpUserSteps() {
           Head over to the{" "}
           <Link
             href="auth/sign-up"
-            className="font-bold hover:underline text-foreground/80"
+            className="font-semibold hover:underline text-foreground/80"
           >
             Sign up
           </Link>{" "}

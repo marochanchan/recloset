@@ -18,7 +18,7 @@ export default function DiscoverError({
 
   return (
     <div className="w-full max-w-md mx-auto flex flex-col items-center gap-4 py-10 text-center">
-      <h1 className="text-xl font-bold">服の読み込みに失敗しました</h1>
+      <h1 className="text-xl font-semibold">服の読み込みに失敗しました</h1>
       <p className="text-sm text-muted-foreground">
         時間をおいて、もう一度お試しください。
       </p>

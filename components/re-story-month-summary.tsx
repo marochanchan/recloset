@@ -38,7 +38,7 @@ export function ReStoryMonthSummary({
           <p className="flex shrink-0 flex-col">
             <span className="text-xs text-muted-foreground">行動した日</span>
             <span>
-              <span className="text-5xl font-bold leading-none tabular-nums">
+              <span className="text-5xl font-semibold leading-none tabular-nums">
                 {summary.activeDays}
               </span>
               <span className="ml-1 text-sm">日</span>

@@ -39,7 +39,7 @@ export function LoopIntro({
         <p className="text-xs font-medium tracking-[0.2em] text-primary">
           Re:Closet Loop
         </p>
-        <Heading className="text-2xl font-bold sm:text-3xl">
+        <Heading className="text-2xl font-semibold sm:text-3xl">
           誰かのクローゼットをのぞいてみる
         </Heading>
         <p className="text-sm text-muted-foreground">

@@ -52,7 +52,7 @@ export function ClothingImageSection({
   return (
     <section aria-labelledby="images-heading" className="grid gap-3">
       <div className="grid gap-1">
-        <h2 id="images-heading" className="text-base font-bold">
+        <h2 id="images-heading" className="text-base font-semibold">
           {maxImages === 1 ? "写真（1枚）" : `写真（任意・最大${maxImages}枚）`}
         </h2>
         <p className="text-sm text-muted-foreground">{description}</p>

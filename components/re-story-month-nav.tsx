@@ -32,7 +32,7 @@ export function ReStoryMonthNav({ nav }: { nav: StoryMonthNav }) {
         <span aria-hidden="true" className="text-xs tracking-[0.2em] text-muted-foreground">
           {year}
         </span>
-        <span aria-hidden="true" className="text-3xl font-bold leading-tight">
+        <span aria-hidden="true" className="text-3xl font-semibold leading-tight">
           {month}
           <span className="ml-0.5 text-lg">月</span>
         </span>

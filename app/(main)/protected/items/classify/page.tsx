@@ -252,7 +252,7 @@ export default function ClothingClassifyPage({
         ← クローゼットに戻る
       </Link>
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold">クイック仕分け</h1>
+        <h1 className="text-2xl font-semibold">クイック仕分け</h1>
         <p className="text-xs text-muted-foreground">
           写真を見ながら、カテゴリや季節をタップで付けていきます。一度に全部やらなくて大丈夫です。
         </p>

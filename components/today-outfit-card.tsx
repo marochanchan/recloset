@@ -1,3 +1,4 @@
+import { DoodleHanger, DoodleSparkle } from "@/components/doodle-icons";
 import { Button } from "@/components/ui/button";
 import { WearTodayButton } from "@/components/wear-today-button";
 import { WeatherRegionSetting } from "@/components/weather-region-setting";
@@ -30,8 +31,6 @@ type TodayWeatherProps = {
 };
 
 type TodayOutfitCardProps = {
-  /** 設定した地域（説明文の地域名に使う） */
-  region: WeatherRegion | null;
   suggestion: OutfitSuggestion;
   /** 候補の服ID → 代表画像の署名付きURL */
   imageUrls: Map<string, string>;
@@ -69,46 +68,51 @@ function OutfitPickCard({
   imageUrl: string | null;
 }) {
   const { item } = pick;
+  // 写真の上には1つ目の理由だけをタグで示し、残りは読み上げで補う（文字を減らして写真を主役に）
+  const [leadReason, ...otherReasons] = pick.reasons;
   return (
     // 枠のないカードで写真を主役にする（縦長の生成りの枠にobject-containで収める）
     <div className="flex h-full flex-col gap-2.5">
       <Link
         href={`/protected/items/${item.id}`}
-        className="group relative block aspect-[4/5] w-full shrink-0 overflow-hidden rounded-xl bg-photo outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:opacity-90"
+        className="group relative block aspect-[3/4] w-full shrink-0 overflow-hidden rounded-2xl bg-photo outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:opacity-90"
       >
         {imageUrl ? (
           <Image
             src={imageUrl}
             alt={item.title}
             fill
-            sizes="(min-width: 640px) 240px, 50vw"
+            sizes="(min-width: 640px) 240px, 70vw"
             className="object-contain motion-safe:transition-transform motion-safe:duration-300 group-hover:scale-[1.03]"
             style={{ objectFit: "contain" }}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
+            <DoodleHanger size={32} className="text-primary/50" />
             画像なし
           </div>
         )}
-        <span className="absolute left-2 top-2 rounded-full bg-card/90 px-2 py-0.5 text-[11px] font-medium leading-4 backdrop-blur-sm">
+        <span className="absolute left-2.5 top-2.5 rounded-full bg-card/90 px-2.5 py-0.5 text-[11px] font-medium leading-5 backdrop-blur-sm">
           {getSlotLabel(pick)}
         </span>
+        {leadReason && (
+          <span className="absolute inset-x-2.5 bottom-2.5 flex">
+            <span className="line-clamp-1 rounded-full bg-card/90 px-2.5 py-1 text-[11px] leading-4 text-primary backdrop-blur-sm">
+              {leadReason}
+              {otherReasons.length > 0 && (
+                <span className="sr-only">／{otherReasons.join("／")}</span>
+              )}
+            </span>
+          </span>
+        )}
       </Link>
       <div className="flex min-w-0 flex-1 flex-col gap-2 px-0.5">
-        <div className="flex min-w-0 flex-col gap-1">
-          <Link
-            href={`/protected/items/${item.id}`}
-            className="line-clamp-2 text-sm font-medium leading-snug hover:underline"
-          >
-            {item.title}
-          </Link>
-          {/* 選んだ理由は2行までに収める（季節の理由に「・」を含むため区切りは「／」） */}
-          {pick.reasons.length > 0 && (
-            <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-              {pick.reasons.join(" ／ ")}
-            </p>
-          )}
-        </div>
+        <Link
+          href={`/protected/items/${item.id}`}
+          className="line-clamp-1 text-sm font-medium leading-snug hover:underline"
+        >
+          {item.title}
+        </Link>
         <div className="mt-auto">
           <WearTodayButton
             itemId={item.id}
@@ -122,42 +126,41 @@ function OutfitPickCard({
 }
 
 /**
- * Todayのヘッダーに置く、設定した地域の今日の天気と地域の設定。
+ * Todayのヘッダーに置く、設定した地域の今日の天気（1行のピル）と地域の設定。
  * 地域が未設定なら、設定欄を開いて案内する（候補は月ベースの季節で選ぶ）。
  */
 export function TodayWeather({ region, weather }: TodayWeatherProps) {
   const weatherLabel = weather ? getWeatherLabel(weather.weatherCode) : null;
 
   return (
-    <div className="flex flex-col gap-1">
-      {region && (
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary text-primary">
-            <WeatherIcon code={weather?.weatherCode ?? null} />
-          </span>
-          <div className="flex min-w-0 flex-col">
-            <p className="text-xs text-muted-foreground">{region.name}の天気</p>
-            {weather ? (
-              <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
-                {weatherLabel && <span className="font-medium">{weatherLabel}</span>}
-                <span className="tabular-nums">
-                  最高{Math.round(weather.maxTemp)}℃ / 最低
-                  {Math.round(weather.minTemp)}℃
-                </span>
-                {weather.precipitationProbability !== null && (
-                  <span className="text-muted-foreground">
-                    降水{weather.precipitationProbability}%
-                  </span>
-                )}
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                天気を取得できませんでした。今の季節から候補を選んでいます。
-              </p>
+    <div className="flex flex-col gap-0.5">
+      {region &&
+        (weather ? (
+          <p className="inline-flex w-fit max-w-full flex-wrap items-center gap-x-2 gap-y-0.5 rounded-full border border-border bg-card px-3.5 py-1.5 text-sm">
+            <WeatherIcon code={weather.weatherCode} />
+            <span className="text-muted-foreground">{region.name}</span>
+            {weatherLabel && <span className="font-medium">{weatherLabel}</span>}
+            <span className="tabular-nums">
+              <span className="sr-only">最高</span>
+              {Math.round(weather.maxTemp)}°
+              <span className="text-muted-foreground">
+                {" "}/ <span className="sr-only">最低</span>
+                {Math.round(weather.minTemp)}°
+              </span>
+            </span>
+            {weather.precipitationProbability !== null && (
+              <span className="text-muted-foreground">
+                <span className="sr-only">降水確率</span>☂{" "}
+                {weather.precipitationProbability}%
+              </span>
             )}
-          </div>
-        </div>
-      )}
+          </p>
+        ) : (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <WeatherIcon code={null} />
+            {region.name}の天気を取得できませんでした。今の季節から選んでいます。
+          </p>
+        ))}
       {/* 未設定なら設定欄を開いて案内し、設定済みなら「地域を変更」を出す */}
       <WeatherRegionSetting currentRegionKey={region?.key ?? null} />
     </div>
@@ -167,47 +170,53 @@ export function TodayWeather({ region, weather }: TodayWeatherProps) {
 /**
  * ログイン中トップの「今日のRe:try」（天気ベースのコーデ候補）。
  * 自分のクローゼットからカテゴリごとに選んだ候補を、写真を主役に表示する。
+ * 選んだ理由はメッセージ（きらめきの吹き出し）と写真上のタグで短く伝える。
  * 天気は TodayWeather（ページのヘッダー）に表示する。
  * 服同士の色や形の相性を判断したものではない。
  */
-export function TodayOutfitCard({
-  region,
-  suggestion,
-  imageUrls,
-}: TodayOutfitCardProps) {
+export function TodayOutfitCard({ suggestion, imageUrls }: TodayOutfitCardProps) {
   return (
     <section
       aria-labelledby="today-outfit-title"
-      className="flex flex-col gap-4"
+      className="flex flex-col gap-3.5"
     >
-      <div className="flex flex-col gap-1">
-        <h2 id="today-outfit-title" className="text-xl font-bold">
-          今日のRe:try
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {suggestion.basis === "weather" && region
-            ? `${region.name}の今日の天気と着用記録から、しばらく出番のない服を中心に選びました。`
-            : "今の季節と着用記録から、しばらく出番のない服を中心に選びました。"}
-        </p>
-      </div>
+      <h2
+        id="today-outfit-title"
+        className="flex items-center gap-2 text-xl font-semibold"
+      >
+        <DoodleHanger size={26} className="text-primary" />
+        今日のRe:try
+      </h2>
 
       {suggestion.picks.length > 0 ? (
-        // スマホは画面の端まで横スクロール（2着目の先が少し見える幅）、広い画面は3列
-        <ul className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
-          {suggestion.picks.map((pick) => (
-            <li
-              key={pick.slot}
-              className="w-[46%] min-w-[9.5rem] shrink-0 snap-start sm:w-auto sm:min-w-0"
-            >
-              <OutfitPickCard
-                pick={pick}
-                imageUrl={imageUrls.get(pick.item.id) ?? null}
-              />
-            </li>
-          ))}
-        </ul>
+        <>
+          {/* 提案のメッセージは埋もれないよう、写真の直前にくすみピンクの面で置く */}
+          <p className="flex items-start gap-2 rounded-2xl bg-blush/20 px-3.5 py-2.5 text-sm leading-relaxed">
+            <DoodleSparkle size={20} className="mt-px text-blush-foreground" />
+            <span>
+              {suggestion.basis === "weather"
+                ? "今日の気温に合わせて、出番の少ない服から選びました"
+                : "今の季節に合わせて、出番の少ない服から選びました"}
+            </span>
+          </p>
+          {/* スマホは画面の端まで横スクロール（1着目を大きく、次の服が少し見える幅）、広い画面は3列 */}
+          <ul className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
+            {suggestion.picks.map((pick) => (
+              <li
+                key={pick.slot}
+                className="w-[66%] min-w-[11rem] max-w-[17rem] shrink-0 snap-start sm:w-auto sm:min-w-0 sm:max-w-none"
+              >
+                <OutfitPickCard
+                  pick={pick}
+                  imageUrl={imageUrls.get(pick.item.id) ?? null}
+                />
+              </li>
+            ))}
+          </ul>
+        </>
       ) : (
         <div className="flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-10 text-center">
+          <DoodleHanger size={36} className="text-primary/60" />
           <p className="text-sm text-muted-foreground">
             {suggestion.basis === "weather"
               ? "今日の気温に合う服がまだ登録されていません"

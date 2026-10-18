@@ -14,7 +14,14 @@ import { useState } from "react";
 // （最終デザインと誤認されないよう、絵は描かずに段階名だけを示す）
 const SIZE = 160;
 
-export function GardenCharacter({ stageIndex }: { stageIndex: number }) {
+export function GardenCharacter({
+  stageIndex,
+  size = SIZE,
+}: {
+  stageIndex: number;
+  /** 表示サイズ（px）。Todayのコンパクトな庭では小さめにする */
+  size?: number;
+}) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const stage = GARDEN_STAGES[stageIndex] ?? GARDEN_STAGES[0];
   const label = GARDEN_STAGE_LABELS[stage.key];
@@ -26,7 +33,7 @@ export function GardenCharacter({ stageIndex }: { stageIndex: number }) {
         role="img"
         aria-label={`植物キャラクター（${label}）`}
         className="flex flex-col items-center justify-center gap-1 rounded-full border-2 border-dashed border-muted-foreground/30 bg-muted/40 text-muted-foreground"
-        style={{ width: SIZE, height: SIZE }}
+        style={{ width: size, height: size }}
       >
         <span className="text-xs">
           {stageIndex + 1} / {GARDEN_STAGES.length}
@@ -45,7 +52,8 @@ export function GardenCharacter({ stageIndex }: { stageIndex: number }) {
       width={SIZE}
       height={SIZE}
       priority={false}
-      className="h-40 w-40 object-contain"
+      className="object-contain"
+      style={{ width: size, height: size }}
       onError={() => setFailedSrc(src)}
     />
   );

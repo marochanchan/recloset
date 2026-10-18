@@ -37,7 +37,7 @@ export function ReviewSuggestionsCard({
       />
       <div className="flex items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-0.5">
-          <h2 id="review-suggestions-title" className="text-base font-bold">
+          <h2 id="review-suggestions-title" className="text-base font-semibold">
             今日見直す3着
           </h2>
           <p className="text-xs text-muted-foreground">

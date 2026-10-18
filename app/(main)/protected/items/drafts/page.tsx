@@ -111,7 +111,7 @@ export default function ClothingDraftsPage() {
         ← クローゼットに戻る
       </Link>
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold">下書き</h1>
+        <h1 className="text-2xl font-semibold">下書き</h1>
         <p className="text-sm text-muted-foreground">
           登録の途中で保存した服です。続きから入力して登録できます。
         </p>

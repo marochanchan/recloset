@@ -107,45 +107,46 @@ export function ClosetFilterBarSkeleton() {
   );
 }
 
-// Today（日付・挨拶・天気のヘッダー → 今日のRe:try → サマリー → 導線）
+// Today（日付・挨拶・天気のヘッダー → 今日のRe:try → アイコンの導線 → サマリー）
 export function TodaySkeleton() {
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-12">
-      <div className="flex flex-col gap-4">
+    <div className="flex w-full max-w-3xl flex-col gap-10">
+      <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-2">
           <Skeleton className="h-3 w-24" />
           <Skeleton className="h-8 w-3/4" />
         </div>
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-10 w-10 rounded-full" />
-          <div className="flex flex-col gap-1.5">
-            <Skeleton className="h-3 w-20" />
-            <Skeleton className="h-4 w-44" />
+        <Skeleton className="h-8 w-56 rounded-full" />
+      </div>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-3.5">
+          <Skeleton className="h-7 w-36" />
+          <Skeleton className="h-11 w-full rounded-2xl" />
+          <div className="-mx-4 flex gap-3 overflow-hidden px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+            {Array.from({ length: 3 }, (_, index) => (
+              <div
+                key={index}
+                className="flex w-[66%] min-w-[11rem] max-w-[17rem] shrink-0 flex-col gap-2.5 sm:w-auto sm:min-w-0 sm:max-w-none"
+              >
+                <Skeleton className="aspect-[3/4] w-full rounded-2xl" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-8 w-24" />
+              </div>
+            ))}
           </div>
         </div>
-      </div>
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-4 w-full" />
-        </div>
-        <div className="-mx-4 flex gap-3 overflow-hidden px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-          {Array.from({ length: 3 }, (_, index) => (
-            <div
-              key={index}
-              className="flex w-[46%] min-w-[9.5rem] shrink-0 flex-col gap-2.5 sm:w-auto sm:min-w-0"
-            >
-              <Skeleton className="aspect-[4/5] w-full rounded-xl" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-8 w-24" />
+        <div className="grid grid-cols-4 gap-1">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="flex flex-col items-center gap-2 py-2">
+              <Skeleton className="h-14 w-14 rounded-full" />
+              <Skeleton className="h-3 w-12" />
             </div>
           ))}
         </div>
       </div>
-      {/* 今週のRe:Closetは服が0着のときは表示しないため、全体のスケルトンには含めない
+      {/* Re:Quest・Re:Garden・今週のRe:Closetは服が0着のときは表示しないため、全体のスケルトンには含めない
           （0着のユーザーに一瞬だけ枠が出るのを防ぐ）。服がある場合は
-          その位置で WeeklyProgressSkeleton を表示する */}
+          その位置でそれぞれのスケルトンを表示する */}
       <div className="flex flex-col gap-3">
         <Skeleton className="h-6 w-40" />
         <div className="grid grid-cols-3 divide-x divide-border border-y border-border">
@@ -157,10 +158,6 @@ export function TodaySkeleton() {
           ))}
         </div>
       </div>
-      <div className="flex flex-col divide-y divide-border border-y border-border">
-        <Skeleton className="my-4 h-6 w-2/3" />
-        <Skeleton className="my-4 h-6 w-3/4" />
-      </div>
     </div>
   );
 }
@@ -168,25 +165,15 @@ export function TodaySkeleton() {
 // Todayの「今日のRe:Quest」（components/re-quest-card.tsx）
 export function ReQuestSkeleton() {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
         <Skeleton className="h-6 w-36" />
-        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-6 w-16 rounded-full" />
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {Array.from({ length: 3 }, (_, index) => (
-          <Skeleton key={index} className="h-12 w-full rounded-xl" />
+          <Skeleton key={index} className="h-[6.25rem] w-full rounded-2xl" />
         ))}
-      </div>
-      <div className="flex flex-col gap-2.5 pt-1">
-        <Skeleton className="h-4 w-1/2" />
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: 7 }, (_, index) => (
-            <div key={index} className="flex justify-center">
-              <Skeleton className="h-9 w-9 rounded-full" />
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -231,30 +218,14 @@ export function ReStorySkeleton() {
 // Todayの「Re:Garden」（components/garden-card.tsx）
 export function GardenSkeleton() {
   return (
-    <div className="flex flex-col gap-4 rounded-3xl bg-gradient-to-b from-primary/5 to-primary/15 px-5 pb-5 pt-6">
-      <div className="flex flex-col gap-1.5">
-        <Skeleton className="h-6 w-28" />
-        <Skeleton className="h-3 w-3/4" />
+    <div className="flex items-center gap-4 rounded-3xl bg-gradient-to-br from-primary/5 to-primary/15 p-4">
+      <Skeleton className="h-28 w-28 shrink-0 rounded-full bg-card/70" />
+      <div className="flex flex-1 flex-col gap-2.5">
+        <Skeleton className="h-4 w-20 bg-card/70" />
+        <Skeleton className="h-6 w-24 bg-card/70" />
+        <Skeleton className="h-1.5 w-full rounded-full bg-card/70" />
+        <Skeleton className="h-3 w-3/4 bg-card/70" />
       </div>
-      <div className="flex flex-col items-center gap-2">
-        <Skeleton className="h-40 w-40 rounded-full bg-card/70" />
-        <Skeleton className="h-7 w-32 bg-card/70" />
-      </div>
-      <Skeleton className="h-16 w-full rounded-2xl bg-card/70" />
-      <div className="grid grid-cols-6 gap-1">
-        {Array.from({ length: 6 }, (_, index) => (
-          <div key={index} className="flex flex-col items-center gap-1.5">
-            <Skeleton className="h-3 w-3 rounded-full bg-card/70" />
-            <Skeleton className="h-3 w-6 bg-card/70" />
-          </div>
-        ))}
-      </div>
-      <div className="hidden grid-cols-5 gap-1 sm:grid">
-        {Array.from({ length: 5 }, (_, index) => (
-          <Skeleton key={index} className="h-12 rounded-xl bg-card/70" />
-        ))}
-      </div>
-      <Skeleton className="h-11 w-full rounded-xl bg-card/70" />
     </div>
   );
 }
@@ -267,22 +238,18 @@ export function WeeklyProgressSkeleton() {
         <Skeleton className="h-6 w-36" />
         <Skeleton className="h-3 w-14" />
       </div>
-      <div className="grid grid-cols-2 divide-x divide-border border-y border-border py-4">
-        <div className="flex flex-col gap-2 pr-4">
-          <Skeleton className="h-3 w-16" />
-          <Skeleton className="h-8 w-24" />
-        </div>
-        <div className="flex flex-col gap-2 pl-4">
-          <Skeleton className="h-3 w-14" />
-          <Skeleton className="h-8 w-16" />
-        </div>
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: 7 }, (_, index) => (
+          <div key={index} className="flex justify-center">
+            <Skeleton className="h-9 w-9 rounded-full" />
+          </div>
+        ))}
       </div>
-      <Skeleton className="h-2 w-full rounded-full" />
-      <Skeleton className="h-4 w-3/4" />
       <div className="grid grid-cols-2 gap-2">
-        <Skeleton className="h-10" />
-        <Skeleton className="h-10" />
+        <Skeleton className="h-[5.5rem] rounded-2xl" />
+        <Skeleton className="h-[5.5rem] rounded-2xl" />
       </div>
+      <Skeleton className="h-4 w-3/4" />
     </div>
   );
 }

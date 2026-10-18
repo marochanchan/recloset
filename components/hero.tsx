@@ -23,7 +23,7 @@ export function Hero() {
         <a
           href="https://supabase.com/?utm_source=create-next-app&utm_medium=template&utm_term=nextjs"
           target="_blank"
-          className="font-bold hover:underline"
+          className="font-semibold hover:underline"
           rel="noreferrer"
         >
           Supabase
@@ -32,7 +32,7 @@ export function Hero() {
         <a
           href="https://nextjs.org/"
           target="_blank"
-          className="font-bold hover:underline"
+          className="font-semibold hover:underline"
           rel="noreferrer"
         >
           Next.js

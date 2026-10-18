@@ -110,7 +110,7 @@ export default function SettingsPage({
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold">設定</h1>
+        <h1 className="text-2xl font-semibold">設定</h1>
         <p className="text-sm text-muted-foreground">
           アカウントや公開情報、見直しの目標を設定できます。
         </p>

@@ -116,7 +116,7 @@ async function ClothingItemDetail({
                   {item.brand}
                 </p>
               )}
-              <h1 className="break-words text-2xl font-bold leading-snug">
+              <h1 className="break-words text-2xl font-semibold leading-snug">
                 {item.title}
               </h1>
             </div>
@@ -154,14 +154,14 @@ async function ClothingItemDetail({
       </section>
 
       <section aria-labelledby="item-records-title" className="flex flex-col gap-3">
-        <h2 id="item-records-title" className="text-base font-bold">
+        <h2 id="item-records-title" className="text-base font-semibold">
           記録
         </h2>
         <dl className="flex flex-col divide-y divide-border rounded-2xl border border-border/70 bg-card px-4 text-sm">
           <div className="flex items-baseline justify-between gap-4 py-3">
             <dt className="shrink-0 text-muted-foreground">Re:Closetでの着用記録</dt>
             <dd className="text-right">
-              <span className="text-lg font-bold tabular-nums">{item.wear_count}</span>回
+              <span className="text-lg font-semibold tabular-nums">{item.wear_count}</span>回
             </dd>
           </div>
           <div className="flex items-baseline justify-between gap-4 py-3">
@@ -193,7 +193,7 @@ async function ClothingItemDetail({
         className="flex flex-col gap-3 rounded-3xl bg-gradient-to-br from-primary/10 to-blush/20 p-5"
       >
         <div className="flex flex-col gap-1">
-          <h2 id="item-diagnosis-title" className="flex items-center gap-2 text-base font-bold">
+          <h2 id="item-diagnosis-title" className="flex items-center gap-2 text-base font-semibold">
             <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
             AIと一緒に見直す
           </h2>
@@ -209,7 +209,7 @@ async function ClothingItemDetail({
       </section>
 
       <section aria-labelledby="item-share-title" className="flex flex-col gap-3">
-        <h2 id="item-share-title" className="text-base font-bold">
+        <h2 id="item-share-title" className="text-base font-semibold">
           公開・出品
         </h2>
         <div className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4">

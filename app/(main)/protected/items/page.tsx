@@ -483,7 +483,7 @@ export default function ClothingItemsPage({
           「その他の登録方法」に折りたたむ。下書きがあるときは見出しの横に小さく出す */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold">クローゼット</h1>
+          <h1 className="text-2xl font-semibold">クローゼット</h1>
           <Suspense fallback={null}>
             <DraftsButton />
           </Suspense>

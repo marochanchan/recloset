@@ -203,7 +203,7 @@ function ReviewResult({
     <div className="flex flex-col gap-6">
       <Card className="flex flex-col gap-4 p-5 text-center">
         <div className="flex flex-col gap-1">
-          <p className="text-lg font-bold">見直しおつかれさまでした</p>
+          <p className="text-lg font-semibold">見直しおつかれさまでした</p>
           <p className="text-sm text-muted-foreground">
             {summary.reviewed > 0
               ? `${summary.reviewed}着を見直しました。1着ずつ向き合えたことが、クローゼットを整える一歩です。`
@@ -214,7 +214,7 @@ function ReviewResult({
           {breakdown.map(({ label, count }) => (
             <div key={label} className="rounded-xl bg-secondary/60 px-2 py-3">
               <dt className="text-xs text-muted-foreground">{label}</dt>
-              <dd className="text-xl font-bold">{count}</dd>
+              <dd className="text-xl font-semibold">{count}</dd>
             </div>
           ))}
         </dl>
@@ -324,7 +324,7 @@ export default function ClosetReviewSessionPage({
       >
         ← クローゼットに戻る
       </Link>
-      <h1 className="text-2xl font-bold">まとめて見直す</h1>
+      <h1 className="text-2xl font-semibold">まとめて見直す</h1>
       <Suspense fallback={<ReviewSessionSkeleton />}>
         <ReviewSessionContent params={params} />
       </Suspense>

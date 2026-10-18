@@ -324,7 +324,7 @@ export function ClosetReviewSession({
             {dragX !== 0 && (
               <span
                 className={cn(
-                  "absolute top-4 rounded-lg border-2 bg-card/90 px-3 py-1 text-lg font-bold",
+                  "absolute top-4 rounded-lg border-2 bg-card/90 px-3 py-1 text-lg font-semibold",
                   dragX > 0
                     ? "left-4 border-primary text-primary"
                     : "right-4 border-muted-foreground text-muted-foreground",

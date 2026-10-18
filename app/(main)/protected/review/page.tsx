@@ -124,7 +124,7 @@ export default function ClosetReviewPage() {
         ← クローゼットに戻る
       </Link>
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold">まとめて見直す</h1>
+        <h1 className="text-2xl font-semibold">まとめて見直す</h1>
         <p className="text-sm text-muted-foreground">
           残す・迷う・手放し候補を、テンポよく選んでいきます。服の状態は変わりません。
         </p>

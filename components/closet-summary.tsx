@@ -38,7 +38,7 @@ export function ClosetSummary({
           aria-label={`${item.label} ${item.value}件をクローゼットで見る`}
           className="flex min-h-[5.5rem] flex-col items-center justify-center gap-1 px-2 py-4 text-center outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent"
         >
-          <span className="text-2xl font-bold tabular-nums">{item.value}</span>
+          <span className="text-2xl font-semibold tabular-nums">{item.value}</span>
           <span className="text-xs text-muted-foreground sm:text-sm">
             {item.label}
           </span>

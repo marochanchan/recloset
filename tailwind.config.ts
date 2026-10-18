@@ -10,34 +10,32 @@ export default {
   ],
   theme: {
     extend: {
-      // 英数字はGeist、日本語はZen Kaku Gothic New。見出しも同じ書体で、太さと字詰めで差をつける
-      // （丸ゴシックは丸みが強く甘く見えるため、ロゴの「Re:Closet」だけに使う）。
+      // 英数字はInter、日本語はNoto Sans JP（すっきりしたファッション系アプリのタイポグラフィ）。
+      // 丸ゴシックは使わない。見出し・ロゴも同じ書体で、太さ（500〜600）と字詰めで差をつける。
       // Webフォントを読み込めないときも崩れないよう、OS標準の日本語フォントを続けて指定する
       fontFamily: {
         sans: [
-          "var(--font-geist-sans)",
-          "var(--font-zen-kaku)",
+          "var(--font-inter)",
+          "var(--font-noto-sans-jp)",
           "Hiragino Sans",
           "Hiragino Kaku Gothic ProN",
-          "Noto Sans JP",
           "Yu Gothic",
           "Meiryo",
           "sans-serif",
         ],
         heading: [
-          "var(--font-geist-sans)",
-          "var(--font-zen-kaku)",
+          "var(--font-inter)",
+          "var(--font-noto-sans-jp)",
           "Hiragino Sans",
           "Hiragino Kaku Gothic ProN",
-          "Noto Sans JP",
           "Yu Gothic",
           "Meiryo",
           "sans-serif",
         ],
         logo: [
-          "var(--font-zen-maru)",
-          "Hiragino Maru Gothic ProN",
-          "var(--font-geist-sans)",
+          "var(--font-inter)",
+          "var(--font-noto-sans-jp)",
+          "Hiragino Sans",
           "sans-serif",
         ],
       },
