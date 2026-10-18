@@ -1,4 +1,10 @@
 import { ClothingImageGallery } from "@/components/clothing-image-gallery";
+import {
+  DoodleHanger,
+  DoodleLoop,
+  DoodleShirt,
+  DoodleSparkle,
+} from "@/components/doodle-icons";
 import { Badge } from "@/components/ui/badge";
 import { StatusSelector } from "@/components/status-selector";
 import { Button } from "@/components/ui/button";
@@ -18,7 +24,7 @@ import { getMarketplaceLinks } from "@/lib/marketplace-urls";
 import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { formatJstDate, hasWornToday } from "@/lib/wear-logs";
-import { Heart, Pencil, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Heart, Pencil } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -101,8 +107,40 @@ async function ClothingItemDetail({
     formatSeasons(item.seasons) || null,
   ].filter((tag): tag is string => Boolean(tag));
 
-  // 写真 → 名前 → 「今日着た」を最初に置き、そのあとを意味ごとのまとまり
-  // （どうする？／記録／AI診断／公開・出品）に分ける。削除は最後に控えめに置く
+  // 記録は4つの小さなタイルで並べる（未登録は短く「—」）
+  const records = [
+    {
+      label: "着用記録",
+      icon: DoodleShirt,
+      value: (
+        <>
+          <span className="text-lg font-semibold tabular-nums">{item.wear_count}</span>
+          <span className="text-xs text-muted-foreground">回</span>
+        </>
+      ),
+    },
+    {
+      label: "最後に着た日",
+      icon: DoodleHanger,
+      value: item.last_worn_at ? formatJstDate(item.last_worn_at) : "記録なし",
+    },
+    {
+      label: "購入日",
+      icon: null,
+      value: item.purchase_date ?? "—",
+    },
+    {
+      label: "購入価格",
+      icon: null,
+      value:
+        item.purchase_price !== null
+          ? `¥${item.purchase_price.toLocaleString("ja-JP")}`
+          : "—",
+    },
+  ];
+
+  // 写真 → 名前 → AI診断の入口 → 「今日着た」を最初に置き、そのあとを意味ごとのまとまり
+  // （どうする？／記録／公開・出品）に分ける。削除は最後に控えめに置く
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-5">
@@ -116,14 +154,14 @@ async function ClothingItemDetail({
                   {item.brand}
                 </p>
               )}
-              <h1 className="break-words text-2xl font-semibold leading-snug">
+              <h1 className="break-words text-xl font-semibold leading-snug">
                 {item.title}
               </h1>
             </div>
             <Button asChild variant="outline" size="sm" className="h-9 shrink-0 rounded-full px-3">
               <Link href={`/protected/items/${item.id}/edit`}>
                 <Pencil aria-hidden="true" />
-                編集する
+                編集
               </Link>
             </Button>
           </div>
@@ -143,6 +181,29 @@ async function ClothingItemDetail({
           </div>
         </div>
 
+        {/* AI診断は「一緒に考える」入口として、写真のすぐ下に淡い色の面で目立たせる */}
+        <Link
+          href={`/protected/items/${item.id}/diagnosis`}
+          className="group flex min-h-[4.5rem] items-center gap-3 rounded-3xl bg-gradient-to-br from-primary/10 to-blush/25 px-4 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring active:opacity-90"
+        >
+          <span
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card text-blush-foreground"
+            aria-hidden="true"
+          >
+            <DoodleSparkle size={24} />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-sm font-semibold">AIと一緒に見直す</span>
+            <span className="text-xs text-muted-foreground">
+              着用データと今の気持ちから、次の一歩を
+            </span>
+          </span>
+          <ChevronRight
+            className="h-5 w-5 shrink-0 text-muted-foreground transition-transform motion-safe:group-hover:translate-x-0.5"
+            aria-hidden="true"
+          />
+        </Link>
+
         <WearTodayButton
           itemId={item.id}
           alreadyLoggedToday={alreadyLoggedToday}
@@ -157,59 +218,31 @@ async function ClothingItemDetail({
         <h2 id="item-records-title" className="text-base font-semibold">
           記録
         </h2>
-        <dl className="flex flex-col divide-y divide-border rounded-2xl border border-border/70 bg-card px-4 text-sm">
-          <div className="flex items-baseline justify-between gap-4 py-3">
-            <dt className="shrink-0 text-muted-foreground">Re:Closetでの着用記録</dt>
-            <dd className="text-right">
-              <span className="text-lg font-semibold tabular-nums">{item.wear_count}</span>回
-            </dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-4 py-3">
-            <dt className="shrink-0 text-muted-foreground">最後に着た日</dt>
-            <dd className="text-right">
-              {item.last_worn_at
-                ? formatJstDate(item.last_worn_at)
-                : "まだRe:Closetでの着用記録がありません"}
-            </dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-4 py-3">
-            <dt className="shrink-0 text-muted-foreground">購入日</dt>
-            <dd className="text-right">{item.purchase_date ?? "未登録"}</dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-4 py-3">
-            <dt className="shrink-0 text-muted-foreground">購入価格</dt>
-            <dd className="text-right">
-              {item.purchase_price !== null
-                ? `¥${item.purchase_price}`
-                : "未登録"}
-            </dd>
-          </div>
+        <dl className="grid grid-cols-2 gap-2">
+          {records.map((record) => {
+            const Icon = record.icon;
+            return (
+              <div
+                key={record.label}
+                className="flex min-h-[4.5rem] flex-col justify-between gap-1 rounded-2xl bg-secondary/60 px-4 py-3"
+              >
+                <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  {Icon && <Icon size={16} className="text-primary" />}
+                  {record.label}
+                </dt>
+                <dd className="text-sm tabular-nums">{record.value}</dd>
+              </div>
+            );
+          })}
         </dl>
       </section>
 
-      {/* AI診断は「一緒に考える」入口として、淡い色の面で目立たせる */}
-      <section
-        aria-labelledby="item-diagnosis-title"
-        className="flex flex-col gap-3 rounded-3xl bg-gradient-to-br from-primary/10 to-blush/20 p-5"
-      >
-        <div className="flex flex-col gap-1">
-          <h2 id="item-diagnosis-title" className="flex items-center gap-2 text-base font-semibold">
-            <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
-            AIと一緒に見直す
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            着用データと今の気持ちから、次の一歩を一緒に考えます
-          </p>
-        </div>
-        <Button asChild variant="outline" className="w-full">
-          <Link href={`/protected/items/${item.id}/diagnosis`}>
-            AI診断
-          </Link>
-        </Button>
-      </section>
-
       <section aria-labelledby="item-share-title" className="flex flex-col gap-3">
-        <h2 id="item-share-title" className="text-base font-semibold">
+        <h2
+          id="item-share-title"
+          className="flex items-center gap-2 text-base font-semibold"
+        >
+          <DoodleLoop size={20} className="text-primary" />
           公開・出品
         </h2>
         <div className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card p-4">
@@ -251,9 +284,10 @@ export default function ClothingItemDetailPage({
     <div className="w-full max-w-md mx-auto flex flex-col gap-6">
       <Link
         href="/protected/items"
-        className="text-sm underline underline-offset-4 text-muted-foreground w-fit"
+        className="-ml-1 flex min-h-10 w-fit items-center gap-1 rounded-lg pr-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
-        ← クローゼットに戻る
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        クローゼット
       </Link>
 
       <Suspense fallback={<ItemDetailSkeleton />}>

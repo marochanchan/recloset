@@ -1,4 +1,9 @@
 import { ClothingItemCard } from "@/components/clothing-item-card";
+import {
+  DoodleHanger,
+  DoodleHangerPlus,
+  DoodleTag,
+} from "@/components/doodle-icons";
 import { ClosetNotice } from "@/components/draft-saved-notice";
 import { ReviewSuggestionsCard } from "@/components/review-suggestions-card";
 import {
@@ -32,7 +37,7 @@ import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { cn } from "@/lib/utils";
 import { getJstDateKey } from "@/lib/weather";
 import { getCurrentSeasonJst } from "@/lib/wear-logs";
-import { Camera, ChevronDown, FileText, Layers, Plus, SlidersHorizontal, Tags } from "lucide-react";
+import { Camera, ChevronDown, FileText, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -40,7 +45,7 @@ type SearchParamsPromise = Promise<RawSearchParams>;
 
 // 詳細へ移動できる衣類カード。押せることが伝わるよう、hover・キーボード操作・タップに反応させる
 const CLICKABLE_CARD_LINK_CLASS =
-  "group block h-full rounded-xl outline-none transition-transform focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background active:scale-[0.98]";
+  "group block h-full rounded-2xl outline-none transition-transform focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background active:scale-[0.98]";
 
 // 空状態（服が0着・条件に合う服がない）の枠
 const EMPTY_STATE_CLASS =
@@ -245,6 +250,7 @@ async function ClothingItemsList({
     if (countError || (count ?? 0) > 0) {
       return (
         <div className={EMPTY_STATE_CLASS}>
+          <DoodleHanger size={40} className="text-primary/60" />
           <p className="font-medium">条件に合う服がありません</p>
           <Button asChild variant="outline" size="sm">
             <Link href={CLOSET_FILTER_PATH} scroll={false}>
@@ -259,10 +265,8 @@ async function ClothingItemsList({
   if (items.length === 0) {
     return (
       <div className={EMPTY_STATE_CLASS}>
+        <DoodleHanger size={44} className="text-primary/60" />
         <p className="font-medium">まだ服が登録されていません</p>
-        <p className="text-sm text-muted-foreground">
-          手持ちの服を登録すると、ここに並びます。
-        </p>
         <Button asChild size="sm">
           <Link href="/protected/items/new?mode=photo">
             <Camera aria-hidden="true" />
@@ -292,7 +296,7 @@ async function ClothingItemsList({
   );
 
   return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
       {items.map((item) => {
         const representativePath = item.clothing_images[0]?.image_path ?? null;
         const imageUrl = representativePath
@@ -500,7 +504,7 @@ export default function ClothingItemsPage({
             {/* 1着ずつスワイプで見直す（最大10着。開始・再開は見直しの画面で選ぶ） */}
             <Button asChild variant="outline" size="lg" className="h-12 px-3 sm:h-10 sm:px-6">
               <Link href="/protected/review">
-                <Layers aria-hidden="true" />
+                <DoodleTag className="text-primary" />
                 まとめて見直す
               </Link>
             </Button>
@@ -516,22 +520,12 @@ export default function ClothingItemsPage({
             <div className="mt-1 flex flex-col rounded-xl border border-border/70 bg-card p-1 sm:absolute sm:left-0 sm:z-20 sm:w-72 sm:shadow-lg">
               {/* 写真だけで登録した服などに、カテゴリ・季節をカードで付けていく入口 */}
               <Link href="/protected/items/classify" className={MORE_REGISTER_LINK_CLASS}>
-                <Tags className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                <span className="flex flex-col">
-                  <span className="font-medium">クイック仕分け</span>
-                  <span className="text-xs text-muted-foreground">
-                    カテゴリや季節をサクッと整理
-                  </span>
-                </span>
+                <DoodleTag size={20} className="text-primary" />
+                <span className="font-medium">クイック仕分け</span>
               </Link>
               <Link href="/protected/items/new" className={MORE_REGISTER_LINK_CLASS}>
-                <Plus className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                <span className="flex flex-col">
-                  <span className="font-medium">服を登録</span>
-                  <span className="text-xs text-muted-foreground">
-                    1着ずつ、詳しく入力して登録
-                  </span>
-                </span>
+                <DoodleHangerPlus size={20} className="text-primary" />
+                <span className="font-medium">1着ずつ詳しく登録</span>
               </Link>
             </div>
           </details>

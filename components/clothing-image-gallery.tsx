@@ -1,5 +1,6 @@
 "use client";
 
+import { DoodleHanger } from "@/components/doodle-icons";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
@@ -60,7 +61,8 @@ export function ClothingImageGallery({
 
   if (images.length === 0) {
     return (
-      <div className="relative aspect-[4/5] w-full rounded-2xl bg-photo flex items-center justify-center">
+      <div className="relative flex aspect-[4/5] w-full flex-col items-center justify-center gap-3 rounded-2xl bg-photo">
+        <DoodleHanger size={56} className="text-primary/50" />
         <p className="text-sm text-muted-foreground">画像なし</p>
       </div>
     );

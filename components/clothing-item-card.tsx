@@ -1,3 +1,4 @@
+import { DoodleHanger } from "@/components/doodle-icons";
 import {
   getStatusLabel,
   PHOTO_ONLY_DISPLAY_LABEL,
@@ -38,12 +39,13 @@ export function ClothingItemCard({
   const showStatus = status !== "closet";
 
   return (
-    // 枠のないカードにして写真を主役にする。画像は縦長（4:5）の生成りの枠に
+    // 枠のないカードにして写真を主役にする。画像は縦長（3:4）の生成りの枠に
     // object-containで収める（服全体を見せるためトリミングしない）。画像なしでも同じ枠を保つ。
+    // 文字はファッション通販の一覧のように「ブランド → 名前（1行） → 最後に着た時期」に絞る。
     // カテゴリ・季節は絞り込みで確認できるためカードには出さない。
     // 一覧ではリンク（group）の中に置き、hoverで写真を少しだけ寄せて押せることを示す
     <div className="flex h-full flex-col gap-2">
-      <div className="relative aspect-[4/5] w-full shrink-0 overflow-hidden rounded-xl bg-photo">
+      <div className="relative aspect-[3/4] w-full shrink-0 overflow-hidden rounded-2xl bg-photo">
         {imageUrl ? (
           <Image
             src={imageUrl}
@@ -54,7 +56,8 @@ export function ClothingItemCard({
             style={{ objectFit: "contain" }}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
+            <DoodleHanger size={32} className="text-primary/50" />
             画像なし
           </div>
         )}
@@ -75,17 +78,15 @@ export function ClothingItemCard({
         )}
       </div>
       <div className="flex min-w-0 flex-col gap-0.5 px-0.5">
-        {isPhotoOnly ? (
-          <p className="text-sm text-muted-foreground">
-            {PHOTO_ONLY_DISPLAY_LABEL}
-          </p>
-        ) : (
-          <p className="line-clamp-2 break-words text-sm font-medium leading-snug">
-            {title}
+        {brand && (
+          <p className="truncate text-[11px] font-medium tracking-[0.08em] text-muted-foreground">
+            {brand}
           </p>
         )}
-        {brand && (
-          <p className="truncate text-xs text-muted-foreground">{brand}</p>
+        {isPhotoOnly ? (
+          <p className="text-sm text-muted-foreground">{PHOTO_ONLY_DISPLAY_LABEL}</p>
+        ) : (
+          <p className="truncate text-sm leading-snug">{title}</p>
         )}
         {/* 見直しの判断材料になる「最後に着た時期」は控えめに1行で残す */}
         <p className="truncate text-[11px] text-muted-foreground">

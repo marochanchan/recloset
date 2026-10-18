@@ -6,8 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const GRID_SKELETON_COUNT = 6;
 
-// /protected/items（ClothingItemCard）・/discover（PublicClothingItemCard）は、
-// どちらも枠なし・縦長4:5の写真（スマホ2列 → 3列 → 4列）
+// /protected/items（ClothingItemCard）は縦長3:4、/discover（PublicClothingItemCard）は縦長4:5の
+// 枠なしの写真（どちらもスマホ2列 → 3列 → 4列）
 export function ItemGridSkeleton({
   variant,
 }: {
@@ -18,11 +18,21 @@ export function ItemGridSkeleton({
       role="status"
       aria-label="読み込み中"
       data-variant={variant}
-      className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4"
+      className={
+        variant === "closet"
+          ? "grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4"
+          : "grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4"
+      }
     >
       {Array.from({ length: GRID_SKELETON_COUNT }, (_, index) => (
         <div key={index} className="flex flex-col gap-2">
-          <Skeleton className="aspect-[4/5] w-full rounded-xl" />
+          <Skeleton
+            className={
+              variant === "closet"
+                ? "aspect-[3/4] w-full rounded-2xl"
+                : "aspect-[4/5] w-full rounded-xl"
+            }
+          />
           <Skeleton className="h-4 w-3/4" />
           <Skeleton className="h-3 w-1/2" />
         </div>
@@ -50,6 +60,7 @@ export function ItemDetailSkeleton() {
             <Skeleton className="h-5 w-14 rounded-full" />
           </div>
         </div>
+        <Skeleton className="h-[4.5rem] w-full rounded-3xl" />
         <Skeleton className="h-9 w-full" />
       </div>
       <div className="flex flex-col gap-3">
@@ -62,7 +73,11 @@ export function ItemDetailSkeleton() {
       </div>
       <div className="flex flex-col gap-3">
         <Skeleton className="h-5 w-12" />
-        <Skeleton className="h-44 w-full rounded-2xl" />
+        <div className="grid grid-cols-2 gap-2">
+          {Array.from({ length: 4 }, (_, index) => (
+            <Skeleton key={index} className="h-[4.5rem] rounded-2xl" />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -72,17 +87,14 @@ export function ItemDetailSkeleton() {
 export function ReviewSuggestionsSkeleton() {
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1.5">
-        <Skeleton className="h-5 w-32" />
-        <Skeleton className="h-3 w-3/4" />
-      </div>
+      <Skeleton className="h-6 w-36" />
       <div className="-mx-5 flex gap-3 overflow-hidden px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:px-0 sm:pb-0">
         {Array.from({ length: 3 }, (_, index) => (
           <div
             key={index}
-            className="flex w-[36%] min-w-[7.5rem] shrink-0 flex-col gap-2 sm:w-auto sm:min-w-0"
+            className="flex w-[42%] min-w-[8.5rem] shrink-0 flex-col gap-2 sm:w-auto sm:min-w-0"
           >
-            <Skeleton className="aspect-square w-full rounded-xl" />
+            <Skeleton className="aspect-[3/4] w-full rounded-2xl" />
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-3 w-full" />
             <Skeleton className="h-8 w-full" />
