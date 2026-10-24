@@ -285,29 +285,37 @@ Run: `node --test scripts/test-media-stream-webhook.mts && npm run lint && npm r
 Expected: PASS（5 tests）、lint と build はエラーなし
 
 - [ ] **Step 4: `scripts/setup-cloudflare.mts` を書く**（何度実行しても同じ結果になる）
+  - **秘密の値は画面に出さない。** 鍵や秘密は `.env.local` の該当する行を書き換える（なければ足す）だけにして、画面には「書き込みました：変数名」とだけ出す。トークンや鍵をログ・例外のメッセージにも含めない。
+  - `--check`（読むだけ。Cloudflare の設定は何も変えない）：
+    - `GET /images/v1/stats` の上限と今の枚数を表示する。
+    - `GET /stream/storage-usage` の保存できる分数と今の分数を表示する。
+    - 今あるバリアントと、その `neverRequireSignedURLs` を表示する。
+  - 引数なし（設定する）：
   1. バリアント `thumb`（480）・`display`（1600）・`analysis`（2048）を、`fit: "scale-down"`、`metadata: "none"`、`neverRequireSignedURLs: false` で作る。すでにあれば、`neverRequireSignedURLs` が true なら false に直す（`PATCH /images/v1/variants/{id}`）。
   2. 全バリアントを読み直し、`neverRequireSignedURLs` が1つでも true なら終了コード1。
-  3. `GET /images/v1/keys` で署名の鍵を取り出し、`CLOUDFLARE_IMAGES_SIGNING_KEY=...` を表示する。
-  4. 引数 `--stream-key` のときだけ、`POST /stream/keys` で署名の鍵を作り、`CLOUDFLARE_STREAM_SIGNING_KEY_ID=` と `CLOUDFLARE_STREAM_SIGNING_JWK=` を表示する（毎回作らない）。
-  5. 引数 `--webhook <URL>` のときだけ、`PUT /stream/webhook` で通知先を登録し、`CLOUDFLARE_STREAM_WEBHOOK_SECRET=` を表示する。
+  3. `GET /images/v1/keys` で署名の鍵を取り出し、`.env.local` の `CLOUDFLARE_IMAGES_SIGNING_KEY` に書き込む。
+  4. 引数 `--stream-key` のときだけ、`POST /stream/keys` で署名の鍵を作り、`CLOUDFLARE_STREAM_SIGNING_KEY_ID` と `CLOUDFLARE_STREAM_SIGNING_JWK` に書き込む（毎回作らない）。
+  5. 引数 `--webhook <URL>` のときだけ、`PUT /stream/webhook` で通知先を登録し、`CLOUDFLARE_STREAM_WEBHOOK_SECRET` に書き込む。
+  - Vercel に入れる値は、ユーザーが `.env.local` を開いてコピーする（Claude は `.env.local` の中身を読まない）。
 
 - [ ] **Step 5: `scripts/smoke-cloudflare.mts` を書く**（引数：服の写真の JPEG のパスと、MP4 のパス。どの段階が失敗したかを表示して、終了コード1で止まる）
   1. 写真：`createUpload("photo")` → 渡された JPEG を `uploadUrl` に POST → `getAssetState` が ready。
-  2. `CLOUDFLARE_IMAGES_ACCOUNT_HASH` がまだなければ、`getImage` の応答の `variants` の URL（`https://imagedelivery.net/<hash>/<id>/<variant>`）から取り出して使い、表示する。そのため Task 2 の `getImage` は `{ draft: boolean; variants: string[] }` を返す。
+  2. `CLOUDFLARE_IMAGES_ACCOUNT_HASH` がまだなければ、`getImage` の応答の `variants` の URL（`https://imagedelivery.net/<hash>/<id>/<variant>`）から取り出して使い、`.env.local` に書き込む（秘密ではないが、書き方をそろえる）。そのため Task 2 の `getImage` は `{ draft: boolean; variants: string[] }` を返す。
   3. 署名なしの `https://imagedelivery.net/{hash}/{id}/thumb` が 200 でない。3つのバリアントの署名付き URL が、どれも 200。
   4. AI の入力：`analysis` の署名付き URL の中身を `analyzeClothingImage()` に渡し、結果の `category` を表示する。
-  5. 動画：`createUpload("video")` → MP4 を POST → ready になるまで5秒ごとに確かめる（最大3分）。`CLOUDFLARE_STREAM_CUSTOMER_CODE` がまだなければ、動画の応答の `preview` の URL（`https://customer-<CODE>.cloudflarestream.com/...`）から取り出して使い、表示する（そのため `getStreamVideo` は `preview` も返す）。署名なしの manifest とサムネイルが 200 でない。署名付きは 200。
+  5. 動画：`createUpload("video")` → MP4 を POST → ready になるまで5秒ごとに確かめる（最大3分）。`CLOUDFLARE_STREAM_CUSTOMER_CODE` がまだなければ、動画の応答の `preview` の URL（`https://customer-<CODE>.cloudflarestream.com/...`）から取り出して使い、`.env.local` に書き込む（そのため `getStreamVideo` は `preview` も返す）。署名なしの manifest とサムネイルが 200 でない。署名付きは 200。
   6. 後片付け：写真と動画を `deleteAsset` → 両方とも `getAssetState` が missing。
 
 - [ ] **Step 6: 動かす**
 
-Run: `node --env-file=.env.local scripts/setup-cloudflare.mts --stream-key`（表示された値を `.env.local` に足す）
+Run: `node --env-file=.env.local scripts/setup-cloudflare.mts --check`（読むだけ。上限と今の量を確かめる）
+Run: `node --env-file=.env.local scripts/setup-cloudflare.mts --stream-key`（鍵は `.env.local` に書き込まれ、画面には出ない）
 Run: `node --env-file=.env.local scripts/smoke-cloudflare.mts ~/Desktop/test-outfit.jpg ~/Desktop/test.mp4`
 Expected: すべての段階が `ok:` で、終了コード0
 
 - [ ] **Step 7: webhook を本番相当で確かめる**
   1. ブランチをプッシュし、Vercel のプレビューに `CLOUDFLARE_STREAM_WEBHOOK_SECRET` 以外の環境変数を入れてデプロイする。
-  2. `node --env-file=.env.local scripts/setup-cloudflare.mts --webhook https://<プレビューのドメイン>/api/webhooks/cloudflare-stream` を実行し、表示された秘密を Vercel と `.env.local` に入れて、もう一度デプロイする。
+  2. `node --env-file=.env.local scripts/setup-cloudflare.mts --webhook https://<プレビューのドメイン>/api/webhooks/cloudflare-stream` を実行する（秘密は `.env.local` に書き込まれる）。ユーザーがその値を Vercel に入れて、もう一度デプロイする。
   3. smoke をもう一度動かし、Vercel のログに仮の `apply` の出力（uid と state）が出て、応答が 200 であることを確かめる。
 
 - [ ] **Step 8: TODO に結果を記録してコミットする**

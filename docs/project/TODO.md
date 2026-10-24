@@ -60,7 +60,10 @@
 
 - [ ] 今日から毎日、スマホで着画を撮りためる（デモ用の本物のデータ）
 - [ ] 手元の過去の写真を確かめ、デモで見せる期間を決める
-- [ ] Cloudflare のアカウントで、Images と Stream の有料プランを有効にする
+- [x] Cloudflare のアカウントを作り、Images & Stream Starter Bundle（月 $5）を契約する（2026-10-25）
+- [ ] Cloudflare の API トークンを作り、アカウント ID と一緒に `.env.local` に入れる
+- [ ] Supabase の secret key を `.env.local` に入れる
+- [ ] 服の写真（JPEG）1枚と、5秒ほどの動画1本を用意する
 
 ## あとで考える（別のブレスト）
 
