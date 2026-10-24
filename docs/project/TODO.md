@@ -61,8 +61,9 @@
 - [ ] 今日から毎日、スマホで着画を撮りためる（デモ用の本物のデータ）
 - [ ] 手元の過去の写真を確かめ、デモで見せる期間を決める
 - [x] Cloudflare のアカウントを作り、Images & Stream Starter Bundle（月 $5）を契約する（2026-10-25）
-- [ ] Cloudflare の API トークンを作り、アカウント ID と一緒に `.env.local` に入れる
-- [ ] Supabase の secret key を `.env.local` に入れる
+- [x] Cloudflare の API トークンを作り、アカウント ID と一緒に `.env.local` に入れる（読み取り専用で確認済み：Images 上限100,000枚、Stream 上限1,000分）
+- [x] Supabase の secret key を `.env.local` に入れる（有効なことを確認済み）
+- [ ] Cloudflare の API トークンの期限（2026-11-24）より前に、期限を延ばしたトークンを作り直して Vercel と `.env.local` を差し替える
 - [ ] 服の写真（JPEG）1枚と、5秒ほどの動画1本を用意する
 
 ## あとで考える（別のブレスト）

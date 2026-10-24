@@ -25,6 +25,7 @@
 - どの関数も、作ったのと同じトランザクションで `revoke all on function ... from public, anon, authenticated` してから `grant` する。PostgreSQL は新しい関数を誰でも（`PUBLIC`）実行できるため。
 - 着用記録の `worn_at`：今日（日本時間）なら `now()`、過去の日付なら、その日の 12:00（日本時間）。
 - `wear_count` と `last_worn_at` は、残っている着用記録から計算し直す（件数と最新の `worn_at`）。
+- 本番の Supabase では、`service_role` に既存のテーブル（`clothing_items` など）の権限が付いていない（2026-10-25 に読み取り専用の確認で `permission denied for table clothing_items` を確認）。サーバー専用の処理は RPC（`security definer`）か、このプランで `service_role` に権限を付ける新しいテーブルだけを使い、既存のテーブルを `service_role` で直接読まない。
 - Cloudflare の ID はクライアントから受け取らない。署名付き URL の期限は1時間。アップロード URL の期限は30分。
 - 着画の写真は、長辺2560px・JPEG・品質0.9 に縮小してから送る。
 - Images のバリアントは `thumb`（長辺480px）、`display`（長辺1600px）、`analysis`（長辺2048px）の3つ。どれも `neverRequireSignedURLs` を付けない。
