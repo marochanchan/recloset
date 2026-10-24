@@ -192,7 +192,7 @@ API の呼び先（`https://api.cloudflare.com/client/v4/accounts/{accountId}` �
 | `getImage(id)` | `GET /images/v1/{id}` | ― | `{ draft: boolean; variants: string[] }`。404 なら `null` |
 | `deleteImage(id)` | `DELETE /images/v1/{id}` | ― | 404 なら `"not_found"` |
 | `createStreamUpload({ meta, expiresAt })` | `POST /stream/direct_upload`（JSON） | `{ maxDurationSeconds: 60, requireSignedURLs: true, meta, expiry }` | `{ uid, uploadURL }` |
-| `getStreamVideo(uid)` | `GET /stream/{uid}` | ― | `{ state, readyToStream, width, height, duration }`。404 なら `null` |
+| `getStreamVideo(uid)` | `GET /stream/{uid}` | ― | `{ state, readyToStream, width, height, duration, preview }`。404 なら `null` |
 | `deleteStreamVideo(uid)` | `DELETE /stream/{uid}` | ― | 404 なら `"not_found"` |
 
 状態の対応：Images は `null` → missing、`draft: true` → awaiting_upload、それ以外 → ready。Stream は `null` → missing、`pendingupload` → awaiting_upload、`downloading`・`queued`・`inprogress` → processing、`ready`（`readyToStream`）→ ready、`error` → failed。
@@ -296,7 +296,7 @@ Expected: PASS（5 tests）、lint と build はエラーなし
   2. `CLOUDFLARE_IMAGES_ACCOUNT_HASH` がまだなければ、`getImage` の応答の `variants` の URL（`https://imagedelivery.net/<hash>/<id>/<variant>`）から取り出して使い、表示する。そのため Task 2 の `getImage` は `{ draft: boolean; variants: string[] }` を返す。
   3. 署名なしの `https://imagedelivery.net/{hash}/{id}/thumb` が 200 でない。3つのバリアントの署名付き URL が、どれも 200。
   4. AI の入力：`analysis` の署名付き URL の中身を `analyzeClothingImage()` に渡し、結果の `category` を表示する。
-  5. 動画：`createUpload("video")` → MP4 を POST → ready になるまで5秒ごとに確かめる（最大3分）。署名なしの manifest とサムネイルが 200 でない。署名付きは 200。
+  5. 動画：`createUpload("video")` → MP4 を POST → ready になるまで5秒ごとに確かめる（最大3分）。`CLOUDFLARE_STREAM_CUSTOMER_CODE` がまだなければ、動画の応答の `preview` の URL（`https://customer-<CODE>.cloudflarestream.com/...`）から取り出して使い、表示する（そのため `getStreamVideo` は `preview` も返す）。署名なしの manifest とサムネイルが 200 でない。署名付きは 200。
   6. 後片付け：写真と動画を `deleteAsset` → 両方とも `getAssetState` が missing。
 
 - [ ] **Step 6: 動かす**
