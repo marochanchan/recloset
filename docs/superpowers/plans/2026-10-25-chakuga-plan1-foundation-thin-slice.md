@@ -18,7 +18,11 @@
 - 新しいトリガーは作らない。019 の行動履歴のトリガーはそのまま残す。
 - SQL の関数は `security definer` ＋ `set search_path = ''`。テーブルと関数は必ず `public.` などのスキーマ付きで書く（019 と同じ）。
 - マイグレーションは `begin;` 〜 `commit;` で包む（016〜019 と同じ）。
-- RPC はユーザーを `auth.uid()` から決める。サーバー専用の RPC だけが `p_user_id` を受け取る。サーバー専用の RPC の `execute` は `service_role` にだけ許可する。
+- RPC は2種類ある（仕様書 6.2 章）。
+  - ユーザー向け：ユーザーを `auth.uid()` から決め、`execute` は `authenticated` にだけ許可する。
+  - サーバー専用：持ち主を保存済みの行から導く。行がまだないときだけ `p_user_id` を受け取る。`execute` は `service_role` にだけ許可する。
+  - 内部用の関数：どのロールにも許可しない。
+- どの関数も、作ったのと同じトランザクションで `revoke all on function ... from public, anon, authenticated` してから `grant` する。PostgreSQL は新しい関数を誰でも（`PUBLIC`）実行できるため。
 - 着用記録の `worn_at`：今日（日本時間）なら `now()`、過去の日付なら、その日の 12:00（日本時間）。
 - `wear_count` と `last_worn_at` は、残っている着用記録から計算し直す（件数と最新の `worn_at`）。
 - Cloudflare の ID はクライアントから受け取らない。署名付き URL の期限は1時間。アップロード URL の期限は30分。
@@ -290,7 +294,7 @@ git commit -m "chore: add Cloudflare setup and smoke scripts"
 
 **Interfaces:**
 - Produces（テーブル。列の意味は仕様書 6.1 章。Plan 2 で `outfit_analysis_runs`・`outfit_detections`、Plan 4 で `item_groups`・`item_group_members` を足す）：
-  - `clothing_items`：`archived_at timestamptz`、制約 `unique (id, user_id)`
+  - `clothing_items`：`archived_at timestamptz`、制約 `unique (id, user_id)`、`check (archived_at is null or not is_public)`
   - `wear_logs`：`source text not null default 'wear_today' check (source in ('wear_today','outfit'))`
   - `outfits`：`id, user_id, worn_on date, source, status default 'pending', revision int default 0, client_request_id uuid, analysis_media_id uuid, selected_person_index int, note text, confirmed_at, created_at, updated_at`、`unique (user_id, client_request_id)`、`unique (id, user_id)`
   - `outfit_media`：`id, user_id, outfit_id, kind, provider, provider_asset_id text, upload_attempt int default 1, upload_expires_at, status default 'uploading', width, height, duration_sec numeric, taken_at, sort_order int default 0, created_at, updated_at`。外部キー `(outfit_id, user_id) → outfits(id, user_id) on delete cascade`。`unique (provider, provider_asset_id)`、`unique (id, outfit_id)`
@@ -302,7 +306,7 @@ git commit -m "chore: add Cloudflare setup and smoke scripts"
   - `item_monthly_stats(user_id, item_id, month, wear_log_count, worn_days, outfit_count, last_worn_on, updated_at)`。主キー `(user_id, item_id, month)`
   - `item_pair_monthly_stats(user_id, item_a, item_b, month, outfit_count, together_days, last_worn_on, updated_at)`。主キー `(user_id, item_a, item_b, month)`、`check (item_a < item_b)`
   - `outfit_combo_monthly_stats(user_id, combo_key text, item_ids uuid[], month, outfit_count, last_worn_on, updated_at)`。主キー `(user_id, combo_key, month)`
-  - `media_deletion_queue(id, user_id uuid（外部キーなし）, provider, provider_asset_id, attempts int default 0, next_attempt_at default now(), last_error, done_at, created_at, updated_at)`。`unique (provider, provider_asset_id)`
+  - `media_deletion_queue(id, user_id uuid（外部キーなし）, provider, provider_asset_id, attempts int default 0, next_attempt_at default now(), claim_token uuid, lease_until timestamptz, last_error, done_at, created_at, updated_at)`。`unique (provider, provider_asset_id)`
 
 決めごと：
 - サマリーは事実から作り直せる派生データで、同期の対象ではないので、主キーは複合キーにする。`month` には `check (extract(day from month) = 1)` を付ける。服への外部キーは `(item_id, user_id) → clothing_items(id, user_id) on delete cascade`。
@@ -327,6 +331,7 @@ git commit -m "chore: add Cloudflare setup and smoke scripts"
 -- ok: 別のコーデのメディアを analysis_media_id にすると外部キーで失敗する
 -- ok: メディアを消すと analysis_media_id だけが null になり、outfits.id は残る
 -- ok: month が月の1日でないサマリーは check で失敗する
+-- ok: archived_at のある服を is_public = true（published_at あり）にすると check で失敗する
 ```
 
 - [ ] **Step 3: テストが失敗することを確かめる**
@@ -530,7 +535,7 @@ git commit -m "feat: add outfit RPCs with revisions, wear-log reuse and per-user
 - Produces（すべてサーバー専用。`service_role` にだけ `execute` を許可する）：
   - `public.register_outfit_media(p_user_id uuid, p_media_id uuid, p_outfit_id uuid, p_kind text, p_provider text, p_asset_id text, p_upload_expires_at timestamptz, p_taken_at timestamptz, p_sort_order integer) returns public.outfit_media`
     - コーデが `p_user_id` のものでなければ `outfit_not_found`。
-    - 同じ `p_media_id` がすでにあれば、そのまま返す。
+    - 同じ `p_media_id` がすでにあれば、`p_user_id` の行ならそのまま返し、他人の行なら message `media_conflict` の例外にする。
     - 種類が photo で、コーデの `analysis_media_id` が null なら、それにする。
   - `public.replace_outfit_media_asset(p_user_id uuid, p_media_id uuid, p_asset_id text, p_upload_expires_at timestamptz) returns public.outfit_media`
     - 古い ID を `enqueue_media_deletion` に入れる。
@@ -540,12 +545,14 @@ git commit -m "feat: add outfit RPCs with revisions, wear-log reuse and per-user
     - それ以外は message `invalid_media_transition` の例外にする。
   - `public.apply_stream_webhook(p_asset_id text, p_state text, p_width integer, p_height integer, p_duration_sec numeric) returns text`
     - `provider = 'cf_stream'` で、今の `provider_asset_id` が一致する行がなければ `'ignored'`。
+    - 行があれば、その行の `user_id` で `outfit_lock_user` してから読み直す。
     - すでに `ready` で `p_state = 'ready'` なら `'duplicate'`。
     - それ以外は、`ready` → ready、`error` → failed、ほか → processing にして `'applied'`。
   - `public.claim_media_deletions(p_limit integer) returns setof public.media_deletion_queue`
-    - 対象：`done_at is null`、`next_attempt_at <= now()`、`attempts < 10`。
-    - `for update skip locked` で取り出し、`next_attempt_at = now() + interval '5 minutes'`（作業中の印）にして返す。
-  - `public.finish_media_deletion(p_id uuid, p_ok boolean, p_error text) returns void`
+    - 対象：`done_at is null`、`next_attempt_at <= now()`、`attempts < 10`、`lease_until is null or lease_until < now()`。
+    - `for update skip locked` で取り出し、新しい `claim_token = gen_random_uuid()` と `lease_until = now() + interval '5 minutes'` を書いて返す。
+  - `public.finish_media_deletion(p_id uuid, p_claim_token uuid, p_ok boolean, p_error text) returns boolean`
+    - `claim_token` が一致しなければ何もせず false を返す。一致したら `claim_token` と `lease_until` を null に戻して true を返す。
     - 成功なら `done_at = now()`。
     - 失敗なら `attempts + 1` と `last_error` を記録し、`next_attempt_at` を延ばす。延ばす幅は、`attempts` が1なら1分、2なら10分、3なら1時間、4以上なら1日。
 
@@ -553,15 +560,17 @@ git commit -m "feat: add outfit RPCs with revisions, wear-log reuse and per-user
 
 ```sql
 -- ok: register_outfit_media は B のコーデに A の user_id で登録しようとすると outfit_not_found
--- ok: 同じ media_id で2回呼ぶと行は1件
+-- ok: 同じ media_id で2回呼ぶと行は1件。B の media_id を A の user_id で呼ぶと media_conflict
 -- ok: 最初の写真が analysis_media_id になり、2枚目では変わらない
 -- ok: 同じ provider_asset_id を別のメディアに登録すると一意制約で失敗する
 -- ok: replace_outfit_media_asset で古い ID が削除待ちに入り、upload_attempt が 2 になる
 -- ok: apply_stream_webhook：古い ID → ignored、今の ID の ready → applied、もう一度 ready → duplicate
 -- ok: set_outfit_media_state：ready → uploading は invalid_media_transition
 -- ok: claim_media_deletions は2つの接続から同時に呼んでも、同じ行を二重に返さない（run-outfits.sh で2接続）
+-- ok: lease_until の前は取り出されず、過ぎたら別の claim_token で取り出し直せる
+-- ok: 古い claim_token の finish_media_deletion は false で、行は変わらない
 -- ok: finish_media_deletion の失敗4回目で next_attempt_at が約1日後、10回失敗した行は claim されない
--- ok: authenticated から register_outfit_media を呼ぶと insufficient_privilege
+-- ok: authenticated と anon から register_outfit_media・claim_media_deletions・rebuild_monthly_stats を呼ぶと、どれも insufficient_privilege（PUBLIC からの継承も残っていない）
 ```
 
 - [ ] **Step 2: テストが失敗することを確かめる**
@@ -599,7 +608,10 @@ git commit -m "feat: add server-only outfit media RPCs and deletion queue"
 - Produces:
   - `type OutfitMediaRow = { id: string; outfitId: string; userId: string; kind: "photo" | "video" | "frame"; provider: MediaProvider; providerAssetId: string; uploadAttempt: number; uploadExpiresAt: string | null; status: "uploading" | "processing" | "ready" | "failed"; width: number | null; height: number | null; durationSec: number | null }`
   - `interface OutfitMediaDb { registerMedia(i: { userId: string; mediaId: string; outfitId: string; kind: "photo" | "video"; provider: MediaProvider; assetId: string; uploadExpiresAt: Date; takenAt: Date | null; sortOrder: number }): Promise<OutfitMediaRow>; getMedia(userId: string, mediaId: string): Promise<OutfitMediaRow | null>; replaceAsset(i: { userId: string; mediaId: string; assetId: string; uploadExpiresAt: Date }): Promise<OutfitMediaRow>; setState(i: { userId: string; mediaId: string; status: OutfitMediaRow["status"]; width?: number; height?: number; durationSec?: number }): Promise<OutfitMediaRow> }`
-  - `startMediaUpload(deps: { db: OutfitMediaDb; store: MediaStore; now: () => Date; newId: () => string }, input: { userId: string; outfitId: string; kind: "photo" | "video"; takenAt: Date | null; sortOrder: number }): Promise<{ mediaId: string; uploadUrl: string }>`
+  - `startMediaUpload(deps: { db: OutfitMediaDb; store: MediaStore; now: () => Date }, input: { userId: string; mediaId: string; outfitId: string; kind: "photo" | "video"; takenAt: Date | null; sortOrder: number }): Promise<{ mediaId: string; uploadUrl: string | null }>`
+    - `mediaId` はブラウザがファイルごとに作った UUID。
+    - `getMedia` で本人の行がすでにあれば、`retryMediaUpload` と同じ処理をする。
+    - なければ `createUpload` → `registerMedia` の順に呼ぶ。`registerMedia` が失敗したら、`store.deleteAsset` を一度だけ試してから（失敗しても無視して）、元のエラーを投げ直す。
   - `completeMediaUpload(deps, input: { userId: string; mediaId: string; width?: number; height?: number }): Promise<OutfitMediaRow>`：
     - 写真：実体が ready なら `ready`（ブラウザが知らせた大きさを入れる）。
     - 動画：実体が processing なら `processing`、ready なら `ready`。
@@ -614,7 +626,9 @@ git commit -m "feat: add server-only outfit media RPCs and deletion queue"
 - [ ] **Step 1: 失敗するテストを書く**（`OutfitMediaDb` はメモリ上のダミーを、テストファイルの中で作る。`store` は `createFakeMediaStore()`）
 
 ```ts
-test("開始：メディア ID を先に作り、その ID を Cloudflare のメタデータと DB の両方に使う");
+test("開始：渡されたメディア ID を、Cloudflare のメタデータと DB の両方に使う");
+test("開始：同じメディア ID で2回呼ぶと、メディアは1つのままで、Cloudflare に届いていれば uploadUrl は null");
+test("開始：DB への保存が失敗したら、作った Cloudflare の ID を deleteAsset してから元のエラーを投げる");
 test("開始：アップロード URL の期限は now の30分後");
 test("完了：写真の実体が awaiting_upload なら MediaNotUploadedError で、状態は uploading のまま");
 test("完了：写真の実体が ready なら ready になり、width・height が入る");
@@ -634,7 +648,7 @@ Expected: FAIL（モジュールがない）
 - [ ] **Step 4: テストが通ることを確かめる**
 
 Run: `node --test scripts/test-outfit-media-service.mts`
-Expected: PASS（8 tests）
+Expected: PASS（10 tests）
 
 - [ ] **Step 5: コミットする**
 
@@ -665,8 +679,8 @@ git commit -m "feat: add outfit media upload service with retry that reuses deli
     - 本文の JSON が読めない、または `uid` がなければ 400。
     - それ以外は `apply` の結果と 200。
     - 本文から読むもの：`uid`、`status.state`、`input.width`、`input.height`、`duration`。
-  - `type QueueRow = { id: string; provider: MediaProvider; providerAssetId: string; attempts: number }`
-  - `processMediaDeletionQueue(deps: { claim: (limit: number) => Promise<QueueRow[]>; finish: (id: string, ok: boolean, error: string | null) => Promise<void>; store: MediaStore }, limit?: number): Promise<{ deleted: number; failed: number }>`（`limit` の初期値は 20。`deleteAsset` が `not_found` でも成功）
+  - `type QueueRow = { id: string; claimToken: string; provider: MediaProvider; providerAssetId: string; attempts: number }`
+  - `processMediaDeletionQueue(deps: { claim: (limit: number) => Promise<QueueRow[]>; finish: (id: string, claimToken: string, ok: boolean, error: string | null) => Promise<boolean>; store: MediaStore }, limit?: number): Promise<{ deleted: number; failed: number }>`（`limit` の初期値は 20。`deleteAsset` が `not_found` でも成功）
   - ルート：
     - webhook は `request.text()` で生の本文を読み、`handleStreamWebhook` を呼ぶ。
     - cron は `Authorization: Bearer ${CRON_SECRET}` を確かめてから `processMediaDeletionQueue` を呼ぶ。
@@ -682,7 +696,7 @@ test("知らない uid（apply が ignored）：200 で ignored");              
 test("同じ通知の2回目（apply が duplicate）：200");
 test("本文が JSON でない：400");
 // test-media-deletion-queue.mts
-test("Cloudflare の削除が成功：finish(ok=true)、deleted=1");
+test("Cloudflare の削除が成功：取り出したときの claimToken で finish(ok=true)、deleted=1");
 test("Cloudflare が not_found：成功として扱う");
 test("Cloudflare が例外：finish(ok=false, error のメッセージ)、failed=1。ほかの行は続けて処理する");
 ```
@@ -722,7 +736,10 @@ git commit -m "feat: add Stream webhook route and media deletion queue processor
 
 `024_tighten_wear_writes.sql` の内容：
 - `revoke insert, update, delete on public.wear_logs from authenticated;`
-- `revoke update on public.clothing_items from authenticated;` のあと、`do` ブロックで `information_schema.columns` から列の一覧を作り、`grant update (...) on public.clothing_items to authenticated;` を動的に実行する。対象は、`id`、`user_id`、`created_at`、`wear_count`、`last_worn_at`、`archived_at` を除くすべての列。コメントに「今後 `clothing_items` に列を足すときは、ここと同じ grant を足す」と書く。
+- `revoke insert, update on public.clothing_items from authenticated;` のあと、`do` ブロックで `information_schema.columns` から列の一覧を作り、2つの grant を動的に実行する。コメントに「今後 `clothing_items` に列を足すときは、ここと同じ grant を足す」と書く。
+  - `grant insert (...)`：`wear_count`、`last_worn_at`、`archived_at` を除くすべての列。今の登録処理は `id` と `user_id` を指定しているので、この2つは含める。
+  - `grant update (...)`：`id`、`user_id`、`created_at`、`wear_count`、`last_worn_at`、`archived_at` を除くすべての列。
+- 削除の権限は今のまま残す（仕様書 6.3 章。コーデに入っている服は外部キーで消せない）。
 - 初期集計：`for u in select distinct user_id from public.clothing_items loop perform public.rebuild_all_stats(u); end loop;`。直す前に、`wear_count` か `last_worn_at` が記録と違っていた服の件数を `raise notice` で出す。
 
 - [ ] **Step 1: 失敗するテストを書く**（`024_tighten_wear_writes.test.sql`。`020_before_setup.sql` の既存データを使う）
@@ -734,6 +751,8 @@ git commit -m "feat: add Stream webhook route and media deletion queue processor
 -- ok: authenticated は wear_logs に insert・update・delete できない
 -- ok: authenticated は clothing_items の title・status・is_public を update できる
 -- ok: authenticated は wear_count・last_worn_at・archived_at を update できない
+-- ok: authenticated は id・user_id・title・category を指定して服を insert できる（今の登録処理と同じ形）
+-- ok: authenticated は wear_count = 999 や last_worn_at・archived_at を指定した insert ができない
 -- ok: authenticated は登録失敗の取り消し（コーデに入っていない服の delete）ができる
 -- ok: authenticated の record_wear_today は今までと同じく、wear_count が1増え、last_worn_at が今になる
 -- ok: 019 の行動履歴に、record_wear_today の着用が1件記録される
@@ -832,8 +851,9 @@ git commit -m "feat: add partner aggregation and radial line layout"
 **Interfaces:**
 - Consumes: Task 6 の RPC、Task 8 の `startMediaUpload`・`completeMediaUpload`・`retryMediaUpload`・`createSupabaseOutfitMediaDb`・`createAdminClient`、Task 2 の `createCloudflareMediaStore`、Task 11 の `aggregatePartners`・`layoutRadialLines`・`jstTodayIsoDate`
 - Produces（Server Actions。どれも最初にログインを確かめ、ユーザー ID はサーバーで決める）：
-  - `startOutfitPhotoUpload(input: { clientRequestId: string; wornOn: string }): Promise<{ outfitId: string; mediaId: string; uploadUrl: string } | { error: string }>`
+  - `startOutfitPhotoUpload(input: { clientRequestId: string; mediaId: string; wornOn: string }): Promise<{ outfitId: string; mediaId: string; uploadUrl: string | null } | { error: string }>`
     - `create_outfit_draft`（source は `upload`）のあと `startMediaUpload` を呼ぶ。`takenAt` は null、`sortOrder` は 0。
+    - `uploadUrl` が null なら、もう届いているので送らずに完了へ進む。
   - `completeOutfitMedia(input: { mediaId: string; width: number; height: number }): Promise<{ ok: true } | { error: string }>`
   - `retryOutfitMedia(input: { mediaId: string }): Promise<{ uploadUrl: string | null } | { error: string }>`
     - 新しい試行に置き換えたときは、`after(() => processMediaDeletionQueue(...))` で、削除待ちに入った古い ID をすぐ消しにいく（仕様書 6.6 章）。
@@ -852,7 +872,7 @@ git commit -m "feat: add partner aggregation and radial line layout"
 3. 日付の初期値は `jstTodayIsoDate()`。`?item=<id>` があれば、その服を選んだ状態にする。
 4. `OutfitItemPicker`：しまっていない服をカテゴリーのタブで出し、複数選べる。
 5. 「確定」→ `confirmOutfitAction`（`expectedRevision: 0`）→ `/protected/looks/[id]` へ。
-6. `clientRequestId` は、画面を開いたときに `crypto.randomUUID()` で1つ作り、送り直しでも同じものを使う。
+6. `clientRequestId` は画面を開いたときに、`mediaId` は写真を選んだときに、それぞれ `crypto.randomUUID()` で作る。送り直しでも同じものを使う。
 
 `/protected/looks/[id]`：写真（`display` の署名付き URL、`MediaStore.signedImageUrl`）、日付、服の一覧（それぞれ詳細ページへのリンク）。
 
