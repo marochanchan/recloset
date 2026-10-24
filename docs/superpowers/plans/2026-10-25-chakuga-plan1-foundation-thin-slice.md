@@ -89,7 +89,7 @@
 **Files:**
 - Modify: `.gitignore`（`.superpowers/` を足す）
 - Modify: `.env.example`（下の環境変数を足す）
-- Modify: `package.json`（`"test:outfits": "node --test 'scripts/test-cloudflare-*.mts'"`。Task 8 で `'scripts/test-outfit-*.mts'`、Task 9 で `'scripts/test-media-*.mts'` を足す。まだファイルのないパターンは入れない）
+- Modify: `package.json`（`"test:outfits": "node --test 'scripts/test-cloudflare-*.mts'"`。Task 3 で `'scripts/test-media-*.mts'`、Task 8 で `'scripts/test-outfit-*.mts'` を足す。まだファイルのないパターンは入れない）
 - Create: `lib/media/cloudflare-config.ts`
 - Create: `lib/media/cloudflare-signing.ts`
 - Test: `scripts/test-cloudflare-signing.mts`
@@ -189,7 +189,7 @@ API の呼び先（`https://api.cloudflare.com/client/v4/accounts/{accountId}` �
 | 関数 | メソッドとパス | 送るもの | 返すもの |
 |---|---|---|---|
 | `createImageUpload({ metadata, expiresAt })` | `POST /images/v2/direct_upload`（multipart） | `requireSignedURLs=true`、`metadata=JSON`、`expiry=ISO` | `{ id, uploadURL }` |
-| `getImage(id)` | `GET /images/v1/{id}` | ― | `{ draft: boolean }`。404 なら `null` |
+| `getImage(id)` | `GET /images/v1/{id}` | ― | `{ draft: boolean; variants: string[] }`。404 なら `null` |
 | `deleteImage(id)` | `DELETE /images/v1/{id}` | ― | 404 なら `"not_found"` |
 | `createStreamUpload({ meta, expiresAt })` | `POST /stream/direct_upload`（JSON） | `{ maxDurationSeconds: 60, requireSignedURLs: true, meta, expiry }` | `{ uid, uploadURL }` |
 | `getStreamVideo(uid)` | `GET /stream/{uid}` | ― | `{ state, readyToStream, width, height, duration }`。404 なら `null` |
@@ -236,50 +236,85 @@ git commit -m "feat: add Cloudflare API wrapper and MediaStore"
 
 ---
 
-### Task 3: Cloudflare の初期設定と、本番相当の確認（10/26 の到達点）
+### Task 3: Stream の webhook（署名の確認まで）と、Cloudflare の本番相当の確認（10/26 の到達点）
 
 **Files:**
+- Create: `lib/media/stream-webhook.ts`
+- Create: `app/api/webhooks/cloudflare-stream/route.ts`
+- Modify: `lib/supabase/proxy.ts`（`/api/webhooks/` と `/api/cron/` は、ログインへの転送の対象外にする。先にファイルを読み、今の除外のしかたに合わせる）
+- Modify: `package.json`（`test:outfits` に `'scripts/test-media-*.mts'` を足す）
 - Create: `scripts/setup-cloudflare.mts`
 - Create: `scripts/smoke-cloudflare.mts`
 - Modify: `docs/project/TODO.md`（結果を記録する）
+- Test: `scripts/test-media-stream-webhook.mts`
 
 **Interfaces:**
-- Consumes: Task 1・2 の `readCloudflareConfig`、`createCloudflareApi`、`createCloudflareMediaStore`、`analyzeClothingImage`（`lib/clothing-image-analysis.ts`）
+- Consumes: Task 1・2 の `readCloudflareConfig`、`verifyStreamWebhookSignature`、`createCloudflareApi`、`createCloudflareMediaStore`、`analyzeClothingImage`（`lib/clothing-image-analysis.ts`）
+- Produces:
+  - `handleStreamWebhook(input: { header: string | null; rawBody: string; secret: string; now: Date; apply: (p: { assetId: string; state: string; width: number | null; height: number | null; durationSec: number | null }) => Promise<"applied" | "ignored" | "duplicate"> }): Promise<{ status: 200 | 400 | 401; result?: string }>`
+    - 署名が通らなければ 401。
+    - 本文の JSON が読めない、または `uid` がなければ 400。
+    - それ以外は `apply` の結果と 200。
+    - 本文から読むもの：`uid`、`status.state`、`input.width`、`input.height`、`duration`。
+  - ルート：`request.text()` で生の本文を読み、`handleStreamWebhook` を呼ぶ。このタスクでは、`apply` は「uid と state を `console.info` に出して `"ignored"` を返す」仮のものにする（DB は Task 9 でつなぐ）。Next.js のルートの書き方は、先に `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/route.md` を読んで合わせる。
 
 **ユーザーにお願いすること（このタスクの前に）：**
 - Cloudflare の Images と Stream の有料プランを有効にする。
 - API トークンを作る（Account の Cloudflare Images: Edit と Stream: Edit）。
 - `CLOUDFLARE_ACCOUNT_ID`、`CLOUDFLARE_API_TOKEN` を `.env.local` に入れる。
-- 5秒ほどの短い MP4 を1本用意する。
+- 5秒ほどの短い MP4 を1本と、服が写った写真（JPEG）を1枚用意する。
 
-- [ ] **Step 1: `scripts/setup-cloudflare.mts` を書く**（何度実行しても同じ結果になる）
+- [ ] **Step 1: webhook の失敗するテストを書く**（`scripts/test-media-stream-webhook.mts`）
+
+```ts
+test("正しい署名：apply を呼び、200 と結果を返す");
+test("署名が違う：401 で、apply を呼ばない");
+test("知らない uid（apply が ignored）：200 で ignored");                       // ← Review Focus 4
+test("同じ通知の2回目（apply が duplicate）：200");
+test("本文が JSON でない：400");
+```
+
+- [ ] **Step 2: テストが失敗することを確かめる**
+
+Run: `node --test scripts/test-media-stream-webhook.mts`
+Expected: FAIL（モジュールがない）
+
+- [ ] **Step 3: `stream-webhook.ts`、ルート（仮の `apply`）、`proxy.ts` を実装し、テストを通す**
+
+Run: `node --test scripts/test-media-stream-webhook.mts && npm run lint && npm run build`
+Expected: PASS（5 tests）、lint と build はエラーなし
+
+- [ ] **Step 4: `scripts/setup-cloudflare.mts` を書く**（何度実行しても同じ結果になる）
   1. バリアント `thumb`（480）・`display`（1600）・`analysis`（2048）を、`fit: "scale-down"`、`metadata: "none"`、`neverRequireSignedURLs: false` で作る。すでにあれば、`neverRequireSignedURLs` が true なら false に直す（`PATCH /images/v1/variants/{id}`）。
   2. 全バリアントを読み直し、`neverRequireSignedURLs` が1つでも true なら終了コード1。
   3. `GET /images/v1/keys` で署名の鍵を取り出し、`CLOUDFLARE_IMAGES_SIGNING_KEY=...` を表示する。
   4. 引数 `--stream-key` のときだけ、`POST /stream/keys` で署名の鍵を作り、`CLOUDFLARE_STREAM_SIGNING_KEY_ID=` と `CLOUDFLARE_STREAM_SIGNING_JWK=` を表示する（毎回作らない）。
   5. 引数 `--webhook <URL>` のときだけ、`PUT /stream/webhook` で通知先を登録し、`CLOUDFLARE_STREAM_WEBHOOK_SECRET=` を表示する。
 
-- [ ] **Step 2: `scripts/smoke-cloudflare.mts` を書く**（引数：MP4 のパス。どの段階が失敗したかを表示して、終了コード1で止まる）
-  1. 写真：`createUpload("photo")` → スクリプトの中で作った 64×64 の JPEG（`Uint8Array` を書き込む）を `uploadUrl` に POST → `getAssetState` が ready。
-  2. 署名なしの `https://imagedelivery.net/{hash}/{id}/thumb` が 200 でない。3つのバリアントの署名付き URL が、どれも 200。
-  3. AI の入力：`analysis` の署名付き URL の中身を `analyzeClothingImage()` に渡し、例外にならない。
-  4. 動画：`createUpload("video")` → MP4 を POST → ready になるまで5秒ごとに確かめる（最大3分）。署名なしの manifest とサムネイルが 200 でない。署名付きは 200。
-  5. 後片付け：写真と動画を `deleteAsset` → 両方とも `getAssetState` が missing。
-  6. 写真の応答に含まれる URL から、`CLOUDFLARE_IMAGES_ACCOUNT_HASH` を表示する。
+- [ ] **Step 5: `scripts/smoke-cloudflare.mts` を書く**（引数：服の写真の JPEG のパスと、MP4 のパス。どの段階が失敗したかを表示して、終了コード1で止まる）
+  1. 写真：`createUpload("photo")` → 渡された JPEG を `uploadUrl` に POST → `getAssetState` が ready。
+  2. `CLOUDFLARE_IMAGES_ACCOUNT_HASH` がまだなければ、`getImage` の応答の `variants` の URL（`https://imagedelivery.net/<hash>/<id>/<variant>`）から取り出して使い、表示する。そのため Task 2 の `getImage` は `{ draft: boolean; variants: string[] }` を返す。
+  3. 署名なしの `https://imagedelivery.net/{hash}/{id}/thumb` が 200 でない。3つのバリアントの署名付き URL が、どれも 200。
+  4. AI の入力：`analysis` の署名付き URL の中身を `analyzeClothingImage()` に渡し、結果の `category` を表示する。
+  5. 動画：`createUpload("video")` → MP4 を POST → ready になるまで5秒ごとに確かめる（最大3分）。署名なしの manifest とサムネイルが 200 でない。署名付きは 200。
+  6. 後片付け：写真と動画を `deleteAsset` → 両方とも `getAssetState` が missing。
 
-- [ ] **Step 3: 動かす**
+- [ ] **Step 6: 動かす**
 
 Run: `node --env-file=.env.local scripts/setup-cloudflare.mts --stream-key`（表示された値を `.env.local` に足す）
-Run: `node --env-file=.env.local scripts/smoke-cloudflare.mts ~/Desktop/test.mp4`
+Run: `node --env-file=.env.local scripts/smoke-cloudflare.mts ~/Desktop/test-outfit.jpg ~/Desktop/test.mp4`
 Expected: すべての段階が `ok:` で、終了コード0
 
-- [ ] **Step 4: webhook の確認は、Task 12 でデプロイしたあとに行う**（`--webhook https://<本番のドメイン>/api/webhooks/cloudflare-stream`）。TODO に結果と残りを記録する。
+- [ ] **Step 7: webhook を本番相当で確かめる**
+  1. ブランチをプッシュし、Vercel のプレビューに `CLOUDFLARE_STREAM_WEBHOOK_SECRET` 以外の環境変数を入れてデプロイする。
+  2. `node --env-file=.env.local scripts/setup-cloudflare.mts --webhook https://<プレビューのドメイン>/api/webhooks/cloudflare-stream` を実行し、表示された秘密を Vercel と `.env.local` に入れて、もう一度デプロイする。
+  3. smoke をもう一度動かし、Vercel のログに仮の `apply` の出力（uid と state）が出て、応答が 200 であることを確かめる。
 
-- [ ] **Step 5: コミットする**
+- [ ] **Step 8: TODO に結果を記録してコミットする**
 
 ```bash
-git add scripts/setup-cloudflare.mts scripts/smoke-cloudflare.mts docs/project/TODO.md
-git commit -m "chore: add Cloudflare setup and smoke scripts"
+git add lib/media/stream-webhook.ts app/api/webhooks lib/supabase/proxy.ts package.json scripts/test-media-stream-webhook.mts scripts/setup-cloudflare.mts scripts/smoke-cloudflare.mts docs/project/TODO.md
+git commit -m "feat: add Stream webhook verification route and Cloudflare smoke scripts"
 ```
 
 ---
@@ -612,6 +647,8 @@ git commit -m "feat: add server-only outfit media RPCs and deletion queue"
     - `mediaId` はブラウザがファイルごとに作った UUID。
     - `getMedia` で本人の行がすでにあれば、`retryMediaUpload` と同じ処理をする。
     - なければ `createUpload` → `registerMedia` の順に呼ぶ。`registerMedia` が失敗したら、`store.deleteAsset` を一度だけ試してから（失敗しても無視して）、元のエラーを投げ直す。
+    - **同時に2回開始された場合**：`registerMedia` が返した行の `providerAssetId` が、自分が作った ID と違うことがある（もう一方が先に登録した）。そのときは、自分の ID を `deleteAsset` してから `MediaUploadConflictError` を投げる。画面は少し待ってから「もう一度送る」を出す。DB に登録されていない ID へ送らせないため。
+  - `class MediaUploadConflictError extends Error`
   - `completeMediaUpload(deps, input: { userId: string; mediaId: string; width?: number; height?: number }): Promise<OutfitMediaRow>`：
     - 写真：実体が ready なら `ready`（ブラウザが知らせた大きさを入れる）。
     - 動画：実体が processing なら `processing`、ready なら `ready`。
@@ -629,6 +666,7 @@ git commit -m "feat: add server-only outfit media RPCs and deletion queue"
 test("開始：渡されたメディア ID を、Cloudflare のメタデータと DB の両方に使う");
 test("開始：同じメディア ID で2回呼ぶと、メディアは1つのままで、Cloudflare に届いていれば uploadUrl は null");
 test("開始：DB への保存が失敗したら、作った Cloudflare の ID を deleteAsset してから元のエラーを投げる");
+test("開始：registerMedia が別の asset ID の行を返したら（同時の開始）、自分の ID を消して MediaUploadConflictError");
 test("開始：アップロード URL の期限は now の30分後");
 test("完了：写真の実体が awaiting_upload なら MediaNotUploadedError で、状態は uploading のまま");
 test("完了：写真の実体が ready なら ready になり、width・height が入る");
@@ -648,7 +686,7 @@ Expected: FAIL（モジュールがない）
 - [ ] **Step 4: テストが通ることを確かめる**
 
 Run: `node --test scripts/test-outfit-media-service.mts`
-Expected: PASS（10 tests）
+Expected: PASS（11 tests）
 
 - [ ] **Step 5: コミットする**
 
@@ -659,43 +697,25 @@ git commit -m "feat: add outfit media upload service with retry that reuses deli
 
 ---
 
-### Task 9: Stream の webhook と、削除待ちの処理
+### Task 9: 削除待ちの処理と、webhook を DB につなぐ
 
 **Files:**
-- Create: `lib/media/stream-webhook.ts`
 - Create: `lib/media/deletion-queue.ts`
-- Create: `app/api/webhooks/cloudflare-stream/route.ts`
+- Modify: `app/api/webhooks/cloudflare-stream/route.ts`（仮の `apply` を、`createAdminClient().rpc("apply_stream_webhook", ...)` に置き換える）
 - Create: `app/api/cron/media-deletions/route.ts`
 - Create: `vercel.json`（`{"crons":[{"path":"/api/cron/media-deletions","schedule":"0 18 * * *"}]}`。日本時間の毎日3:00）
-- Modify: `lib/supabase/proxy.ts`（`/api/webhooks/` と `/api/cron/` は、ログインへの転送の対象外にする。先にファイルを読み、今の除外のしかたに合わせる）
-- Modify: `package.json`（`test:outfits` に `'scripts/test-media-*.mts'` を足す）
-- Test: `scripts/test-media-stream-webhook.mts`、`scripts/test-media-deletion-queue.mts`
+- Test: `scripts/test-media-deletion-queue.mts`
 
 **Interfaces:**
-- Consumes: Task 1 の `verifyStreamWebhookSignature`、Task 2 の `MediaStore`、Task 7 の `apply_stream_webhook`・`claim_media_deletions`・`finish_media_deletion`
+- Consumes: Task 2 の `MediaStore`、Task 3 の `handleStreamWebhook`、Task 7 の `apply_stream_webhook`・`claim_media_deletions`・`finish_media_deletion`、Task 8 の `createAdminClient`
 - Produces:
-  - `handleStreamWebhook(input: { header: string | null; rawBody: string; secret: string; now: Date; apply: (p: { assetId: string; state: string; width: number | null; height: number | null; durationSec: number | null }) => Promise<"applied" | "ignored" | "duplicate"> }): Promise<{ status: 200 | 400 | 401; result?: string }>`
-    - 署名が通らなければ 401。
-    - 本文の JSON が読めない、または `uid` がなければ 400。
-    - それ以外は `apply` の結果と 200。
-    - 本文から読むもの：`uid`、`status.state`、`input.width`、`input.height`、`duration`。
   - `type QueueRow = { id: string; claimToken: string; provider: MediaProvider; providerAssetId: string; attempts: number }`
   - `processMediaDeletionQueue(deps: { claim: (limit: number) => Promise<QueueRow[]>; finish: (id: string, claimToken: string, ok: boolean, error: string | null) => Promise<boolean>; store: MediaStore }, limit?: number): Promise<{ deleted: number; failed: number }>`（`limit` の初期値は 20。`deleteAsset` が `not_found` でも成功）
-  - ルート：
-    - webhook は `request.text()` で生の本文を読み、`handleStreamWebhook` を呼ぶ。
-    - cron は `Authorization: Bearer ${CRON_SECRET}` を確かめてから `processMediaDeletionQueue` を呼ぶ。
-    - Next.js のルートの書き方は、先に `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/route.md` を読んで合わせる。
+  - cron のルート：`Authorization: Bearer ${CRON_SECRET}` を確かめてから `processMediaDeletionQueue` を呼ぶ。違えば 401。
 
-- [ ] **Step 1: 失敗するテストを書く**
+- [ ] **Step 1: 失敗するテストを書く**（`scripts/test-media-deletion-queue.mts`）
 
 ```ts
-// test-media-stream-webhook.mts
-test("正しい署名：apply を呼び、200 と結果を返す");
-test("署名が違う：401 で、apply を呼ばない");
-test("知らない uid（apply が ignored）：200 で ignored");                       // ← Review Focus 4
-test("同じ通知の2回目（apply が duplicate）：200");
-test("本文が JSON でない：400");
-// test-media-deletion-queue.mts
 test("Cloudflare の削除が成功：取り出したときの claimToken で finish(ok=true)、deleted=1");
 test("Cloudflare が not_found：成功として扱う");
 test("Cloudflare が例外：finish(ok=false, error のメッセージ)、failed=1。ほかの行は続けて処理する");
@@ -703,10 +723,10 @@ test("Cloudflare が例外：finish(ok=false, error のメッセージ)、failed
 
 - [ ] **Step 2: テストが失敗することを確かめる**
 
-Run: `node --test scripts/test-media-stream-webhook.mts scripts/test-media-deletion-queue.mts`
+Run: `node --test scripts/test-media-deletion-queue.mts`
 Expected: FAIL（モジュールがない）
 
-- [ ] **Step 3: `stream-webhook.ts`、`deletion-queue.ts`、2つのルート、`vercel.json`、`proxy.ts` を実装する**
+- [ ] **Step 3: `deletion-queue.ts`、cron のルート、`vercel.json` を実装し、webhook のルートの `apply` を RPC に置き換える**
 
 - [ ] **Step 4: テストとビルドが通ることを確かめる**
 
@@ -716,8 +736,8 @@ Expected: テストはすべて PASS、lint と build はエラーなし
 - [ ] **Step 5: コミットする**
 
 ```bash
-git add lib/media/stream-webhook.ts lib/media/deletion-queue.ts app/api vercel.json lib/supabase/proxy.ts package.json scripts/test-media-stream-webhook.mts scripts/test-media-deletion-queue.mts
-git commit -m "feat: add Stream webhook route and media deletion queue processor"
+git add lib/media/deletion-queue.ts app/api vercel.json scripts/test-media-deletion-queue.mts
+git commit -m "feat: add media deletion queue and wire Stream webhook to the database"
 ```
 
 ---
@@ -895,7 +915,7 @@ Expected: エラーなし
   - [ ] 「確定」を連打しても、着用回数は1回しか増えない。
   - [ ] 送る途中で通信を切り（DevTools の Offline）、戻してから「もう一度送る」で完了する。
   - [ ] 「今日着た」と服の削除が、今までどおり動く。
-  - [ ] `node --env-file=.env.local scripts/setup-cloudflare.mts --webhook https://<プレビューのドメイン>/api/webhooks/cloudflare-stream` で通知先を登録する。smoke の動画を送ると、Vercel のログに webhook の `ignored` が出る（メディアの行がないため）。
+  - [ ] webhook が DB につながったあとも、smoke の動画を送ると 200 と `ignored` が返る（メディアの行がないため）。通知先の登録は Task 3 で済んでいる。
 
 - [ ] **Step 5: コミットする**
 
