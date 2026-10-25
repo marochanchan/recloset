@@ -5,7 +5,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test:outfits": "node --test 'scripts/test-cloudflare-*.mts' 'scripts/test-media-*.mts'"
+    "test:outfits": "node --test 'scripts/test-cloudflare-*.mts' 'scripts/test-media-*.mts' 'scripts/test-outfit-*.mts'"
   },
   "engines": {
     "node": "24.x"
