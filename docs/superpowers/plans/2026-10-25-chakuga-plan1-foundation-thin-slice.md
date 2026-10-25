@@ -346,13 +346,13 @@ Run: `node --env-file=.env.local scripts/setup-cloudflare.mts --stream-key`（�
 Run: `node --env-file=.env.local scripts/smoke-cloudflare.mts ~/Desktop/test-outfit.jpg ~/Desktop/test.mp4`
 Expected: すべての段階が `ok:` で、終了コード0
 
-- [ ] **Step 7: webhook を本番相当で確かめる**
+- [ ] **Step 7: webhook を本番相当で確かめる**（**Task 12b の Step 1 で 020〜023 を本番に適用したあとに行う**。Task 9 で、このルートは 023 の `apply_stream_webhook` を呼ぶようになったため、DB に 023 がないと 500 になる。10/26 の確認は Step 6 の setup と smoke まで）
   1. ブランチをプッシュし、Vercel のプレビューに `CLOUDFLARE_STREAM_WEBHOOK_SECRET` 以外の環境変数を入れてデプロイする。通知先には、デプロイごとに変わる URL ではなく、ブランチの固定の URL（`<プロジェクト>-git-<ブランチ>-<アカウント>.vercel.app`）を使う。
   2. プレビューが保護されているかを確かめる：`curl -s -o /dev/null -w "%{http_code}" -X POST https://<ブランチの URL>/api/webhooks/cloudflare-stream`。
      - 401 か、Vercel のログイン画面への転送なら、保護されている。ユーザーが Vercel の Settings → Deployment Protection → Protection Bypass for Automation で秘密を作り、`.env.local` の `VERCEL_AUTOMATION_BYPASS_SECRET` に入れる。
      - アプリの 401（署名がないため）が返れば、保護はない。どちらの 401 かは、本文に Vercel のログイン画面が含まれるかで見分ける。
-  3. `node --env-file=.env.local scripts/setup-cloudflare.mts --webhook https://<ブランチの URL>/api/webhooks/cloudflare-stream` を実行する（秘密は `.env.local` に書き込まれる）。ユーザーがその値を Vercel に入れて、もう一度デプロイする。
-  4. smoke をもう一度動かし、Vercel のログに仮の `apply` の出力（uid と status）が出て、応答が 200 であることを確かめる。
+  3. `node --env-file=.env.local scripts/setup-cloudflare.mts --webhook https://<ブランチの URL>/api/webhooks/cloudflare-stream --preview` を実行する（秘密は `.env.local` に書き込まれる。`--preview` を付けたときだけ、保護を通る設定が URL に付く）。ユーザーがその値を Vercel の Preview に入れて、もう一度デプロイする。
+  4. smoke をもう一度動かし、Vercel のログで、webhook への POST が 200 で、応答が `{"result":"ignored"}` であることを確かめる（smoke の動画には outfit_media の行がないため）。401 なら署名か秘密、500 なら 023 の適用か `SUPABASE_SECRET_KEY` を確かめる。
   5. 通知先は、本番に切り替えるとき（Task 12b）に本番のドメインへ登録し直す。
 
 - [ ] **Step 8: TODO に結果を記録してコミットする**
@@ -1132,6 +1132,10 @@ git commit -m "feat: add thin outfit recording flow with relation lines"
   - [ ] 送る途中で通信を切り（DevTools の Offline）、戻してから「もう一度送る」で完了する。
   - [ ] 「今日着た」と服の削除が、今までどおり動く。
   - [ ] smoke の動画を送ると、本番の webhook が 200 と `ignored` を返す（メディアの行がないため）。
+  - [ ] 服 A の詳細から記録画面を開き、戻って服 B から開き直すと、選ばれているのは B だけ。
+  - [ ] 選んだ服を別のタブで削除すると、選択から外れる。
+  - [ ] 記録画面から別の画面へ移って戻っても、写真のプレビューが表示される。
+  - [ ] 確定の通信を切って（DevTools の Offline）戻し、もう一度確定すると、服の詳細の着用回数と線が更新される。
 
 - [ ] **Step 7: コミットする**
 
