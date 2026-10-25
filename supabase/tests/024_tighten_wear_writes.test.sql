@@ -120,6 +120,23 @@ select test.assert(
   and has_column_privilege('authenticated', 'public.clothing_items', 'category_classified_at', 'update'),
   '通常の列（title・status・is_public・published_at・category_classified_at）には update の権限がある');
 
+-- 列の権限を information_schema.columns の全列と照らし合わせる
+-- （あとの migration で列が足されて grant が漏れたら、ここで失敗する）
+select test.assert(
+  not exists (
+    select 1 from information_schema.columns c
+     where c.table_schema = 'public' and c.table_name = 'clothing_items'
+       and has_column_privilege('authenticated', 'public.clothing_items', c.column_name, 'insert')
+           is distinct from (c.column_name not in ('wear_count', 'last_worn_at', 'archived_at'))),
+  'insert の権限は、wear_count・last_worn_at・archived_at 以外の全列にだけある（列の一覧と完全に一致）');
+select test.assert(
+  not exists (
+    select 1 from information_schema.columns c
+     where c.table_schema = 'public' and c.table_name = 'clothing_items'
+       and has_column_privilege('authenticated', 'public.clothing_items', c.column_name, 'update')
+           is distinct from (c.column_name not in ('id', 'user_id', 'created_at', 'wear_count', 'last_worn_at', 'archived_at'))),
+  'update の権限は、id・user_id・created_at・wear_count・last_worn_at・archived_at 以外の全列にだけある（列の一覧と完全に一致）');
+
 select test.assert(
   not has_table_privilege('authenticated', 'public.wear_logs', 'insert')
   and not has_table_privilege('authenticated', 'public.wear_logs', 'update')

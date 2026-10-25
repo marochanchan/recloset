@@ -92,10 +92,10 @@ export async function recordWearToday(
     p_item_id: itemId,
   });
   if (error) {
-    if (error.message?.includes("item_not_found")) {
+    if (error.message === "item_not_found") {
       return { error: "対象の服が見つかりません" };
     }
-    console.error("recordWearToday: rpc error", error);
+    console.error("recordWearToday: record_wear_today failed", error.code);
     return { error: "着用記録の登録に失敗しました" };
   }
 
@@ -325,10 +325,10 @@ export async function deleteClothingItem(
     p_item_id: itemId,
   });
   if (deleteError) {
-    if (deleteError.message?.includes("item_not_found")) {
+    if (deleteError.message === "item_not_found") {
       return { error: "対象の服が見つかりません" };
     }
-    console.error("deleteClothingItem: delete error", deleteError);
+    console.error("deleteClothingItem: hard_delete_item failed", deleteError.code);
     return { error: "服の削除に失敗しました" };
   }
 
