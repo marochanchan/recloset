@@ -166,10 +166,14 @@ select test.assert(
   and not exists (select 1 from public.item_monthly_stats where user_id = :'A' and item_id = :'T' and month = '2025-10-01'),
   'delete_outfit のあと、そのコーデの月のサマリーから、そのコーデの分が消える（G の wear_today の分だけ残る）');
 
--- 同じメディアが別の経路で入っていても二重にならない（on conflict do nothing）
+-- 同じ asset をもう一度入れても、エラーにならず行は増えない（on conflict do nothing）
+select public.enqueue_media_deletion(:'A', 'cf_images', 'img-o1');
+select public.enqueue_media_deletion(:'A', 'cf_stream', 'vid-o1');
 select test.assert(
-  (select count(*) from public.media_deletion_queue where provider_asset_id in ('img-o1', 'vid-o1')) = 2,
-  '（確認）削除待ちは asset ごとに1行');
+  (select count(*) from public.media_deletion_queue where provider = 'cf_images' and provider_asset_id = 'img-o1') = 1
+  and (select count(*) from public.media_deletion_queue where provider = 'cf_stream' and provider_asset_id = 'vid-o1') = 1
+  and (select count(*) from public.media_deletion_queue where provider_asset_id in ('img-o1', 'vid-o1')) = 2,
+  '同じ asset を enqueue_media_deletion し直しても、エラーにならず削除待ちは asset ごとに1行のまま');
 
 -- -----------------------------------------
 -- record_wear_today
