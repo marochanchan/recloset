@@ -68,6 +68,15 @@ export async function startOutfitPhotoUpload(input: {
     return { error: INVALID_INPUT_ERROR };
   }
 
+  // 設定が足りないときに下書きだけが残らないよう、先に部品を組み立てる
+  let mediaDeps;
+  try {
+    mediaDeps = createOutfitMediaDeps();
+  } catch {
+    console.error("startOutfitPhotoUpload: media deps unavailable");
+    return { error: GENERIC_ERROR };
+  }
+
   const { data: outfit, error: draftError } = await supabase.rpc("create_outfit_draft", {
     p_client_request_id: input.clientRequestId,
     p_worn_on: input.wornOn,
@@ -79,8 +88,7 @@ export async function startOutfitPhotoUpload(input: {
   }
 
   try {
-    const { deps } = createOutfitMediaDeps();
-    const result = await startMediaUpload(deps, {
+    const result = await startMediaUpload(mediaDeps.deps, {
       userId,
       mediaId: input.mediaId,
       outfitId: outfit.id as string,

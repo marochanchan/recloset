@@ -45,11 +45,12 @@ async function LookDetail({ params }: { params: Promise<{ id: string }> }) {
   // 写真は ready のものだけ。Cloudflare の設定が足りなければ、写真なしで表示を続ける
   const { data: media, error: mediaError } = await supabase
     .from("outfit_media")
-    .select("provider_asset_id")
+    .select("provider_asset_id, width, height")
     .eq("outfit_id", id)
     .eq("kind", "photo")
     .eq("status", "ready")
     .order("sort_order")
+    .order("created_at")
     .limit(1);
   if (mediaError) {
     console.error("look detail: fetch media error", mediaError.code);
@@ -67,7 +68,9 @@ async function LookDetail({ params }: { params: Promise<{ id: string }> }) {
         <img
           src={photoUrl}
           alt="着画"
-          className="max-h-[32rem] w-full rounded-2xl bg-photo object-contain"
+          width={media?.[0]?.width ?? undefined}
+          height={media?.[0]?.height ?? undefined}
+          className="h-auto max-h-[32rem] w-full rounded-2xl bg-photo object-contain"
         />
       ) : (
         <p className="rounded-2xl bg-secondary/60 px-4 py-6 text-center text-sm text-muted-foreground">

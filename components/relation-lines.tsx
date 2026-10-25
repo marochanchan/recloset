@@ -1,6 +1,7 @@
 import { aggregatePartners, layoutRadialLines, type PairMonthRow } from "@/lib/outfits/relations";
 import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
+import Image from "next/image";
 import Link from "next/link";
 
 const SIZE = 340; // 描く範囲の一辺（中心 170）
@@ -53,7 +54,7 @@ export async function RelationLines({ itemId }: { itemId: string }) {
   const half = SIZE / 2;
 
   return (
-    <div className="relative mx-auto" style={{ width: SIZE, height: SIZE, maxWidth: "100%" }}>
+    <div className="relative mx-auto aspect-square w-full max-w-[340px]">
       <svg
         viewBox={`${-half} ${-half} ${SIZE} ${SIZE}`}
         className="absolute inset-0 h-full w-full text-primary/50"
@@ -93,8 +94,14 @@ export async function RelationLines({ itemId }: { itemId: string }) {
             }}
           >
             {url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={url} alt={partner.title} className="h-full w-full object-cover" />
+              <Image
+                src={url}
+                alt=""
+                fill
+                sizes="60px"
+                className="object-cover"
+                style={{ objectFit: "cover" }}
+              />
             ) : (
               <span className="sr-only">{partner.title}</span>
             )}

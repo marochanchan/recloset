@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createCloudflareApi } from "@/lib/media/cloudflare-api";
 import { readCloudflareConfig } from "@/lib/media/cloudflare-config";
 import { createCloudflareMediaStore, type MediaStore } from "@/lib/media/media-store";

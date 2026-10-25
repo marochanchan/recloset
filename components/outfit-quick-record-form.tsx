@@ -28,6 +28,7 @@ type OutfitQuickRecordFormProps = {
 
 type UploadPhase = "idle" | "processing" | "uploading" | "failed" | "done";
 
+const CONFIRM_FAILED_MESSAGE = "うまく進められませんでした。時間をおいて、もう一度お試しください";
 const UPLOAD_FAILED_MESSAGE = "写真を送れませんでした。もう一度送ってみてください";
 
 // 写真を1枚選ぶ → 送る → 服を選ぶ → 確定、の細い1本の流れ
@@ -39,7 +40,8 @@ export function OutfitQuickRecordForm({
   const router = useRouter();
 
   // 送り直しでも同じ ID を使うので、画面を開いたときと写真を選んだときに1回だけ作る
-  const [clientRequestId] = useState(() => crypto.randomUUID());
+  const clientRequestIdRef = useRef<string>("");
+  const startedMediaIdRef = useRef<string | null>(null);
   const mediaIdRef = useRef<string | null>(null);
   const processedRef = useRef<ProcessedImage | null>(null);
 
@@ -57,6 +59,11 @@ export function OutfitQuickRecordForm({
   const [isConfirming, setIsConfirming] = useState(false);
 
   useEffect(() => {
+    // 画面を開いたときに作る（写真を選び直すたびに作り直す）
+    if (!clientRequestIdRef.current) clientRequestIdRef.current = crypto.randomUUID();
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
@@ -70,16 +77,22 @@ export function OutfitQuickRecordForm({
     if (!response.ok) throw new Error("upload_failed");
   };
 
+  // 開始・完了・送り直しの呼び出しが失敗（通信の切断など）しても、同じ ID で送り直せる状態に戻す
+  const fail = (text: string) => {
+    setMessage(text);
+    setPhase("failed");
+  };
+
   const complete = async (mediaId: string, image: ProcessedImage) => {
-    const result = await completeOutfitMedia({
-      mediaId,
-      width: image.width,
-      height: image.height,
-    });
-    if ("error" in result) {
-      setMessage(result.error);
-      setPhase("failed");
-      return;
+    try {
+      const result = await completeOutfitMedia({
+        mediaId,
+        width: image.width,
+        height: image.height,
+      });
+      if ("error" in result) return fail(result.error);
+    } catch {
+      return fail(UPLOAD_FAILED_MESSAGE);
     }
     setMessage(null);
     setPhase("done");
@@ -92,19 +105,43 @@ export function OutfitQuickRecordForm({
       // uploadUrl が null なら、もう届いているので送らずに完了へ進む
       if (uploadUrl) await sendPhoto(uploadUrl, image);
     } catch {
-      setMessage(UPLOAD_FAILED_MESSAGE);
-      setPhase("failed");
-      return;
+      return fail(UPLOAD_FAILED_MESSAGE);
     }
     await complete(mediaId, image);
   };
 
+  // この mediaId をまだ開始していないときだけ、開始からやり直す（サーバー側で1回にまとまる）
+  const start = async (mediaId: string, image: ProcessedImage) => {
+    setPhase("uploading");
+    setMessage(null);
+    let started;
+    try {
+      started = await startOutfitPhotoUpload({
+        clientRequestId: clientRequestIdRef.current,
+        mediaId,
+        wornOn,
+      });
+    } catch {
+      return fail(UPLOAD_FAILED_MESSAGE);
+    }
+    if ("error" in started) return fail(started.error);
+    startedMediaIdRef.current = started.mediaId;
+    setOutfitId(started.outfitId);
+    await upload(started.uploadUrl, started.mediaId, image);
+  };
+
+  // 写真を選ぶたびに、下書きごと作り直す（1つの下書きに写真は1枚だけ）
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
 
     setMessage(null);
+    setOutfitId(null);
+    startedMediaIdRef.current = null;
+    processedRef.current = null;
+    mediaIdRef.current = null;
+    clientRequestIdRef.current = crypto.randomUUID();
     setPhase("processing");
     let image: ProcessedImage;
     try {
@@ -123,72 +160,57 @@ export function OutfitQuickRecordForm({
     const mediaId = crypto.randomUUID();
     mediaIdRef.current = mediaId;
     setPreviewUrl(URL.createObjectURL(image.blob));
-
-    setPhase("uploading");
-    const started = await startOutfitPhotoUpload({ clientRequestId, mediaId, wornOn });
-    if ("error" in started) {
-      setMessage(started.error);
-      setPhase("failed");
-      return;
-    }
-    setOutfitId(started.outfitId);
-    await upload(started.uploadUrl, started.mediaId, image);
+    await start(mediaId, image);
   };
 
   const handleRetry = async () => {
     const mediaId = mediaIdRef.current;
     const image = processedRef.current;
     if (!image || !mediaId) return;
-    setMessage(null);
-    setPhase("uploading");
-    const retried = await retryOutfitMedia({ mediaId });
-    if ("error" in retried) {
-      setMessage(retried.error);
-      setPhase("failed");
-      return;
-    }
-    await upload(retried.uploadUrl, mediaId, image);
-  };
+    // この mediaId が開始済みでなければ、開始からやり直す
+    if (startedMediaIdRef.current !== mediaId) return start(mediaId, image);
 
-  // 開始そのものが失敗していたとき用に、同じ ID で開始からやり直す（サーバー側で1回にまとまる）
-  const handleRestart = async () => {
-    const mediaId = mediaIdRef.current;
-    const image = processedRef.current;
-    if (!mediaId || !image) return;
     setMessage(null);
     setPhase("uploading");
-    const started = await startOutfitPhotoUpload({ clientRequestId, mediaId, wornOn });
-    if ("error" in started) {
-      setMessage(started.error);
-      setPhase("failed");
-      return;
+    let retried;
+    try {
+      retried = await retryOutfitMedia({ mediaId });
+    } catch {
+      return fail(UPLOAD_FAILED_MESSAGE);
     }
-    setOutfitId(started.outfitId);
-    await upload(started.uploadUrl, started.mediaId, image);
+    if ("error" in retried) return fail(retried.error);
+    await upload(retried.uploadUrl, mediaId, image);
   };
 
   const handleConfirm = async () => {
     if (!outfitId || phase !== "done" || selectedIds.length === 0) return;
     setIsConfirming(true);
     setMessage(null);
-    const result = await confirmOutfitAction({
-      outfitId,
-      expectedRevision: 0,
-      wornOn,
-      itemIds: selectedIds,
-      note: note.trim() || null,
-    });
-    if ("error" in result) {
-      setMessage(result.error);
-      setIsConfirming(false);
-      return;
+    let navigating = false;
+    try {
+      const result = await confirmOutfitAction({
+        outfitId,
+        expectedRevision: 0,
+        wornOn,
+        itemIds: selectedIds,
+        note: note.trim() || null,
+      });
+      if ("error" in result) {
+        setMessage(result.error);
+        return;
+      }
+      navigating = true;
+      if (result.status === "stale") {
+        setMessage("ほかの画面で先に変更されました。最新の内容を表示します");
+        setTimeout(() => router.push(`/protected/looks/${outfitId}`), 1500);
+        return;
+      }
+      router.push(`/protected/looks/${outfitId}`);
+    } catch {
+      setMessage(CONFIRM_FAILED_MESSAGE);
+    } finally {
+      if (!navigating) setIsConfirming(false);
     }
-    if (result.status === "stale") {
-      setMessage("ほかの画面で先に変更されました。最新の内容を表示します");
-      setTimeout(() => router.push(`/protected/looks/${outfitId}`), 1500);
-      return;
-    }
-    router.push(`/protected/looks/${outfitId}`);
   };
 
   const canConfirm = phase === "done" && selectedIds.length > 0 && !isConfirming;
@@ -224,7 +246,7 @@ export function OutfitQuickRecordForm({
             type="button"
             variant="outline"
             className="w-fit"
-            onClick={outfitId ? handleRetry : handleRestart}
+            onClick={handleRetry}
           >
             もう一度送る
           </Button>
@@ -275,7 +297,7 @@ export function OutfitQuickRecordForm({
       <Button type="button" onClick={handleConfirm} disabled={!canConfirm} className="w-full">
         {isConfirming ? "確定しています" : "確定"}
       </Button>
-      {phase !== "done" && (
+      {!canConfirm && !isConfirming && (
         <p className="text-xs text-muted-foreground">
           写真が届いて、服を1つ以上選ぶと確定できます
         </p>
