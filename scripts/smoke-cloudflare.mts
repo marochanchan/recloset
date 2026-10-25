@@ -44,6 +44,14 @@ const step = (name: string, fn: () => Promise<string | void>) =>
       throw new StageError(formatStageError(name, error));
     },
   );
+// 設定を読む処理の失敗は、足りない変数の名前（値は入っていない）をそのまま見せる
+function readSettings<T>(read: () => T): T {
+  try {
+    return read();
+  } catch (error) {
+    throw new StageFailure(error instanceof Error ? error.message : "設定を読めませんでした");
+  }
+}
 // 1回の通信は30秒で打ち切る。止まったままにならないようにする
 const timedFetch: typeof fetch = (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(30_000) });
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -53,7 +61,10 @@ const created: { kind: "photo" | "video"; id: string }[] = [];
 let failed = false;
 
 try {
-  const api = createCloudflareApi(readCloudflareApiConfig(), timedFetch);
+  let api!: ReturnType<typeof createCloudflareApi>;
+  await step("0. 設定の読み込み（API）", async () => {
+    api = createCloudflareApi(readSettings(() => readCloudflareApiConfig()), timedFetch);
+  });
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
   let imageId = "";
   let videoId = "";
@@ -116,12 +127,17 @@ try {
     }
   });
 
-  const config = readCloudflareConfig({
-    ...process.env,
-    CLOUDFLARE_IMAGES_ACCOUNT_HASH: accountHash,
-    CLOUDFLARE_STREAM_CUSTOMER_CODE: customerCode,
+  let store!: ReturnType<typeof createCloudflareMediaStore>;
+  await step("3. 設定の読み込み（署名の鍵など）", async () => {
+    const config = readSettings(() =>
+      readCloudflareConfig({
+        ...process.env,
+        CLOUDFLARE_IMAGES_ACCOUNT_HASH: accountHash,
+        CLOUDFLARE_STREAM_CUSTOMER_CODE: customerCode,
+      }),
+    );
+    store = createCloudflareMediaStore(config, api);
   });
-  const store = createCloudflareMediaStore(config, api);
   const now = new Date();
   const status = async (url: string) => (await timedFetch(url)).status;
 

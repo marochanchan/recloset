@@ -28,30 +28,38 @@ export async function upsertEnvFile(
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
 
-  const newLine = `${name}=${value}`;
   const lines = text.split("\n");
+  // 行末の \r（CRLF）は判定では無視し、書き換えるときは元のまま残す
+  const bare = (line: string) => line.replace(/\r$/, "");
 
   for (const line of lines) {
-    const multiline = opensMultilineQuote(line);
+    const multiline = opensMultilineQuote(bare(line));
     if (multiline) {
       throw new StageFailure(`${multiline} が複数行の値のため、${name} を安全に書き換えられません。手で直してください`);
     }
   }
-  const matches = lines.flatMap((line, i) => (line.startsWith(`${name}=`) ? [i] : []));
+  // 「NAME=」「export NAME=」「NAME =」のどれも同じ変数として数える
+  const target = new RegExp(`^(\\s*(?:export\\s+)?)${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*=`);
+  const matches = lines.flatMap((line, i) => (target.test(bare(line)) ? [i] : []));
   if (matches.length > 1) {
     throw new StageFailure(`${name} が .env.local に複数あるため、書き換えられません。1つにしてください`);
   }
 
   if (matches.length === 1) {
     const index = matches[0];
-    if (lines[index] === newLine) return "unchanged";
-    lines[index] = newLine;
+    const original = lines[index];
+    const lead = target.exec(bare(original))![1];
+    const eol = original.endsWith("\r") ? "\r" : "";
+    const replaced = `${lead}${name}=${value}${eol}`;
+    if (replaced === original) return "unchanged";
+    lines[index] = replaced;
     await writeFile(path, lines.join("\n"), { mode: 0o600 });
     return "updated";
   }
 
   // 末尾に改行がなければ足してから追記する
-  const prefix = text === "" || text.endsWith("\n") ? text : `${text}\n`;
-  await writeFile(path, `${prefix}${newLine}\n`, { mode: 0o600 });
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const prefix = text === "" || text.endsWith("\n") ? text : `${text}${eol}`;
+  await writeFile(path, `${prefix}${name}=${value}${eol}`, { mode: 0o600 });
   return "added";
 }

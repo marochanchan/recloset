@@ -100,3 +100,35 @@ test("1行で閉じた引用符つきの値は、そのまま通る", async () =
     assert.equal(await readFile(path, "utf8"), 'Q="one line"\nNAME=new\n');
   });
 });
+
+test("引用符つきの複数行の値だけがある（対象の2行目はない）：書かずに例外", async () => {
+  await assertRefused('KEY="line1\nNAME=inside\nline3"\nOTHER=1\n', "NAME", "VALUE-X", "inside");
+});
+
+test("CRLF のファイルでも、複数行の値を見つけて例外にする", async () => {
+  await assertRefused('KEY="line1\r\nNAME=inside\r\nline3"\r\n', "NAME", "VALUE-X", "inside");
+});
+
+test("CRLF のファイル：その行だけ置き換え、改行は CRLF のまま", async () => {
+  await withTempDir(async (dir) => {
+    const path = join(dir, ".env");
+    await writeFile(path, "A=1\r\nNAME=old\r\nB=2\r\n");
+    assert.equal(await upsertEnvFile(path, "NAME", "new"), "updated");
+    assert.equal(await readFile(path, "utf8"), "A=1\r\nNAME=new\r\nB=2\r\n");
+    assert.equal(await upsertEnvFile(path, "C", "3"), "added");
+    assert.equal(await readFile(path, "utf8"), "A=1\r\nNAME=new\r\nB=2\r\nC=3\r\n");
+  });
+});
+
+test("NAME= と export NAME= が両方ある：書かずに例外", async () => {
+  await assertRefused("NAME=a\nexport NAME=b\n", "NAME", "VALUE-X");
+});
+
+test("export NAME= だけがある：export を残して置き換える", async () => {
+  await withTempDir(async (dir) => {
+    const path = join(dir, ".env");
+    await writeFile(path, "export NAME=old\nA=1\n");
+    assert.equal(await upsertEnvFile(path, "NAME", "new"), "updated");
+    assert.equal(await readFile(path, "utf8"), "export NAME=new\nA=1\n");
+  });
+});
