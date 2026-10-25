@@ -36,7 +36,8 @@ psql_quiet() {
 # テスト結果（NOTICE）を表示し、失敗（FAIL・ERROR・終了コード）があれば止める
 run_test() {
   local out
-  if ! out=$(psql_run -f "$1" 2>&1); then
+  # -o /dev/null: select の結果行（stdout）を捨てる。NOTICE（stderr）と混ざって sed が崩れるのを防ぐ
+  if ! out=$(psql_run -o /dev/null -f "$1" 2>&1); then
     echo "$out"
     echo "FAIL: $1"
     exit 1
@@ -108,9 +109,14 @@ done
 # 同時実行のテスト（Task 6a が supabase/tests/concurrency/ を作り、6b 以降で足す）。
 # 規約: supabase/tests/concurrency/*.sh を名前順にすべて動かす（なければ何もしない）。
 # コミット済みのユーザー C のデータに対して、通常のテストがすべて終わった後に動かす
+export CONTAINER
 for t in supabase/tests/concurrency/*.sh; do
   [ -e "$t" ] || continue
   echo "== concurrency/$(basename "$t")"
-  # shellcheck disable=SC1090
-  source "$t"
+  # source ではなく子プロセスで動かす（スクリプトの中の exit で、このランナーが
+  # 成功のまま終わってしまうのを防ぐ）。非ゼロで終わったら、ランナーも非ゼロで止まる
+  if ! bash "$t"; then
+    echo "FAIL: $t"
+    exit 1
+  fi
 done
