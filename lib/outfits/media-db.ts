@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MediaProvider } from "@/lib/media/media-store";
-import { MediaNotFoundError, MediaUploadConflictError } from "@/lib/outfits/media-service";
+import { MediaNotFoundError, MediaStateTransitionError, MediaUploadConflictError } from "@/lib/outfits/media-service";
 
 // outfit_media の読み書き。書き込みはすべて 023 の RPC（service_role 専用）を通す。
 
@@ -88,6 +88,7 @@ function mapError(error: { message: string }): Error {
   if (error.message.includes("media_conflict") || error.message.includes("media_attempt_changed")) {
     return new MediaUploadConflictError(error.message);
   }
+  if (error.message.includes("invalid_media_transition")) return new MediaStateTransitionError(error.message);
   if (error.message.includes("media_not_found")) return new MediaNotFoundError(error.message);
   return new Error(error.message);
 }

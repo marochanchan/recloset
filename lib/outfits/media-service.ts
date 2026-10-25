@@ -24,6 +24,14 @@ export class MediaNotUploadedError extends Error {
   }
 }
 
+// 今の状態からは進められない遷移（invalid_media_transition）
+export class MediaStateTransitionError extends Error {
+  constructor(message = "invalid_media_transition") {
+    super(message);
+    this.name = "MediaStateTransitionError";
+  }
+}
+
 // 本人のメディアが見つからないとき（他人の ID も同じ扱い）
 export class MediaNotFoundError extends Error {
   constructor(message = "media_not_found") {
@@ -46,6 +54,24 @@ function targetStatus(kind: OutfitMediaRow["kind"], state: AssetState["state"]):
   if (state === "ready") return "ready";
   if (state === "processing" && kind === "video") return "processing";
   return null;
+}
+
+type SetStateInput = Parameters<OutfitMediaDb["setState"]>[0];
+
+// 確かめているあいだに webhook が終わりの状態（ready / failed）を先に書いた場合は、記録済みとして返す
+async function setStateOrTerminal(deps: MediaServiceDeps, input: SetStateInput): Promise<OutfitMediaRow> {
+  try {
+    return await deps.db.setState(input);
+  } catch (error) {
+    if (!(error instanceof MediaStateTransitionError)) throw error;
+    const current = await deps.db.getMedia(input.userId, input.mediaId);
+    if (!current) throw error;
+    if (current.uploadAttempt !== input.expectedUploadAttempt) {
+      throw new MediaUploadConflictError("media_attempt_changed");
+    }
+    if (current.status === "ready" || current.status === "failed") return current;
+    throw error;
+  }
 }
 
 function dimensions(state: AssetState, width?: number, height?: number) {
@@ -125,7 +151,7 @@ export async function completeMediaUpload(
   if (!status) throw new MediaNotUploadedError();
 
   // 確かめた試行を渡す。置き換わっていれば MediaUploadConflictError になる
-  return deps.db.setState({
+  return setStateOrTerminal(deps, {
     userId: input.userId,
     mediaId: input.mediaId,
     expectedUploadAttempt: row.uploadAttempt,
@@ -146,7 +172,7 @@ export async function retryMediaUpload(
   const status = targetStatus(row.kind, state.state);
   if (status) {
     // もう届いている。新しい試行は作らない
-    const updated = await deps.db.setState({
+    const updated = await setStateOrTerminal(deps, {
       userId: input.userId,
       mediaId: input.mediaId,
       expectedUploadAttempt: row.uploadAttempt,

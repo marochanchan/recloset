@@ -23,6 +23,7 @@ registerHooks({
 const {
   MediaNotFoundError,
   MediaNotUploadedError,
+  MediaStateTransitionError,
   MediaUploadConflictError,
   completeMediaUpload,
   retryMediaUpload,
@@ -109,6 +110,10 @@ function createFakeDb() {
       row.uploadAttempt += 1;
       row.uploadExpiresAt = i.uploadExpiresAt.toISOString();
       row.status = "uploading";
+      // 023 と同じく、前の試行の大きさは消す
+      row.width = null;
+      row.height = null;
+      row.durationSec = null;
       return { ...row };
     },
     async setState(i) {
@@ -121,7 +126,7 @@ function createFakeDb() {
         (row.status === "uploading" && ["processing", "ready", "failed"].includes(i.status)) ||
         (row.status === "processing" && ["processing", "ready", "failed"].includes(i.status)) ||
         (row.status === "ready" && i.status === "ready");
-      if (!ok) throw new Error("invalid_media_transition");
+      if (!ok) throw new MediaStateTransitionError("invalid_media_transition");
       row.status = i.status;
       if (i.width !== undefined) row.width = i.width;
       if (i.height !== undefined) row.height = i.height;
@@ -219,9 +224,11 @@ test("開始：registerMedia が別の asset ID の行を返したら（同時�
     takenAt: null,
     sortOrder: 0,
   });
+  s.store.assets.set("other-asset", { provider: "cf_images", state: "awaiting_upload" });
   s.hooks.nullNextGetMedia = true; // 自分が見たときはまだ無かった
   await assert.rejects(startMediaUpload(s.deps, s.startInput), (e) => e instanceof MediaUploadConflictError);
-  assert.equal(s.store.assets.size, 0);
+  // 消えたのは自分の ID だけで、先に登録した方の ID は残る
+  assert.deepEqual([...s.store.assets.keys()], ["other-asset"]);
   assert.equal(s.rows.get(MEDIA)?.providerAssetId, "other-asset");
 });
 
@@ -401,4 +408,57 @@ test("他人のメディア ID：getMedia が null なら MediaNotFoundError（C
     (e) => e instanceof MediaNotFoundError,
   );
   assert.equal(s.createCalls.length, 0);
+});
+
+// webhook が終わりの状態を先に書いたあとに、確かめた processing を書こうとする場合
+async function videoWithWebhookRace(terminal: "ready" | "failed", replace: boolean) {
+  const s = setup();
+  await startMediaUpload(s.deps, { ...s.startInput, kind: "video" });
+  s.store.setState("fake-video-1", { state: "processing" });
+  const original = s.store.getAssetState.bind(s.store);
+  s.store.getAssetState = async (provider, assetId) => {
+    const state = await original(provider, assetId);
+    await s.db.setState({ userId: USER, mediaId: MEDIA, expectedUploadAttempt: 1, status: terminal });
+    if (replace && terminal === "failed") {
+      await s.db.replaceAsset({
+        userId: USER,
+        mediaId: MEDIA,
+        expectedUploadAttempt: 1,
+        assetId: "replacement",
+        uploadExpiresAt: NOW,
+      });
+    }
+    return state;
+  };
+  return s;
+}
+
+for (const terminal of ["ready", "failed"] as const) {
+  test(`完了：確かめているあいだに webhook が ${terminal} を書いたら、その行を返す`, async () => {
+    const s = await videoWithWebhookRace(terminal, false);
+    const row = await completeMediaUpload(s.deps, { userId: USER, mediaId: MEDIA });
+    assert.equal(row.status, terminal);
+    assert.equal(row.uploadAttempt, 1);
+  });
+
+  test(`送り直し：確かめているあいだに webhook が ${terminal} を書いたら、新しい試行を作らず uploadUrl は null でその行を返す`, async () => {
+    const s = await videoWithWebhookRace(terminal, false);
+    const result = await retryMediaUpload(s.deps, { userId: USER, mediaId: MEDIA });
+    assert.equal(result.uploadUrl, null);
+    assert.equal(result.row.status, terminal);
+    assert.equal(s.createCalls.length, 1);
+  });
+}
+
+test("完了・送り直し：webhook の failed のあとに試行が置き換わったら MediaUploadConflictError", async () => {
+  const a = await videoWithWebhookRace("failed", true);
+  await assert.rejects(
+    completeMediaUpload(a.deps, { userId: USER, mediaId: MEDIA }),
+    (e) => e instanceof MediaUploadConflictError,
+  );
+  const b = await videoWithWebhookRace("failed", true);
+  await assert.rejects(
+    retryMediaUpload(b.deps, { userId: USER, mediaId: MEDIA }),
+    (e) => e instanceof MediaUploadConflictError,
+  );
 });
