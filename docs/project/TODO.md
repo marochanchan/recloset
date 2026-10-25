@@ -18,9 +18,9 @@
 - [x] ブレスト（要件と設計）
 - [x] 仕様書を書く
 - [x] Codex が仕様書をレビューする（指摘15件を反映、2026-10-25）
-- [ ] 開発プラン（TDD）を書く
-- [ ] Codex が開発プランをレビューする
-- [ ] Cloudflare Images と Stream を有効化し、鍵と環境変数を用意する
+- [x] 開発プラン（TDD）を書く（Plan 1：`docs/superpowers/plans/2026-10-25-chakuga-plan1-foundation-thin-slice.md`）
+- [x] Codex が開発プランをレビューする（指摘12件を反映、2026-10-25）
+- [ ] Cloudflare Images と Stream の設定（バリアント、署名の鍵、webhook）と環境変数（契約、トークン、アカウント ID は済）
 - [ ] 本番相当で確かめる：写真のアップロード、署名付きの非公開配信、AI への入力、Stream の署名と webhook
 - [ ] `.superpowers/` を `.gitignore` に足す
 - [x] プレゼンのセッションに仕様の要点を共有する
