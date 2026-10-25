@@ -28,6 +28,10 @@ begin;
 -- -----------------------------------------
 -- 準備（postgres）
 -- -----------------------------------------
+-- 024 の初期集計で作られた item_monthly_stats は、このテストが数を決めて入れ直すため消す
+-- （rollback で戻る）
+delete from public.item_monthly_stats;
+
 insert into public.clothing_items (id, user_id, title, category)
 values (:'B_ITEM2', :'B', 'Bの服2', 'bottoms');
 

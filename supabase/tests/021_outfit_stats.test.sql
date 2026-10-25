@@ -22,6 +22,8 @@ begin;
 -- -----------------------------------------
 delete from public.wear_logs
  where clothing_item_id in (select id from public.clothing_items where user_id = :'A');
+-- 024 の初期集計で作られた A のサマリーも消す（記録を消したので古い値になる）
+delete from public.item_monthly_stats where user_id = :'A';
 
 insert into public.clothing_items (id, user_id, title, category, wear_count)
 values
