@@ -1095,9 +1095,23 @@ git commit -m "feat: add thin outfit recording flow with relation lines"
   - 本番で、「今日着た」と服の削除が動くこと（今は RPC を通る）と、細い流れが動くことを確かめる。
 
 - [ ] **Step 5: 024 を本番に適用し、webhook と Cron を本番に向ける**
-  1. ユーザーが SQL Editor で 024 を実行し、`notice` に出た件数を TODO に記録する。
-  2. 本番で、次がすべて今までどおり動くことを確かめる：「今日着た」、服の登録（1着ずつと、写真からまとめて）、服の編集、服の削除、細い流れ。
-  3. 服の登録か編集が失敗したら、すぐ次を SQL Editor で実行して元に戻し、Claude に知らせる（列の権限の一覧を直してから、024 を適用し直す）：
+  1. 024 の前に、読むだけの確認を SQL Editor で実行し、結果を TODO に記録する。SQL Editor は `raise notice` を表示しないことがあるため、ずれていた服の件数はここで残す。
+
+     ```sql
+     -- wear_count か last_worn_at が着用記録と違う服の件数（024 の初期集計で直る）
+     select count(*) from public.clothing_items c
+     left join lateral (select count(*) n, max(worn_at) m from public.wear_logs w where w.clothing_item_id = c.id) s on true
+     where c.wear_count <> s.n or c.last_worn_at is distinct from s.m;
+     -- anon に古い書き込み権限が残っていないか（すべて false であること）
+     select has_table_privilege('anon', 'public.wear_logs', 'insert'),
+            has_table_privilege('anon', 'public.clothing_items', 'insert'),
+            has_table_privilege('anon', 'public.clothing_items', 'update');
+     ```
+
+     anon の結果に true があれば、024 の前に Claude に知らせる（024 は authenticated だけを締めるため）。
+  2. ユーザーが SQL Editor で 024 を実行する。
+  3. 本番で、次がすべて今までどおり動くことを確かめる：「今日着た」、服の登録（1着ずつと、写真からまとめて）、服の編集、服の削除、細い流れ。
+  4. 服の登録か編集が失敗したら、すぐ次を SQL Editor で実行して元に戻し、Claude に知らせる（列の権限の一覧を直してから、024 を適用し直す）：
 
      ```sql
      begin;
@@ -1106,9 +1120,9 @@ git commit -m "feat: add thin outfit recording flow with relation lines"
      commit;
      ```
 
-  4. `node --env-file=.env.local scripts/setup-cloudflare.mts --webhook https://<本番のドメイン>/api/webhooks/cloudflare-stream` を実行する。通知先はアカウントに1つなので、プレビューへの通知はここで止まる。本番のドメインには保護を通る設定を付けない。スクリプトは、秘密が前と変わったかどうかだけを表示する。変わっていたら、ユーザーが Vercel の Production の `CLOUDFLARE_STREAM_WEBHOOK_SECRET` を入れ直し、もう一度デプロイする。
-  5. Vercel の Settings → Cron Jobs に `/api/cron/media-deletions` が出ていることを確かめ、そこから1回動かして、ログに 200 が出ることを確かめる。
-  6. Task 3 で作った `VERCEL_AUTOMATION_BYPASS_SECRET` は、もう使わない。ユーザーが Vercel で取り消してよい。
+  5. `node --env-file=.env.local scripts/setup-cloudflare.mts --webhook https://<本番のドメイン>/api/webhooks/cloudflare-stream` を実行する。通知先はアカウントに1つなので、プレビューへの通知はここで止まる。本番のドメインには保護を通る設定を付けない。スクリプトは、秘密が前と変わったかどうかだけを表示する。変わっていたら、ユーザーが Vercel の Production の `CLOUDFLARE_STREAM_WEBHOOK_SECRET` を入れ直し、もう一度デプロイする。
+  6. Vercel の Settings → Cron Jobs に `/api/cron/media-deletions` が出ていることを確かめ、そこから1回動かして、ログに 200 が出ることを確かめる。
+  7. Task 3 で作った `VERCEL_AUTOMATION_BYPASS_SECRET` は、もう使わない。ユーザーが Vercel で取り消してよい。
 
 - [ ] **Step 6: 本番で通しで確かめる**（手動の確認リスト。結果を TODO に記録する）
   - [ ] 服の詳細 →「この服で着画を記録」→ 写真を選ぶ → 送れる。
