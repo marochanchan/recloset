@@ -20,9 +20,8 @@ registerHooks({
   },
 });
 
-const { CloudflareApiError, createCloudflareApi, createCloudflareMediaStore } =
-  await import("../lib/media/cloudflare-api.ts");
-const { mapStreamState } = await import("../lib/media/media-store.ts");
+const { CloudflareApiError, createCloudflareApi } = await import("../lib/media/cloudflare-api.ts");
+const { createCloudflareMediaStore, mapStreamState } = await import("../lib/media/media-store.ts");
 const { createFakeMediaStore } = await import("../lib/media/fake-media-store.ts");
 
 const apiConfig = { accountId: "acc1", apiToken: "secret-token" };
@@ -31,7 +30,7 @@ const base = "https://api.cloudflare.com/client/v4/accounts/acc1";
 type Call = { url: string; method: string; headers: Headers; body: unknown };
 
 // 呼び先ごとに決まった応答を返し、呼ばれた内容を記録するダミーの fetch
-function fakeFetch(respond: (call: Call) => { status?: number; json: unknown }) {
+function fakeFetch(respond: (call: Call) => { status?: number; json?: unknown; raw?: string }) {
   const calls: Call[] = [];
   const impl = (async (input: string | URL | Request, init?: RequestInit) => {
     const call: Call = {
@@ -41,8 +40,8 @@ function fakeFetch(respond: (call: Call) => { status?: number; json: unknown }) 
       body: init?.body,
     };
     calls.push(call);
-    const { status = 200, json } = respond(call);
-    return new Response(JSON.stringify(json), { status, headers: { "content-type": "application/json" } });
+    const { status = 200, json, raw } = respond(call);
+    return new Response(raw ?? JSON.stringify(json), { status, headers: { "content-type": "application/json" } });
   }) as typeof fetch;
   return { calls, impl };
 }
@@ -158,6 +157,24 @@ test("deleteAsset：404 は not_found、200 は deleted、500 は CloudflareApiE
       assert.ok(!error.message.includes("secret-token"));
       return true;
     },
+  );
+});
+
+test("deleteImage：200 でも本文が JSON として読めなければ CloudflareApiError", async () => {
+  const api = createCloudflareApi(apiConfig, fakeFetch(() => ({ raw: "<html>oops</html>" })).impl);
+  await assert.rejects(
+    () => api.deleteImage("a"),
+    (error: unknown) => error instanceof CloudflareApiError && error.status === 200,
+  );
+});
+
+test("deleteStreamVideo：200 で本文が空なら deleted、空でなく読めない本文は CloudflareApiError", async () => {
+  const empty = createCloudflareApi(apiConfig, fakeFetch(() => ({ raw: "" })).impl);
+  assert.equal(await empty.deleteStreamVideo("a"), "deleted");
+  const broken = createCloudflareApi(apiConfig, fakeFetch(() => ({ raw: "<html>oops</html>" })).impl);
+  await assert.rejects(
+    () => broken.deleteStreamVideo("a"),
+    (error: unknown) => error instanceof CloudflareApiError && error.status === 200,
   );
 });
 

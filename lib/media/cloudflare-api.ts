@@ -1,10 +1,7 @@
 // Cloudflare Images / Stream の API 呼び出し。fetch は差し替えられるので、テストはネットワークに出ない。
 // トークンはヘッダーにだけ使い、エラーメッセージやログには入れない。
 
-import type { CloudflareApiConfig, CloudflareConfig } from "@/lib/media/cloudflare-config";
-import { buildStreamUrls, createStreamToken, signImagesDeliveryUrl } from "@/lib/media/cloudflare-signing";
-import { mapStreamState } from "@/lib/media/media-store";
-import type { AssetState, MediaProvider, MediaStore } from "@/lib/media/media-store";
+import type { CloudflareApiConfig } from "@/lib/media/cloudflare-config";
 
 export class CloudflareApiError extends Error {
   status: number;
@@ -39,17 +36,25 @@ export function createCloudflareApi(config: CloudflareApiConfig, fetchImpl: type
   async function call(
     method: string,
     path: string,
-    options: { body?: FormData | string; json?: boolean; allowNotFound?: boolean } = {},
+    options: { body?: FormData | string; json?: boolean; allowNotFound?: boolean; allowEmptyBody?: boolean } = {},
   ): Promise<{ result: unknown } | null> {
     const headers: Record<string, string> = { Authorization: `Bearer ${config.apiToken}` };
     if (options.json) headers["Content-Type"] = "application/json";
     const response = await fetchImpl(`${base}${path}`, { method, headers, body: options.body });
     if (response.status === 404 && options.allowNotFound) return null;
+    // 本文が JSON として読めないときは、成功とは見なさず例外にする（2xx の空本文は allowEmptyBody のときだけ許す）
     let envelope: Envelope = {};
+    const text = await response.text();
+    if (text.trim() === "" && response.ok && options.allowEmptyBody) {
+      return { result: null };
+    }
     try {
-      envelope = (await response.json()) as Envelope;
+      envelope = JSON.parse(text) as Envelope;
     } catch {
-      // 本文が JSON でないときは、状態コードだけで失敗を伝える
+      throw new CloudflareApiError(
+        `Cloudflare API の応答が JSON ではありません (${method} ${path}) status=${response.status}`,
+        response.status,
+      );
     }
     if (!response.ok || envelope.success === false) {
       const details = (envelope.errors ?? [])
@@ -126,69 +131,10 @@ export function createCloudflareApi(config: CloudflareApiConfig, fetchImpl: type
     },
 
     async deleteStreamVideo(uid: string): Promise<"deleted" | "not_found"> {
-      const response = await call("DELETE", `/stream/${uid}`, { allowNotFound: true });
+      const response = await call("DELETE", `/stream/${uid}`, { allowNotFound: true, allowEmptyBody: true });
       return response ? "deleted" : "not_found";
     },
   };
 }
 
 export type CloudflareApi = ReturnType<typeof createCloudflareApi>;
-
-// 配信 URL の有効期間
-const DELIVERY_TTL_MS = 60 * 60 * 1000;
-
-export function createCloudflareMediaStore(config: CloudflareConfig, api: CloudflareApi): MediaStore {
-  return {
-    async createUpload(input) {
-      const meta = { userId: input.userId, mediaId: input.mediaId };
-      if (input.kind === "photo") {
-        const upload = await api.createImageUpload({ metadata: meta, expiresAt: input.expiresAt });
-        return { provider: "cf_images", assetId: upload.id, uploadUrl: upload.uploadURL };
-      }
-      const upload = await api.createStreamUpload({ meta, expiresAt: input.expiresAt });
-      return { provider: "cf_stream", assetId: upload.uid, uploadUrl: upload.uploadURL };
-    },
-
-    async getAssetState(provider: MediaProvider, assetId: string): Promise<AssetState> {
-      if (provider === "cf_images") {
-        const image = await api.getImage(assetId);
-        if (!image) return { state: "missing" };
-        return { state: image.draft ? "awaiting_upload" : "ready" };
-      }
-      const video = await api.getStreamVideo(assetId);
-      if (!video) return { state: "missing" };
-      const state = mapStreamState({ state: video.state, readyToStream: video.readyToStream });
-      if (state !== "ready") return { state };
-      const result: AssetState = { state };
-      if (video.width !== null) result.width = video.width;
-      if (video.height !== null) result.height = video.height;
-      if (video.duration !== null) result.durationSec = video.duration;
-      return result;
-    },
-
-    deleteAsset(provider, assetId) {
-      return provider === "cf_images" ? api.deleteImage(assetId) : api.deleteStreamVideo(assetId);
-    },
-
-    signedImageUrl(assetId, variant, now) {
-      return signImagesDeliveryUrl({
-        accountHash: config.imagesAccountHash,
-        imageId: assetId,
-        variant,
-        signingKey: config.imagesSigningKey,
-        expiresAt: new Date(now.getTime() + DELIVERY_TTL_MS),
-      });
-    },
-
-    signedStreamUrls(assetId, now) {
-      const token = createStreamToken({
-        videoUid: assetId,
-        keyId: config.streamSigningKeyId,
-        jwkBase64: config.streamSigningJwk,
-        expiresAt: new Date(now.getTime() + DELIVERY_TTL_MS),
-        now,
-      });
-      return buildStreamUrls({ customerCode: config.streamCustomerCode, token });
-    },
-  };
-}
