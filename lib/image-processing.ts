@@ -33,6 +33,12 @@ export const UPLOAD_IMAGE_OPTIONS: ImageOutputOptions = {
   quality: 0.85,
 };
 
+/** 着画（コーデの写真）。Cloudflare Imagesへ直接送るので、Server Actionの上限は関係しない */
+export const OUTFIT_UPLOAD_IMAGE_OPTIONS: ImageOutputOptions = {
+  maxLongEdge: 2560,
+  quality: 0.9,
+};
+
 /** 画像AI解析に送る画像（Server Actionの1MB上限に収まる大きさ） */
 export const ANALYSIS_IMAGE_OPTIONS: ImageOutputOptions = {
   maxLongEdge: 1024,
@@ -204,4 +210,12 @@ export function processImageForAnalysis(
   rotation: ImageRotation,
 ): Promise<ProcessedImage> {
   return processImage(file, rotation, ANALYSIS_IMAGE_OPTIONS);
+}
+
+/** 着画として送る画像（長辺2560px・JPEG品質0.9） */
+export function processImageForOutfitUpload(
+  file: Blob,
+  rotation: ImageRotation,
+): Promise<ProcessedImage> {
+  return processImage(file, rotation, OUTFIT_UPLOAD_IMAGE_OPTIONS);
 }
