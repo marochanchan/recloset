@@ -352,7 +352,7 @@ Expected: すべての段階が `ok:` で、終了コード0
      - 401 か、Vercel のログイン画面への転送なら、保護されている。ユーザーが Vercel の Settings → Deployment Protection → Protection Bypass for Automation で秘密を作り、`.env.local` の `VERCEL_AUTOMATION_BYPASS_SECRET` に入れる。
      - アプリの 401（署名がないため）が返れば、保護はない。どちらの 401 かは、本文に Vercel のログイン画面が含まれるかで見分ける。
   3. `node --env-file=.env.local scripts/setup-cloudflare.mts --webhook https://<ブランチの URL>/api/webhooks/cloudflare-stream --preview` を実行する（秘密は `.env.local` に書き込まれる。`--preview` を付けたときだけ、保護を通る設定が URL に付く）。ユーザーがその値を Vercel の Preview に入れて、もう一度デプロイする。
-  4. smoke をもう一度動かし、Vercel のログで、webhook への POST が 200 で、応答が `{"result":"ignored"}` であることを確かめる（smoke の動画には outfit_media の行がないため）。401 なら署名か秘密、500 なら 023 の適用か `SUPABASE_SECRET_KEY` を確かめる。
+  4. smoke をもう一度動かし、Vercel のログ（Requests）で、webhook への POST が 200 であることを確かめる。応答の本文（`{"result":"ignored"}`。smoke の動画には outfit_media の行がないため）はログに出ないので、状態コードで判断する。401 なら署名か秘密、500 なら 023 の適用か `SUPABASE_SECRET_KEY` を確かめる。
   5. 通知先は、本番に切り替えるとき（Task 12b）に本番のドメインへ登録し直す。
 
 - [ ] **Step 8: TODO に結果を記録してコミットする**
@@ -1133,7 +1133,7 @@ git commit -m "feat: add thin outfit recording flow with relation lines"
   - [ ] 「今日着た」と服の削除が、今までどおり動く。
   - [ ] smoke の動画を送ると、本番の webhook が 200 と `ignored` を返す（メディアの行がないため）。
   - [ ] 服 A の詳細から記録画面を開き、戻って服 B から開き直すと、選ばれているのは B だけ。
-  - [ ] 選んだ服を別のタブで削除すると、選択から外れる。
+  - [ ] 選んだ服を別のタブで削除し、記録画面を開き直すと（一覧を取り直すと）、選択から外れる。別のタブの削除は自動では反映されない。
   - [ ] 記録画面から別の画面へ移って戻っても、写真のプレビューが表示される。
   - [ ] 確定の通信を切って（DevTools の Offline）戻し、もう一度確定すると、服の詳細の着用回数と線が更新される。
 
