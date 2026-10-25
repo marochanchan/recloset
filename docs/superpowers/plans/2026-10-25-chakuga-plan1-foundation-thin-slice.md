@@ -151,6 +151,7 @@ test("webhook：正しい署名は ok");                          // → { ok: t
 test("webhook：本文が1文字違うと mismatch");                 // rawBody '{"uid":"v2"}' → mismatch
 test("webhook：秘密が違うと mismatch");
 test("webhook：301秒より古いと expired");                    // now = 1700000301 → expired（300 ちょうどは ok）
+test("webhook：301秒より未来も expired");                    // now = 1699999699 → expired（now = 1699999700 は ok）。ずれは絶対値で比べる
 test("webhook：ヘッダーがないと missing、形が違うと malformed"); // null → missing、"sig1=abc" → malformed
 test("設定：API 用は、アカウント ID とトークンだけの環境で読める");  // readCloudflareApiConfig({ CLOUDFLARE_ACCOUNT_ID: "a", CLOUDFLARE_API_TOKEN: "t" }) が通る
 test("設定：署名用は、足りない環境変数の名前をすべて挙げて例外にする"); // readCloudflareConfig({ CLOUDFLARE_ACCOUNT_ID: "a", CLOUDFLARE_API_TOKEN: "t" }) の message に
@@ -170,7 +171,7 @@ Expected: FAIL（`lib/media/cloudflare-signing.ts` が見つからない）
 - [ ] **Step 4: テストが通ることを確かめる**
 
 Run: `node --test scripts/test-cloudflare-signing.mts`
-Expected: PASS（11 tests）
+Expected: PASS（12 tests）
 
 - [ ] **Step 5: `.gitignore`、`.env.example`、`package.json` を直してコミットする**
 
@@ -328,14 +329,15 @@ Expected: PASS（6 tests）、lint と build はエラーなし
   - Vercel に入れる値は、ユーザーが `.env.local` を開いてコピーする（Claude は `.env.local` の中身を読まない）。
 
 - [ ] **Step 5: `scripts/smoke-cloudflare.mts` を書く**（引数：服の写真の JPEG のパスと、MP4 のパス。どの段階が失敗したかを表示して、終了コード1で止まる）
-  - アップロードと配信の ID の取り出しは、`readCloudflareApiConfig` と `createCloudflareApi` だけで行う。署名付き URL を作る段階で、取り出した値を足して `readCloudflareConfig({ ...process.env, ... })` と `createCloudflareMediaStore` を作る。
+  - アップロードと配信の ID の取り出し（1〜2）は、`readCloudflareApiConfig` と `createCloudflareApi` だけで行う。2つの配信の ID がそろってから（3）、署名付き URL を確かめる。
   - 作った写真と動画の ID は配列に持ち、**`try` 〜 `finally` で必ず後片付けする**（途中の段階が失敗しても消す）。削除にも失敗したら、ID と種類だけを表示して終了コード1にする（秘密は出さない）。
-  1. 写真：`createImageUpload` → 渡された JPEG を `uploadUrl` に POST → `getImage` が draft でない。
-  2. `CLOUDFLARE_IMAGES_ACCOUNT_HASH` がまだなければ、`getImage` の応答の `variants` の URL（`https://imagedelivery.net/<hash>/<id>/<variant>`）から取り出して使い、`.env.local` に書き込む（秘密ではないが、書き方をそろえる）。そのため Task 2 の `getImage` は `{ draft: boolean; variants: string[] }` を返す。
-  3. 署名なしの `https://imagedelivery.net/{hash}/{id}/thumb` が 200 でない。3つのバリアントの署名付き URL が、どれも 200。
-  4. AI の入力：`analysis` の署名付き URL の中身を `analyzeClothingImage()` に渡し、結果の `category` を表示する。
-  5. 動画：`createStreamUpload` → MP4 を POST → `mapStreamState` が ready になるまで5秒ごとに確かめる（最大3分）。`CLOUDFLARE_STREAM_CUSTOMER_CODE` がまだなければ、動画の応答の `preview` の URL（`https://customer-<CODE>.cloudflarestream.com/...`）から取り出して使い、`.env.local` に書き込む（そのため `getStreamVideo` は `preview` も返す）。署名なしの manifest とサムネイルが 200 でない。署名付きは 200。
-  6. 後片付け（`finally`）：写真と動画を削除 → 両方とも `getImage`・`getStreamVideo` が `null`。
+  1. 写真：`createImageUpload` → 渡された JPEG を `uploadUrl` に POST → `getImage` が draft でない。`CLOUDFLARE_IMAGES_ACCOUNT_HASH` がまだなければ、`getImage` の応答の `variants` の URL（`https://imagedelivery.net/<hash>/<id>/<variant>`）から取り出して使い、`.env.local` に書き込む（秘密ではないが、書き方をそろえる）。そのため Task 2 の `getImage` は `{ draft: boolean; variants: string[] }` を返す。
+  2. 動画：`createStreamUpload` → MP4 を POST → `mapStreamState` が ready になるまで5秒ごとに確かめる（最大3分）。`CLOUDFLARE_STREAM_CUSTOMER_CODE` がまだなければ、動画の応答の `preview` の URL（`https://customer-<CODE>.cloudflarestream.com/...`）から取り出して使い、`.env.local` に書き込む（そのため `getStreamVideo` は `preview` も返す）。
+  3. 取り出した2つの値を足して `readCloudflareConfig({ ...process.env, CLOUDFLARE_IMAGES_ACCOUNT_HASH: ..., CLOUDFLARE_STREAM_CUSTOMER_CODE: ... })` と `createCloudflareMediaStore` を作る（署名の鍵は、先に setup の `--stream-key` で入れておく）。
+  4. 写真の署名：署名なしの `https://imagedelivery.net/{hash}/{id}/thumb` が 200 でない。3つのバリアントの署名付き URL が、どれも 200。
+  5. AI の入力：`analysis` の署名付き URL の中身を `analyzeClothingImage()` に渡し、結果の `category` を表示する。
+  6. 動画の署名：署名なしの manifest とサムネイルが 200 でない。署名付きは 200。
+  7. 後片付け（`finally`）：写真と動画を削除 → 両方とも `getImage`・`getStreamVideo` が `null`。
 
 - [ ] **Step 6: 動かす**
 
@@ -533,10 +535,11 @@ git commit -m "feat: add monthly outfit stats rebuild functions"
 ```text
 1. p_expected_revision が null か負なら invalid_revision。
    ロック → outfits を user で for update 取得（なければ outfit_not_found）
+   p_expected_revision > revision なら invalid_revision（中身が同じでも。次の 3 より先に確かめる）
 2. 新しい服のどれかが本人の服でなければ item_not_found。足す服がしまった服（archived_at あり）でも item_not_found
 3. 状態が confirmed で、worn_on・服の集合・note が今と同じなら {unchanged, 今の revision} を返す
-   （p_expected_revision は問わない。応答だけが失われた送り直しを、古い版として拒否しないため）
-4. p_expected_revision < revision なら {stale, revision} を返す。> revision なら invalid_revision
+   （p_expected_revision が今と同じか古くてもよい。応答だけが失われた送り直しを、古い版として拒否しないため）
+4. p_expected_revision < revision なら {stale, revision} を返す
 5. 影響する月 = 元の worn_on の月（確定済みのとき）と、新しい worn_on の月
 6. 外す服：outfit_items の行を消す（source にかかわらず）。
    つながっていた記録が source=outfit なら、その記録も消す。wear_today なら残す
@@ -567,6 +570,7 @@ git commit -m "feat: add monthly outfit stats rebuild functions"
 -- ok: 同じ内容をもう一度（expected 0 でも 1 でも）送ると {unchanged, 1}、記録は増えない         ← Review Focus 2
 -- ok: 古い版から別の内容を送ると {stale, 2}、何も変わらない
 -- ok: expected が null・-1・今より大きい版なら invalid_revision で、何も変わらない
+-- ok: 中身が今と同じでも、expected が 999 なら unchanged ではなく invalid_revision
 -- ok: 服を外すと、その服の outfit_items の行が消える。source=outfit の記録は消え、使っていた wear_today の記録は残る
 -- ok: 服を外したあと、外した服を含む組み合わせ（item_pair_monthly_stats）と、元の服の集合の combo の行が消える
 -- ok: 服を足すと、outfit_items の行ができ、その服の記録がつながる
@@ -688,8 +692,8 @@ git commit -m "feat: add outfit delete, wear-today and hard-delete RPCs"
     - 種類が photo で、コーデの `analysis_media_id` が null なら、それにする。
   - 次の2つは、`p_expected_upload_attempt` が今の `upload_attempt` と同じときだけ書き込む。違えば message `media_attempt_changed` の例外にする（別の処理が先に置き換えた。Cloudflare で確かめた実体が、もう今の試行ではない）。行が `p_user_id` のものでなければ `media_not_found`。
     - `public.replace_outfit_media_asset(p_user_id uuid, p_media_id uuid, p_expected_upload_attempt integer, p_asset_id text, p_upload_expires_at timestamptz) returns public.outfit_media`
-      - 古い ID を `enqueue_media_deletion` に入れる。
-      - 新しい ID に置き換え、`upload_attempt + 1`、`status = 'uploading'` にする。
+      - ロックを取ったあと、今の状態が `processing` か `ready` なら、何も変えずにその行を返す（削除待ちにも入れない）。送り直しが実体を確かめたあとに、完了の知らせが同じ試行を先に ready にした場合、届いた写真を消さないため。
+      - `uploading` か `failed` のときだけ、古い ID を `enqueue_media_deletion` に入れ、新しい ID に置き換え、`upload_attempt + 1`、`status = 'uploading'` にする。
     - `public.set_outfit_media_state(p_user_id uuid, p_media_id uuid, p_expected_upload_attempt integer, p_status text, p_width integer, p_height integer, p_duration_sec numeric) returns public.outfit_media`
       - 許可する変化：`uploading → processing | ready | failed`、`processing → processing | ready | failed`、`ready → ready`。同じ状態への変化は、完了の知らせの送り直しのため。
       - それ以外は message `invalid_media_transition` の例外にする。`failed` から戻すのは `replace_outfit_media_asset` だけ。
@@ -721,6 +725,7 @@ git commit -m "feat: add outfit delete, wear-today and hard-delete RPCs"
 -- ok: 同じ provider_asset_id を別のメディアに登録すると一意制約で失敗する
 -- ok: replace_outfit_media_asset（expected 1）で古い ID が削除待ちに入り、upload_attempt が 2 になる
 -- ok: replace_outfit_media_asset を expected 1 のままもう一度呼ぶと media_attempt_changed で、新しい ID は入らず、削除待ちも増えない
+-- ok: 状態が ready（または processing）のメディアに replace_outfit_media_asset（expected は今の試行）を呼ぶと、行は変わらず（provider_asset_id・upload_attempt・status がそのまま）、削除待ちも増えない
 -- ok: set_outfit_media_state を古い expected で呼ぶと media_attempt_changed で、状態は変わらない
 -- ok: set_outfit_media_state：processing → processing と ready → ready は通る。ready → uploading と failed → ready は invalid_media_transition
 -- ok: apply_stream_webhook：古い ID → ignored、今の ID の ready → applied、もう一度 ready → duplicate
@@ -788,6 +793,7 @@ git commit -m "feat: add server-only outfit media RPCs and deletion queue"
     - 実体が ready か processing なら、`completeMediaUpload` と同じく `setState` して、`uploadUrl: null` を返す。
     - そうでなければ（awaiting_upload でも、期限内でも）、新しいアップロードを作って `replaceAsset` に `expectedUploadAttempt` を渡す。アップロード URL はサーバーに残していないので、前の URL は渡せないため。
     - `replaceAsset` が `MediaUploadConflictError` を投げたら（別の送り直しが先に置き換えた）、自分が作った新しい ID を `deleteAsset` してから、そのエラーを投げ直す。
+    - `replaceAsset` が返した行の `providerAssetId` が自分の新しい ID と違い、状態が `processing` か `ready` なら（確かめたあとに、完了の知らせが先に届いた）、自分の新しい ID を `deleteAsset` して、`uploadUrl: null` とその行を返す（もう届いている）。
   - `class MediaNotUploadedError extends Error`
   - `createAdminClient(): SupabaseClient`（`NEXT_PUBLIC_SUPABASE_URL` と `SUPABASE_SECRET_KEY`。セッションは保存しない。サーバーのファイルからだけ import する、とコメントに書く）
   - `createSupabaseOutfitMediaDb(admin: SupabaseClient): OutfitMediaDb`（Task 7 の RPC を呼び、snake_case を camelCase に直す）
@@ -810,6 +816,8 @@ test("完了：実体を確かめているあいだに、別の処理が試行�
 test("送り直し：Cloudflare に届いていれば新しい試行を作らず、uploadUrl は null で ready になる");   // ← Review Focus 1
 test("送り直し：期限切れ（missing）なら新しい asset を作り、replaceAsset で upload_attempt が増える");
 test("送り直し：2つの送り直しが同じ試行を見て、あとの方の replaceAsset が食い違ったら、あとの方が作った ID を消して MediaUploadConflictError。先の方の URL の ID は削除待ちに入らない");
+test("送り直し：実体を確かめたあと、完了の知らせが同じ試行を先に ready にしたら、作った新しい ID を消して uploadUrl は null。届いた写真の ID は削除待ちに入らない");
+// store.getAssetState を、awaiting_upload を返す前に db.setState(ready) を済ませるように差し替えて再現する
 test("他人のメディア ID：getMedia が null なら MediaNotFoundError（Cloudflare は呼ばない）");
 ```
 
@@ -823,7 +831,7 @@ Expected: FAIL（モジュールがない）
 - [ ] **Step 4: テストが通ることを確かめる**
 
 Run: `node --test scripts/test-outfit-media-service.mts`
-Expected: PASS（15 tests）
+Expected: PASS（16 tests）
 
 - [ ] **Step 5: コミットする**
 
