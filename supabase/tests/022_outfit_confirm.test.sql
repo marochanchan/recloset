@@ -471,6 +471,42 @@ select test.assert(
   and (select status from public.outfits where id = :'O_B') = 'pending',
   'B のコーデを A が確定しようとすると outfit_not_found');
 
+-- -----------------------------------------
+-- wear_today につながっている残す服を、別の日の未使用の wear_today につなぎ替える
+-- -----------------------------------------
+\set U_G2 'c0000004-0000-4000-8000-000000000004'
+-- まず G を足して、2025-10-31 に戻す（G は U1 を使う。T・S は outfit の記録の worn_at が直る）
+select test.as_user(:'A');
+insert into _r select 'g_adopt',
+  test.confirm((select id from _o), 6, '2025-10-31', array[:'T', :'S', :'G']::uuid[], 'メモ', 'g_adopt');
+select test.as_postgres();
+select test.assert(
+  (select res = '{"status": "confirmed", "revision": 7}'::jsonb from _r where label = 'g_adopt')
+  and (select wear_log_id from public.outfit_items where outfit_id = (select id from _o) and item_id = :'G') = :'U1'::uuid,
+  '（確認）G は 10/31 の未使用の wear_today U1 につながっている');
+
+-- 11/5 に G の未使用の wear_today を用意して、日付を 11/5 に変える
+insert into public.wear_logs (id, clothing_item_id, worn_at, source)
+values (:'U_G2', :'G', '2025-11-05 09:00+09', 'wear_today');
+select public.recompute_item_wear(array[:'G']::uuid[]);
+select test.ev_mark('g_move', :'A');
+insert into _snap values ('g_outfit_logs',
+  (select count(*)::text from public.wear_logs where clothing_item_id = :'G' and source = 'outfit'));
+
+select test.as_user(:'A');
+insert into _r select 'g_move',
+  test.confirm((select id from _o), 7, '2025-11-05', array[:'T', :'S', :'G']::uuid[], 'メモ', 'g_move');
+select test.as_postgres();
+select test.assert(
+  (select res = '{"status": "confirmed", "revision": 8}'::jsonb from _r where label = 'g_move')
+  and exists (select 1 from public.wear_logs where id = :'U1' and source = 'wear_today')
+  and not exists (select 1 from public.outfit_items where wear_log_id = :'U1')
+  and (select wear_log_id from public.outfit_items where outfit_id = (select id from _o) and item_id = :'G') = :'U_G2'::uuid
+  and (select count(*)::text from public.wear_logs where clothing_item_id = :'G' and source = 'outfit')
+      = (select h from _snap where label = 'g_outfit_logs')
+  and test.ev_delta('g_move', :'A') = 0,
+  'wear_today につながった残す服を、日付変更で別の日の未使用の wear_today につなぎ替える（元の記録は残って未使用、outfit の記録は作らない、wear_logged は +0、いつも成り立つことも成り立つ）');
+
 -- ログイン前
 select test.as_postgres();
 set local role authenticated;
@@ -504,7 +540,7 @@ select test.assert(
 
 -- どの確定・編集のあとも「いつも成り立つこと」を確かめた
 select test.assert(
-  (select count(*) from test.inv_calls) = 8,
+  (select count(*) from test.inv_calls) = 10,
   'どの確定・編集のあとも、上の2つの「いつも成り立つこと」が成り立つ（確かめる関数を作って毎回呼ぶ）');
 
 rollback;
