@@ -4,6 +4,11 @@
 -- ユーザー向けの RPC（authenticated にだけ execute を許可する）:
 --   public.create_outfit_draft(p_client_request_id, p_worn_on, p_source) returns public.outfits
 --   public.confirm_outfit(p_outfit_id, p_expected_revision, p_worn_on, p_item_ids, p_note) returns jsonb
+--   public.delete_outfit(p_outfit_id) returns void
+--   public.record_wear_today(p_item_id) returns jsonb   -- {created: boolean}
+--   public.hard_delete_item(p_item_id) returns void
+-- 内部用（どのロールにも execute を与えない）:
+--   public.enqueue_media_deletion(p_user, p_provider, p_asset_id) returns void
 --
 -- 方針:
 -- - ユーザーは auth.uid() から決める（引数で受け取らない）。null なら not_authenticated
@@ -255,6 +260,176 @@ end;
 $$;
 
 -- -----------------------------------------
+-- enqueue_media_deletion（内部用。どのロールにも execute を与えない。Task 7 も使う）
+-- 外部（Cloudflare）のメディアの削除待ちに入れる。同じ asset がすでにあれば何もしない
+-- -----------------------------------------
+create or replace function public.enqueue_media_deletion(p_user uuid, p_provider text, p_asset_id text)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  insert into public.media_deletion_queue (user_id, provider, provider_asset_id)
+  values (p_user, p_provider, p_asset_id)
+  on conflict (provider, provider_asset_id) do nothing;
+$$;
+
+-- -----------------------------------------
+-- delete_outfit
+-- source=outfit の記録は消し、wear_today の記録は残す（つながりだけ外れる）
+-- -----------------------------------------
+create or replace function public.delete_outfit(p_outfit_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid    uuid := auth.uid();
+  v_outfit public.outfits;
+  v_items  uuid[];
+  v_months date[];
+  v_media  record;
+  v_month  date;
+begin
+  if v_uid is null then
+    raise exception using errcode = '28000', message = 'not_authenticated';
+  end if;
+  perform public.outfit_lock_user(v_uid);
+
+  select * into v_outfit
+    from public.outfits
+   where id = p_outfit_id and user_id = v_uid
+     for update;
+  if not found then
+    raise exception using errcode = 'P0002', message = 'outfit_not_found';
+  end if;
+
+  -- 影響する服と月（コーデの日付の月と、つながった記録の月）を、消す前に集める
+  select coalesce(array_agg(oi.item_id), '{}') into v_items
+    from public.outfit_items oi where oi.outfit_id = p_outfit_id;
+
+  select coalesce(array_agg(distinct m), '{}') into v_months
+    from (
+      select date_trunc('month', v_outfit.worn_on::timestamp)::date as m
+      union
+      select date_trunc('month', public.jst_date(wl.worn_at)::timestamp)::date
+        from public.outfit_items oi
+        join public.wear_logs wl on wl.id = oi.wear_log_id
+       where oi.outfit_id = p_outfit_id
+    ) x;
+
+  -- source=outfit の記録を消す（wear_today の記録は残す）
+  delete from public.wear_logs wl
+   using public.outfit_items oi
+   where oi.outfit_id = p_outfit_id
+     and oi.wear_log_id = wl.id
+     and wl.source = 'outfit';
+
+  -- メディアを外部の削除待ちに入れる
+  for v_media in
+    select provider, provider_asset_id from public.outfit_media where outfit_id = p_outfit_id
+  loop
+    perform public.enqueue_media_deletion(v_uid, v_media.provider, v_media.provider_asset_id);
+  end loop;
+
+  -- outfit_media と outfit_items は cascade で消える
+  delete from public.outfits where id = p_outfit_id;
+
+  perform public.recompute_item_wear(v_items);
+  for v_month in select unnest(v_months) loop
+    perform public.rebuild_monthly_stats(v_uid, v_month);
+  end loop;
+end;
+$$;
+
+-- -----------------------------------------
+-- record_wear_today
+-- 日本時間の今日の記録がすでにあれば作らない。worn_at は now()
+-- -----------------------------------------
+create or replace function public.record_wear_today(p_item_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception using errcode = '28000', message = 'not_authenticated';
+  end if;
+  perform public.outfit_lock_user(v_uid);
+
+  if not exists (select 1 from public.clothing_items ci
+                  where ci.id = p_item_id and ci.user_id = v_uid and ci.archived_at is null) then
+    raise exception using errcode = 'P0002', message = 'item_not_found';
+  end if;
+
+  if exists (select 1 from public.wear_logs wl
+              where wl.clothing_item_id = p_item_id
+                and public.jst_date(wl.worn_at) = public.jst_date(now())) then
+    return jsonb_build_object('created', false);
+  end if;
+
+  insert into public.wear_logs (clothing_item_id, worn_at, source)
+  values (p_item_id, now(), 'wear_today');
+
+  perform public.recompute_item_wear(array[p_item_id]);
+  perform public.rebuild_monthly_stats(v_uid, date_trunc('month', public.jst_date(now())::timestamp)::date);
+  return jsonb_build_object('created', true);
+end;
+$$;
+
+-- -----------------------------------------
+-- hard_delete_item
+-- 服を完全に消す。コーデは残す（その服の outfit_items の行だけ消える）
+-- -----------------------------------------
+create or replace function public.hard_delete_item(p_item_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid    uuid := auth.uid();
+  v_months date[];
+  v_month  date;
+begin
+  if v_uid is null then
+    raise exception using errcode = '28000', message = 'not_authenticated';
+  end if;
+  perform public.outfit_lock_user(v_uid);
+
+  if not exists (select 1 from public.clothing_items ci
+                  where ci.id = p_item_id and ci.user_id = v_uid) then
+    raise exception using errcode = 'P0002', message = 'item_not_found';
+  end if;
+
+  -- 影響する月（記録の月と、確定済みコーデの月）を、消す前に集める
+  select coalesce(array_agg(distinct m), '{}') into v_months
+    from (
+      select date_trunc('month', public.jst_date(wl.worn_at)::timestamp)::date as m
+        from public.wear_logs wl where wl.clothing_item_id = p_item_id
+      union
+      select date_trunc('month', o.worn_on::timestamp)::date
+        from public.outfit_items oi
+        join public.outfits o on o.id = oi.outfit_id
+       where oi.item_id = p_item_id and o.status = 'confirmed'
+    ) x;
+
+  -- (item_id, user_id) の外部キーは restrict なので、先に outfit_items の行を消す
+  delete from public.outfit_items where item_id = p_item_id and user_id = v_uid;
+  -- 着用記録は cascade で消える
+  delete from public.clothing_items where id = p_item_id and user_id = v_uid;
+
+  for v_month in select unnest(v_months) loop
+    perform public.rebuild_monthly_stats(v_uid, v_month);
+  end loop;
+end;
+$$;
+
+-- -----------------------------------------
 -- 権限: 同じトランザクションで取り上げてから、必要な分だけ与える
 -- -----------------------------------------
 revoke all on function public.outfit_find_unused_wear_today(uuid, date)
@@ -263,8 +438,20 @@ revoke all on function public.create_outfit_draft(uuid, date, text)
   from public, anon, authenticated, service_role;
 revoke all on function public.confirm_outfit(uuid, integer, date, uuid[], text)
   from public, anon, authenticated, service_role;
+revoke all on function public.enqueue_media_deletion(uuid, text, text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.delete_outfit(uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.record_wear_today(uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.hard_delete_item(uuid)
+  from public, anon, authenticated, service_role;
 
 grant execute on function public.create_outfit_draft(uuid, date, text) to authenticated;
 grant execute on function public.confirm_outfit(uuid, integer, date, uuid[], text) to authenticated;
+grant execute on function public.delete_outfit(uuid) to authenticated;
+grant execute on function public.record_wear_today(uuid) to authenticated;
+grant execute on function public.hard_delete_item(uuid) to authenticated;
+-- enqueue_media_deletion は内部用。どのロールにも execute を与えない
 
 commit;
