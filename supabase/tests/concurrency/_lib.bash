@@ -85,3 +85,23 @@ run_two() {
   wait "$P1" || { cat "$OUT1"; fail "connection 1 failed"; }
   wait "$P2" || { cat "$OUT2"; fail "connection 2 failed"; }
 }
+
+# 確定したコーデの「いつも成り立つこと」を postgres で確かめる
+#   $1 = outfit id, $2 = 期待する日付, $3 = 期待する服の id（昇順・カンマ区切り）
+# 保存されている worn_on と服の集合を確かめ、つながった記録がその服のもので、日本時間の日付が
+# 保存されている worn_on と同じことを確かめる
+check_invariants() {
+  local ok
+  ok=$(pg -c "select
+    (select count(*) from public.outfits where id = '$1' and status = 'confirmed' and worn_on = '$2') = 1
+    and (select coalesce(string_agg(item_id::text, ',' order by item_id), '')
+           from public.outfit_items where outfit_id = '$1') = '$3'
+    and not exists (
+      select 1 from public.outfit_items oi
+        join public.outfits o on o.id = oi.outfit_id
+        left join public.wear_logs wl on wl.id = oi.wear_log_id
+       where oi.outfit_id = '$1'
+         and (wl.id is null or wl.clothing_item_id <> oi.item_id
+              or public.jst_date(wl.worn_at) <> o.worn_on))")
+  [ "$ok" = "t" ] || fail "invariants do not hold for outfit $1"
+}

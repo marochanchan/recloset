@@ -62,7 +62,17 @@ declare
   v_expected uuid[];
   v_bad int;
   v_user uuid;
+  v_stored date;
 begin
+  -- 保存されている worn_on を基準にする（引数の日付だけを見ると、保存の誤りを見逃す）
+  select worn_on, user_id into v_stored, v_user from public.outfits where id = p_outfit;
+  if not found then
+    raise exception 'FAIL: outfit does not exist (%)', p_label;
+  end if;
+  if v_stored is distinct from p_worn_on then
+    raise exception 'FAIL: stored worn_on % <> expected % (%)', v_stored, p_worn_on, p_label;
+  end if;
+
   select array_agg(distinct x order by x) into v_expected from unnest(p_items) x;
   select coalesce(array_agg(item_id order by item_id), '{}') into v_actual
     from public.outfit_items where outfit_id = p_outfit;
@@ -76,12 +86,11 @@ begin
    where oi.outfit_id = p_outfit
      and (wl.id is null
           or wl.clothing_item_id <> oi.item_id
-          or (wl.worn_at at time zone 'Asia/Tokyo')::date <> p_worn_on);
+          or (wl.worn_at at time zone 'Asia/Tokyo')::date <> v_stored);
   if v_bad <> 0 then
     raise exception 'FAIL: invariant 2 (%): % rows with missing/wrong wear log', p_label, v_bad;
   end if;
 
-  select user_id into v_user from public.outfits where id = p_outfit;
   select count(*) into v_bad
     from public.clothing_items ci
    where ci.user_id = v_user
@@ -124,6 +133,19 @@ create function test.snap(p_user uuid) returns text language sql security define
                where ci.user_id = p_user), '') ||
     coalesce((select string_agg(ci.id::text || ci.wear_count || coalesce(ci.last_worn_at::text, ''), ',' order by ci.id)
                 from public.clothing_items ci where ci.user_id = p_user), ''));
+$$;
+
+-- 019 の行動履歴（wear_logs の insert で wear_logged が1件）の増え方を確かめる
+create table test.ev_marks (label text primary key, n bigint);
+create function test.ev_count(p_user uuid) returns bigint language sql security definer as $$
+  select count(*) from public.closet_activity_events
+   where user_id = p_user and action = 'wear_logged' and source_table = 'wear_logs';
+$$;
+create function test.ev_mark(p_label text, p_user uuid) returns void language sql security definer as $$
+  insert into test.ev_marks values (p_label, test.ev_count(p_user));
+$$;
+create function test.ev_delta(p_label text, p_user uuid) returns bigint language sql security definer as $$
+  select test.ev_count(p_user) - n from test.ev_marks where label = p_label;
 $$;
 
 grant usage on schema test to authenticated;
@@ -196,6 +218,9 @@ select test.as_user(:'A');
 create temp table _r (label text, res jsonb);
 grant all on _r to authenticated;
 
+select test.as_postgres();
+select test.ev_mark('first', :'A');
+select test.as_user(:'A');
 insert into _r select 'first',
   test.confirm((select id from _o), 0, '2025-10-31', array[:'T', :'D', :'G']::uuid[], null, 'first');
 
@@ -218,10 +243,14 @@ select test.assert(
   '同じ日の未使用の wear_today の記録があれば、それを使う（記録が増えない）');
 
 
+select test.assert(test.ev_delta('first', :'A') = 2,
+  '行動履歴: 初めての確定で source=outfit の記録を2件作ると wear_logged が +2（G は既存の wear_today を使うので +0）');
+
 create temp table _snap (label text, h text);
 grant all on _snap to authenticated;
 select test.as_postgres();
 insert into _snap values ('s1', test.snap(:'A'));
+select test.ev_mark('again', :'A');
 
 select test.as_user(:'A');
 insert into _r select 'again0',
@@ -234,6 +263,8 @@ select test.assert(
   and (select res = '{"status": "unchanged", "revision": 1}'::jsonb from _r where label = 'again1')
   and test.snap(:'A') = (select h from _snap where label = 's1'),
   '同じ内容をもう一度（expected 0 でも 1 でも）送ると {unchanged, 1}、記録は増えない');
+
+select test.assert(test.ev_delta('again', :'A') = 0, '行動履歴: 同じ内容の再送は wear_logged が +0');
 
 -- 月のサマリー（2025-10）: T と D と G の組み合わせが入っている
 select test.assert(
@@ -308,6 +339,8 @@ select test.assert(
                where user_id = :'A' and month = '2025-10-01' and item_ids = array[:'T', :'D']::uuid[]),
   '服を外したあと、外した服を含む組み合わせ（item_pair_monthly_stats）と、元の服の集合の combo の行が消える');
 
+select test.as_postgres();
+select test.ev_mark('swap', :'A');
 -- 足す S、外す D（D は source=outfit の記録を消す）
 select test.as_user(:'A');
 insert into _r select 'swap',
@@ -325,6 +358,8 @@ select test.assert(
              and wl.source = 'outfit' and wl.clothing_item_id = :'S')
   and (select wear_count from public.clothing_items where id = :'S') = 2,
   '服を足すと、outfit_items の行ができ、その服の記録がつながる');
+select test.assert(test.ev_delta('swap', :'A') = 1,
+  '行動履歴: 服を足して新しい source=outfit の記録を作ると wear_logged が +1（外すだけでは増えない）');
 -- （S の wear_count 2 = 未使用の wear_today U_S（11/2）+ 新しい source=outfit の記録）
 
 -- 日付を 10/31 → 11/2 に変える（T は source=outfit の記録を直す、S は未使用の wear_today につなぎ替える）
@@ -335,6 +370,7 @@ insert into _snap values ('t_cnt', (select count(*)::text from public.wear_logs 
 insert into _snap values ('oct', (select count(*)::text from public.item_monthly_stats
                                    where user_id = :'A' and item_id = :'T' and month = '2025-10-01'));
 
+select test.ev_mark('move', :'A');
 select test.as_user(:'A');
 insert into _r select 'move',
   test.confirm((select id from _o), 4, '2025-11-02', array[:'T', :'S']::uuid[], 'メモ', 'move');
@@ -363,11 +399,15 @@ select test.assert(
   and (select source from public.wear_logs where id = :'U_S') = 'wear_today',
   '日付を変えた先の日に、残す服の未使用の wear_today があれば、それにつなぎ替え、source=outfit の記録は消える');
 
+select test.assert(test.ev_delta('move', :'A') = 0,
+  '行動履歴: 日付変更で outfit の記録の worn_at を直す・未使用の wear_today につなぎ替えるだけなら wear_logged は +0');
+
 -- 最新の着用を過去へ（T: 11/2 → 2025-09-01。ほかの記録 U_T = 9/15 が最新に戻る）
 select test.as_postgres();
 select test.assert(
   (select last_worn_at from public.clothing_items where id = :'T') = '2025-11-02 12:00+09'::timestamptz,
   '（確認）直す前の T の last_worn_at は 11/2');
+select test.ev_mark('past', :'A');
 select test.as_user(:'A');
 insert into _r select 'past',
   test.confirm((select id from _o), 5, '2025-09-01', array[:'T', :'S']::uuid[], 'メモ', 'past');
@@ -382,6 +422,9 @@ select test.assert(
                      where outfit_id = (select id from _o) and item_id = :'S')) = 'outfit'
   and exists (select 1 from public.wear_logs where id = :'U_S' and source = 'wear_today'),
   '最新の着用を過去の日付に直すと、last_worn_at がほかの記録の最新に戻る');
+
+select test.assert(test.ev_delta('past', :'A') = 1,
+  '行動履歴: 日付変更で wear_today のつながりを外して source=outfit の記録を作ると wear_logged が +1（T の worn_at 修正は +0）');
 
 -- -----------------------------------------
 -- 失敗しても何も書き込まれない

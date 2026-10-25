@@ -31,5 +31,8 @@ total=$(pg -c "select count(*) from public.wear_logs where clothing_item_id = '$
 [ "$src2" = "outfit" ] || fail "second outfit's log should be source=outfit (got: $src2)"
 [ "$total" = "2" ] || fail "two wear logs expected (got: $total)"
 
+check_invariants "$O1" 2025-10-31 "$C_ITEM1"
+check_invariants "$O2" 2025-10-31 "$C_ITEM1"
+
 reset_c
 echo "ok: 同時に確定しても、同じ記録を2つのコーデで使わない"

@@ -22,5 +22,7 @@ logs=$(pg -c "select count(*) from public.wear_logs where clothing_item_id in ('
 [ "$rev" = "1" ] || fail "revision should be 1 (got: $rev)"
 [ "$logs" = "1" ] || fail "exactly one wear log expected (got: $logs)"
 
+check_invariants "$O" 2025-10-31 "$C_ITEM1"
+
 reset_c
 echo "ok: 同時に確定しても、あとの方は stale になる"
