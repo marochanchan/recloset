@@ -73,7 +73,7 @@ export function verifyStreamWebhookSignature(input: {
     return { ok: false, reason: "malformed" };
   }
   const tolerance = input.toleranceSec ?? 300;
-  if (toUnixSec(input.now) - Number(time) > tolerance) return { ok: false, reason: "expired" };
+  if (Math.abs(toUnixSec(input.now) - Number(time)) > tolerance) return { ok: false, reason: "expired" };
   const expected = Buffer.from(
     createHmac("sha256", input.secret).update(`${time}.${input.rawBody}`).digest("hex"),
   );

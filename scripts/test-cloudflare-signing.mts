@@ -113,3 +113,11 @@ test("設定：webhook の秘密だけを読める", () => {
   assert.throws(() => readStreamWebhookSecret({}), /CLOUDFLARE_STREAM_WEBHOOK_SECRET/);
   assert.equal(readStreamWebhookSecret({ CLOUDFLARE_STREAM_WEBHOOK_SECRET: "s" }), "s");
 });
+
+test("webhook：301秒より未来も expired（300 ちょうど未来は ok）", () => {
+  const header = whHeader(WH_SECRET, WH_BODY);
+  const edge = verifyStreamWebhookSignature({ header, rawBody: WH_BODY, secret: WH_SECRET, now: whNow(1_699_999_700) });
+  assert.deepEqual(edge, { ok: true });
+  const future = verifyStreamWebhookSignature({ header, rawBody: WH_BODY, secret: WH_SECRET, now: whNow(1_699_999_699) });
+  assert.deepEqual(future, { ok: false, reason: "expired" });
+});
