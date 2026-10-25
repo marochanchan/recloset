@@ -9,6 +9,7 @@ import {
   retryMediaUpload,
   startMediaUpload,
 } from "@/lib/outfits/media-service";
+import { outfitPathsToRevalidate } from "@/lib/outfits/revalidate";
 import { createOutfitMediaDeps } from "@/lib/outfits/media-deps";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -223,11 +224,8 @@ export async function confirmOutfitAction(input: {
     return { error: GENERIC_ERROR };
   }
 
-  if (status === "confirmed") {
-    revalidatePath(`/protected/looks/${input.outfitId}`);
-    for (const itemId of new Set(input.itemIds)) {
-      revalidatePath(`/protected/items/${itemId}`);
-    }
+  for (const path of outfitPathsToRevalidate(status, input.outfitId, input.itemIds)) {
+    revalidatePath(path);
   }
   return { status, revision };
 }

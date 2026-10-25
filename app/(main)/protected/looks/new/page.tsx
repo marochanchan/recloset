@@ -52,6 +52,7 @@ async function NewLookContent({
 
   return (
     <OutfitQuickRecordForm
+      key={itemParam ?? "none"}
       items={items}
       defaultWornOn={jstTodayIsoDate()}
       preselectedItemId={itemParam}

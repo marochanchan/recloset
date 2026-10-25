@@ -49,6 +49,8 @@ export function OutfitQuickRecordForm({
 
   const [phase, setPhase] = useState<UploadPhase>("idle");
   const [outfitId, setOutfitId] = useState<string | null>(null);
+  // 縮小した写真。表示用の URL は、これをもとに effect の中で作る
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [wornOn, setWornOn] = useState(defaultWornOn);
   const [selectedIds, setSelectedIds] = useState<string[]>(() =>
@@ -60,11 +62,24 @@ export function OutfitQuickRecordForm({
   const [message, setMessage] = useState<string | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
 
+  // Activity で隠れると effect の後始末が走り、また表示されると作り直される。
+  // 作った URL をその場で解放するので、戻ってきたときも新しい URL で表示できる
   useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
+    if (!previewBlob) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(previewBlob);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [previewBlob]);
+
+  // 選んでいる服のうち、今の一覧にあるものだけ（消えた服は外れる）
+  const validSelectedIds = selectedIds.filter((id) => items.some((item) => item.id === id));
+  const entryItemIds = () =>
+    preselectedItemId && items.some((item) => item.id === preselectedItemId)
+      ? [preselectedItemId]
+      : [];
 
   // 確定のあとは新しい入力に戻す。キャッシュされた画面（Activity）に戻ったときに、
   // 「確定しています」のままや前の写真が残らないようにする（previewUrl を消すと、古い blob も解放される）
@@ -76,13 +91,9 @@ export function OutfitQuickRecordForm({
     isConfirmingRef.current = false;
     setPhase("idle");
     setOutfitId(null);
-    setPreviewUrl(null);
+    setPreviewBlob(null);
     setWornOn(defaultWornOn);
-    setSelectedIds(
-      preselectedItemId && items.some((item) => item.id === preselectedItemId)
-        ? [preselectedItemId]
-        : [],
-    );
+    setSelectedIds(entryItemIds());
     setNote("");
     setMessage(null);
     setIsConfirming(false);
@@ -179,7 +190,7 @@ export function OutfitQuickRecordForm({
     processedRef.current = image;
     const mediaId = crypto.randomUUID();
     mediaIdRef.current = mediaId;
-    setPreviewUrl(URL.createObjectURL(image.blob));
+    setPreviewBlob(image.blob);
     await start(mediaId, image);
   };
 
@@ -205,7 +216,7 @@ export function OutfitQuickRecordForm({
 
   const handleConfirm = async () => {
     if (isConfirmingRef.current) return;
-    if (!outfitId || phase !== "done" || selectedIds.length === 0) return;
+    if (!outfitId || phase !== "done" || validSelectedIds.length === 0) return;
     isConfirmingRef.current = true;
     setIsConfirming(true);
     setMessage(null);
@@ -215,7 +226,7 @@ export function OutfitQuickRecordForm({
         outfitId,
         expectedRevision: 0,
         wornOn,
-        itemIds: selectedIds,
+        itemIds: validSelectedIds,
         note: note.trim() || null,
       });
       if ("error" in result) {
@@ -245,7 +256,7 @@ export function OutfitQuickRecordForm({
     }
   };
 
-  const canConfirm = phase === "done" && selectedIds.length > 0 && !isConfirming;
+  const canConfirm = phase === "done" && validSelectedIds.length > 0 && !isConfirming;
 
   return (
     <div className="flex flex-col gap-6">
@@ -307,7 +318,7 @@ export function OutfitQuickRecordForm({
         <h2 id="look-items-title" className="text-base font-semibold">
           3. 着た服を選ぶ
         </h2>
-        <OutfitItemPicker items={items} selectedIds={selectedIds} onChange={setSelectedIds}
+        <OutfitItemPicker items={items} selectedIds={validSelectedIds} onChange={setSelectedIds}
           disabled={isConfirming}
         />
       </section>
