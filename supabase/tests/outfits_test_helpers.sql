@@ -3,7 +3,7 @@
 -- （ローカルのDockerのPostgres専用。run-outfits.sh がテストの前に読み込む）
 -- =========================================
 create schema if not exists test;
-grant usage on schema test to anon, authenticated;
+grant usage on schema test to anon, authenticated, service_role;
 
 create or replace function test.assert(cond boolean, msg text) returns void
 language plpgsql as $$
@@ -47,4 +47,4 @@ begin
 end;
 $$;
 
-grant execute on all functions in schema test to anon, authenticated;
+grant execute on all functions in schema test to anon, authenticated, service_role;

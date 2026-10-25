@@ -105,10 +105,12 @@ for t in supabase/tests/02[0-9]_*.test.sql; do
   run_test "$t"
 done
 
-# 同時実行のテスト（Task 6b 以降で足す。コミット済みのユーザー C のデータに対して最後に動かす）
-for t in supabase/tests/02[0-9]_*.concurrency.sh; do
+# 同時実行のテスト（Task 6a が supabase/tests/concurrency/ を作り、6b 以降で足す）。
+# 規約: supabase/tests/concurrency/*.sh を名前順にすべて動かす（なければ何もしない）。
+# コミット済みのユーザー C のデータに対して、通常のテストがすべて終わった後に動かす
+for t in supabase/tests/concurrency/*.sh; do
   [ -e "$t" ] || continue
-  echo "== $(basename "$t")"
+  echo "== concurrency/$(basename "$t")"
   # shellcheck disable=SC1090
   source "$t"
 done

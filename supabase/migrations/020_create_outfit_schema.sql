@@ -56,8 +56,10 @@ create table public.outfits (
   id                   uuid primary key default gen_random_uuid(),
   user_id              uuid not null references auth.users(id) on delete cascade,
   worn_on              date not null,
-  source               text not null,
-  status               text not null default 'pending',
+  source               text not null
+    constraint outfits_source_check check (source in ('mirror', 'upload', 'manual', 'wear_suggestion')),
+  status               text not null default 'pending'
+    constraint outfits_status_check check (status in ('pending', 'confirmed')),
   revision             integer not null default 0,
   client_request_id    uuid,
   analysis_media_id    uuid,
@@ -75,12 +77,15 @@ create table public.outfit_media (
   id                uuid primary key default gen_random_uuid(),
   user_id           uuid not null,
   outfit_id         uuid not null,
-  kind              text not null,
-  provider          text not null,
+  kind              text not null
+    constraint outfit_media_kind_check check (kind in ('photo', 'video', 'frame')),
+  provider          text not null
+    constraint outfit_media_provider_check check (provider in ('cf_images', 'cf_stream')),
   provider_asset_id text not null,
   upload_attempt    integer not null default 1,
   upload_expires_at timestamptz,
-  status            text not null default 'uploading',
+  status            text not null default 'uploading'
+    constraint outfit_media_status_check check (status in ('uploading', 'processing', 'ready', 'failed')),
   width             integer,
   height            integer,
   duration_sec      numeric,
@@ -106,7 +111,8 @@ create table public.outfit_items (
   item_id      uuid not null,
   user_id      uuid not null,
   wear_log_id  uuid unique,
-  source       text not null default 'manual',
+  source       text not null default 'manual'
+    constraint outfit_items_source_check check (source in ('detected', 'manual')),
   detection_id uuid,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
@@ -177,7 +183,8 @@ create table public.outfit_combo_monthly_stats (
 create table public.media_deletion_queue (
   id                uuid primary key default gen_random_uuid(),
   user_id           uuid not null,  -- 外部キーなし（ユーザーが消えても削除は続ける）
-  provider          text not null,
+  provider          text not null
+    constraint media_deletion_queue_provider_check check (provider in ('cf_images', 'cf_stream')),
   provider_asset_id text not null,
   attempts          integer not null default 0,
   next_attempt_at   timestamptz not null default now(),
