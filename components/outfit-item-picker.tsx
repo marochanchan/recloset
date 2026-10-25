@@ -18,10 +18,11 @@ type OutfitItemPickerProps = {
   items: PickerItem[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
+  disabled?: boolean;
 };
 
 // しまっていない服をカテゴリーのタブで出し、複数選べる。選んだ服は別のタブにあっても残る
-export function OutfitItemPicker({ items, selectedIds, onChange }: OutfitItemPickerProps) {
+export function OutfitItemPicker({ items, selectedIds, onChange, disabled = false }: OutfitItemPickerProps) {
   const tabs = CATEGORY_OPTIONS.filter((option) =>
     items.some((item) => item.category === option.value),
   );
@@ -97,6 +98,7 @@ export function OutfitItemPicker({ items, selectedIds, onChange }: OutfitItemPic
               <button
                 type="button"
                 aria-pressed={selected}
+                disabled={disabled}
                 onClick={() => toggle(item.id)}
                 className={cn(
                   "relative flex w-full flex-col gap-1 rounded-2xl p-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring",

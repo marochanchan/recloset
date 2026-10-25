@@ -39,8 +39,10 @@ export function OutfitQuickRecordForm({
 }: OutfitQuickRecordFormProps) {
   const router = useRouter();
 
-  // 送り直しでも同じ ID を使うので、画面を開いたときと写真を選んだときに1回だけ作る
+  // 送り直しでも同じ ID を使うので、写真を選んだとき（と確定後のリセット）に1回だけ作り直す
   const clientRequestIdRef = useRef<string>("");
+  if (!clientRequestIdRef.current) clientRequestIdRef.current = crypto.randomUUID();
+  const isConfirmingRef = useRef(false);
   const startedMediaIdRef = useRef<string | null>(null);
   const mediaIdRef = useRef<string | null>(null);
   const processedRef = useRef<ProcessedImage | null>(null);
@@ -59,15 +61,32 @@ export function OutfitQuickRecordForm({
   const [isConfirming, setIsConfirming] = useState(false);
 
   useEffect(() => {
-    // 画面を開いたときに作る（写真を選び直すたびに作り直す）
-    if (!clientRequestIdRef.current) clientRequestIdRef.current = crypto.randomUUID();
-  }, []);
-
-  useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  // 確定のあとは新しい入力に戻す。キャッシュされた画面（Activity）に戻ったときに、
+  // 「確定しています」のままや前の写真が残らないようにする（previewUrl を消すと、古い blob も解放される）
+  const resetForm = () => {
+    clientRequestIdRef.current = crypto.randomUUID();
+    startedMediaIdRef.current = null;
+    mediaIdRef.current = null;
+    processedRef.current = null;
+    isConfirmingRef.current = false;
+    setPhase("idle");
+    setOutfitId(null);
+    setPreviewUrl(null);
+    setWornOn(defaultWornOn);
+    setSelectedIds(
+      preselectedItemId && items.some((item) => item.id === preselectedItemId)
+        ? [preselectedItemId]
+        : [],
+    );
+    setNote("");
+    setMessage(null);
+    setIsConfirming(false);
+  };
 
   // 縮小した写真を Cloudflare へ直接送る（ファイルの欄の名前は file）
   const sendPhoto = async (uploadUrl: string, image: ProcessedImage) => {
@@ -134,14 +153,11 @@ export function OutfitQuickRecordForm({
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
+    if (!file || isConfirmingRef.current) return;
 
+    // 処理に失敗したら、できあがっている下書きはそのまま残す
+    const previousPhase = phase;
     setMessage(null);
-    setOutfitId(null);
-    startedMediaIdRef.current = null;
-    processedRef.current = null;
-    mediaIdRef.current = null;
-    clientRequestIdRef.current = crypto.randomUUID();
     setPhase("processing");
     let image: ProcessedImage;
     try {
@@ -152,10 +168,14 @@ export function OutfitQuickRecordForm({
           ? error.message
           : "画像を処理できませんでした。時間をおいてお試しください",
       );
-      setPhase("idle");
+      setPhase(previousPhase);
       return;
     }
 
+    // 処理に成功してから、下書きごと作り直す
+    setOutfitId(null);
+    startedMediaIdRef.current = null;
+    clientRequestIdRef.current = crypto.randomUUID();
     processedRef.current = image;
     const mediaId = crypto.randomUUID();
     mediaIdRef.current = mediaId;
@@ -164,6 +184,7 @@ export function OutfitQuickRecordForm({
   };
 
   const handleRetry = async () => {
+    if (isConfirmingRef.current) return;
     const mediaId = mediaIdRef.current;
     const image = processedRef.current;
     if (!image || !mediaId) return;
@@ -183,7 +204,9 @@ export function OutfitQuickRecordForm({
   };
 
   const handleConfirm = async () => {
+    if (isConfirmingRef.current) return;
     if (!outfitId || phase !== "done" || selectedIds.length === 0) return;
+    isConfirmingRef.current = true;
     setIsConfirming(true);
     setMessage(null);
     let navigating = false;
@@ -200,16 +223,25 @@ export function OutfitQuickRecordForm({
         return;
       }
       navigating = true;
+      const target = `/protected/looks/${outfitId}`;
       if (result.status === "stale") {
         setMessage("ほかの画面で先に変更されました。最新の内容を表示します");
-        setTimeout(() => router.push(`/protected/looks/${outfitId}`), 1500);
+        // 操作はロックしたまま少し見せてから、リセットして移動する
+        setTimeout(() => {
+          resetForm();
+          router.push(target);
+        }, 1500);
         return;
       }
-      router.push(`/protected/looks/${outfitId}`);
+      resetForm();
+      router.push(target);
     } catch {
       setMessage(CONFIRM_FAILED_MESSAGE);
     } finally {
-      if (!navigating) setIsConfirming(false);
+      if (!navigating) {
+        isConfirmingRef.current = false;
+        setIsConfirming(false);
+      }
     }
   };
 
@@ -233,7 +265,7 @@ export function OutfitQuickRecordForm({
           type="file"
           accept="image/*"
           onChange={handleFileChange}
-          disabled={phase === "processing" || phase === "uploading"}
+          disabled={isConfirming || phase === "processing" || phase === "uploading"}
           aria-label="着画の写真を選ぶ"
         />
         <p className="text-sm text-muted-foreground" role="status">
@@ -247,6 +279,7 @@ export function OutfitQuickRecordForm({
             variant="outline"
             className="w-fit"
             onClick={handleRetry}
+            disabled={isConfirming}
           >
             もう一度送る
           </Button>
@@ -265,6 +298,7 @@ export function OutfitQuickRecordForm({
           type="date"
           value={wornOn}
           onChange={(e) => setWornOn(e.target.value)}
+          disabled={isConfirming}
           className="w-fit"
         />
       </section>
@@ -273,7 +307,9 @@ export function OutfitQuickRecordForm({
         <h2 id="look-items-title" className="text-base font-semibold">
           3. 着た服を選ぶ
         </h2>
-        <OutfitItemPicker items={items} selectedIds={selectedIds} onChange={setSelectedIds} />
+        <OutfitItemPicker items={items} selectedIds={selectedIds} onChange={setSelectedIds}
+          disabled={isConfirming}
+        />
       </section>
 
       <section aria-labelledby="look-note-title" className="flex flex-col gap-2">
@@ -283,6 +319,7 @@ export function OutfitQuickRecordForm({
         <Input
           value={note}
           onChange={(e) => setNote(e.target.value)}
+          disabled={isConfirming}
           maxLength={500}
           aria-label="メモ"
         />
