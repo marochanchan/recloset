@@ -29,10 +29,11 @@ function describeFailure(error: unknown): string {
 export async function processMediaDeletionQueue(
   deps: DeletionQueueDeps,
   limit = 20,
-): Promise<{ deleted: number; failed: number }> {
+): Promise<{ deleted: number; failed: number; skipped: number }> {
   const rows = await deps.claim(limit);
   let deleted = 0;
   let failed = 0;
+  let skipped = 0;
   for (const row of rows) {
     try {
       // not_found は、すでに消えているということなので成功として扱う
@@ -47,13 +48,15 @@ export async function processMediaDeletionQueue(
       continue;
     }
     try {
-      await deps.finish(row.id, row.claimToken, true, null);
-      deleted++;
+      const accepted = await deps.finish(row.id, row.claimToken, true, null);
+      // false は claim_token の不一致（別の処理が取り直した）。この処理の成果には数えない
+      if (accepted) deleted++;
+      else skipped++;
     } catch {
       failed++;
     }
   }
-  return { deleted, failed };
+  return { deleted, failed, skipped };
 }
 
 type ClaimedRow = {

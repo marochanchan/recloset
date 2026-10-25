@@ -37,7 +37,7 @@ const row = (n: number): Row => ({
   attempts: 0,
 });
 
-function setup(rows: Row[]) {
+function setup(rows: Row[], finishResult = true) {
   const finishCalls: Array<[string, string, boolean, string | null]> = [];
   const claimLimits: number[] = [];
   const store = createFakeMediaStore();
@@ -48,7 +48,7 @@ function setup(rows: Row[]) {
     },
     finish: async (id: string, token: string, ok: boolean, error: string | null) => {
       finishCalls.push([id, token, ok, error]);
-      return true;
+      return finishResult;
     },
     store,
   };
@@ -56,18 +56,27 @@ function setup(rows: Row[]) {
 }
 
 test("Cloudflare の削除が成功：取り出したときの claimToken で finish(ok=true)、deleted=1", async () => {
-  const { deps, finishCalls, claimLimits } = setup([row(1)]);
+  const { deps, finishCalls, claimLimits, store } = setup([row(1)]);
+  store.assets.set("asset1", { provider: "cf_images", state: "ready" });
   const result = await processMediaDeletionQueue(deps);
-  assert.deepEqual(result, { deleted: 1, failed: 0 });
+  assert.deepEqual(result, { deleted: 1, failed: 0, skipped: 0 });
+  assert.equal(store.assets.has("asset1"), false);
   assert.deepEqual(finishCalls, [["id1", "token1", true, null]]);
   assert.deepEqual(claimLimits, [20]);
+});
+
+test("finish が false（claimToken の不一致）：deleted に数えない", async () => {
+  const { deps, store } = setup([row(1)], false);
+  store.assets.set("asset1", { provider: "cf_images", state: "ready" });
+  const result = await processMediaDeletionQueue(deps);
+  assert.deepEqual(result, { deleted: 0, failed: 0, skipped: 1 });
 });
 
 test("Cloudflare が not_found：成功として扱う", async () => {
   // 何も登録していない asset の削除は not_found になる
   const { deps, finishCalls } = setup([row(1)]);
   const result = await processMediaDeletionQueue(deps, 5);
-  assert.deepEqual(result, { deleted: 1, failed: 0 });
+  assert.deepEqual(result, { deleted: 1, failed: 0, skipped: 0 });
   assert.deepEqual(finishCalls, [["id1", "token1", true, null]]);
 });
 
@@ -75,7 +84,7 @@ test("Cloudflare が例外：finish(ok=false, 安全な説明)、failed=1。ほ�
   const { deps, finishCalls, store } = setup([row(1), row(2)]);
   store.failNextDelete(new CloudflareApiError("secret external text", 503));
   const result = await processMediaDeletionQueue(deps);
-  assert.deepEqual(result, { deleted: 1, failed: 1 });
+  assert.deepEqual(result, { deleted: 1, failed: 1, skipped: 0 });
   assert.equal(finishCalls.length, 2);
   assert.deepEqual(finishCalls[0].slice(0, 3), ["id1", "token1", false]);
   assert.match(String(finishCalls[0][3]), /CloudflareApiError/);
