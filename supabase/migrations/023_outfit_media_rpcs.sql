@@ -112,7 +112,7 @@ begin
     raise exception using errcode = 'P0002', message = 'media_not_found';
   end if;
 
-  if v_row.upload_attempt <> p_expected_upload_attempt then
+  if v_row.upload_attempt is distinct from p_expected_upload_attempt then
     raise exception using errcode = 'P0001', message = 'media_attempt_changed';
   end if;
 
@@ -127,6 +127,10 @@ begin
   update public.outfit_media
      set provider_asset_id = p_asset_id,
          upload_attempt    = upload_attempt + 1,
+         -- 前の試行の寸法・長さは新しい実体に持ち越さない
+         width             = null,
+         height            = null,
+         duration_sec      = null,
          upload_expires_at = p_upload_expires_at,
          status            = 'uploading',
          updated_at        = now()
@@ -167,7 +171,7 @@ begin
     raise exception using errcode = 'P0002', message = 'media_not_found';
   end if;
 
-  if v_row.upload_attempt <> p_expected_upload_attempt then
+  if v_row.upload_attempt is distinct from p_expected_upload_attempt then
     raise exception using errcode = 'P0001', message = 'media_attempt_changed';
   end if;
 

@@ -181,6 +181,37 @@ select test.assert(
   and exists (select 1 from public.media_deletion_queue where provider_asset_id = 'img-1b'),
   'failed のメディアの replace は置き換わり、古い ID が削除待ちに入る');
 
+-- expected が null なら media_attempt_changed で、行も削除待ちも変わらない
+select test.as_postgres();
+create temp table _nullsnap as
+  select (select md5(m::text) from public.outfit_media m where id = :'M1') as h,
+         (select count(*) from public.media_deletion_queue) as q;
+grant all on _nullsnap to service_role;
+select test.as_service();
+select test.expect_error(
+  format($$select public.replace_outfit_media_asset(%L, %L, null, 'img-null', null)$$, :'A', :'M1'),
+  'media_attempt_changed', 'expected null の replace は media_attempt_changed');
+select test.expect_error(
+  format($$select public.set_outfit_media_state(%L, %L, null, 'processing', null, null, null)$$, :'A', :'M1'),
+  'media_attempt_changed', 'expected null の set_outfit_media_state は media_attempt_changed');
+select test.as_postgres();
+select test.assert(
+  (select md5(m::text) from public.outfit_media m where id = :'M1') = (select h from _nullsnap)
+  and (select count(*) from public.media_deletion_queue) = (select q from _nullsnap),
+  'expected null では行も削除待ちも変わらない');
+
+-- replace で前の試行の寸法・長さは消える
+update public.outfit_media set status = 'failed', width = 5, height = 6, duration_sec = 7 where id = :'M1';
+select test.as_service();
+select public.replace_outfit_media_asset(:'A', :'M1', 3, 'img-1f', null);
+select test.as_postgres();
+select test.assert(
+  (select width is null and height is null and duration_sec is null from public.outfit_media where id = :'M1'),
+  'replace のあと width・height・duration_sec は null');
+-- 以降のテストのため、状態と試行を元に戻す
+update public.outfit_media set upload_attempt = 3 where id = :'M1';
+select test.as_service();
+
 -- -----------------------------------------
 -- set_outfit_media_state
 -- -----------------------------------------

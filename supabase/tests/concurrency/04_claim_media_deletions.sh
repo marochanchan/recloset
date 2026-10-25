@@ -25,16 +25,22 @@ SQL
 OUT1=$(mktemp); OUT2=$(mktemp)
 claim_sql 2 "select pg_sleep(3);" | pg >"$OUT1" 2>&1 &
 P1=$!
-# 接続1が行を掴む（リースが書かれる）まで待つ。commit 前は他の接続からは見えないので、
-# 行ロックを持つ接続が sleep 中であることを pg_stat_activity で確かめる
+# 接続1が claim を終えて pg_sleep の中にいる（行のロックを持ったまま）ことを確かめる。見えなければ失敗
+sleeping() {
+  [ "$(pg -c "select count(*) from pg_stat_activity where query like '%pg_sleep(3)%' and state = 'active' and pid <> pg_backend_pid()")" -ge 1 ]
+}
+seen=0
 for _ in $(seq 1 50); do
-  [ "$(pg -c "select count(*) from pg_stat_activity where query like '%pg_sleep(3)%' and state = 'active' and pid <> pg_backend_pid()")" -ge 1 ] && break
+  if sleeping; then seen=1; break; fi
   sleep 0.1
 done
+[ "$seen" = "1" ] || { cat "$OUT1"; fail "connection 1 was never observed sleeping inside its transaction"; }
 claim_sql 10 "" | pg >"$OUT2" 2>&1 &
 P2=$!
-wait "$P1" || { cat "$OUT1"; fail "connection 1 failed"; }
 wait "$P2" || { cat "$OUT2"; fail "connection 2 failed"; }
+# 接続2が終わった時点で、接続1がまだ commit 前（sleep 中）であること = 接続2は待たずに終わった
+sleeping || { cat "$OUT1"; fail "connection 1 had already finished when connection 2 completed (overlap not proven)"; }
+wait "$P1" || { cat "$OUT1"; fail "connection 1 failed"; }
 
 ids1=$(grep '^ids=' "$OUT1" | sed 's/^ids=//' | tr ',' '\n' | sed '/^$/d' | sort)
 ids2=$(grep '^ids=' "$OUT2" | sed 's/^ids=//' | tr ',' '\n' | sed '/^$/d' | sort)
