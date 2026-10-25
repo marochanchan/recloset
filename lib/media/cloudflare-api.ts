@@ -5,11 +5,14 @@ import type { CloudflareApiConfig } from "@/lib/media/cloudflare-config";
 
 export class CloudflareApiError extends Error {
   status: number;
+  // Cloudflare が返したエラーの番号（画面に出してよいのは番号だけ）
+  codes: number[];
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, codes: number[] = []) {
     super(message);
     this.name = "CloudflareApiError";
     this.status = status;
+    this.codes = codes;
   }
 }
 
@@ -63,6 +66,7 @@ export function createCloudflareApi(config: CloudflareApiConfig, fetchImpl: type
       throw new CloudflareApiError(
         `Cloudflare API エラー (${method} ${path}) status=${response.status}${details ? ` ${details}` : ""}`,
         response.status,
+        (envelope.errors ?? []).map((item) => item.code).filter((code): code is number => typeof code === "number"),
       );
     }
     return { result: envelope.result };

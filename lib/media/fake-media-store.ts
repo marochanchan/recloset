@@ -25,7 +25,8 @@ export function createFakeMediaStore(): MediaStore & {
     async getAssetState(_provider, assetId) {
       const asset = assets.get(assetId);
       if (!asset) return { state: "missing" };
-      const { provider: _ignored, ...state } = asset;
+      const state = { ...asset };
+      delete (state as { provider?: MediaProvider }).provider;
       return state;
     },
 

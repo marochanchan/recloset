@@ -2,7 +2,8 @@
 //
 // 使い方:
 //   node --env-file=.env.local scripts/setup-cloudflare.mts --check
-//   node --env-file=.env.local scripts/setup-cloudflare.mts [--stream-key] [--webhook <URL>]
+//   node --env-file=.env.local scripts/setup-cloudflare.mts [--stream-key] [--webhook <URL> [--preview]]
+//   （--preview は、通知先が Vercel のプレビューのときだけ付ける）
 //
 // 鍵や秘密は .env.local の該当する行に書き込むだけで、画面には変数名しか出さない。
 // 取り出した値は Vercel にも入れる必要がある（.env.local を開いてコピーしてください）。
@@ -21,13 +22,16 @@ registerHooks({
 });
 
 const { readCloudflareApiConfig } = await import("../lib/media/cloudflare-config.ts");
+const { CloudflareApiError } = await import("../lib/media/cloudflare-api.ts");
 const { upsertEnvFile } = await import("./lib/env-file.mts");
+const { formatStageError, StageFailure } = await import("./lib/stage-error.mts");
 
 const ENV_PATH = `${repoRoot}.env.local`;
 const args = process.argv.slice(2);
 const checkOnly = args.includes("--check");
 const wantStreamKey = args.includes("--stream-key");
 const forceStreamKey = args.includes("--force");
+const isPreview = args.includes("--preview");
 const webhookIndex = args.indexOf("--webhook");
 const webhookUrl = webhookIndex >= 0 ? args[webhookIndex + 1] : undefined;
 
@@ -48,7 +52,7 @@ try {
 
 const base = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}`;
 
-// Cloudflare の API を呼び、result を返す。トークンはヘッダーにだけ使い、メッセージには入れない
+// Cloudflare の API を呼び、result を返す。トークンはヘッダーにだけ使い、エラーには入れない
 async function cf<T>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await fetch(`${base}${path}`, {
     method,
@@ -59,15 +63,16 @@ async function cf<T>(method: string, path: string, body?: unknown): Promise<T> {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await response.text();
-  let envelope: { success?: boolean; errors?: { code?: number; message?: string }[]; result?: T };
+  let envelope: { success?: boolean; errors?: { code?: number }[]; result?: T };
   try {
     envelope = JSON.parse(text);
   } catch {
-    throw new Error(`Cloudflare の応答が JSON ではありません (${method} ${path}) status=${response.status}`);
+    throw new CloudflareApiError("応答が JSON ではありません", response.status);
   }
   if (!response.ok || envelope.success === false) {
-    const details = (envelope.errors ?? []).map((e) => `${e.code ?? "?"}: ${e.message ?? ""}`).join("; ");
-    throw new Error(`Cloudflare のエラー (${method} ${path}) status=${response.status}${details ? ` ${details}` : ""}`);
+    // 文言は持たせず、番号だけを持たせる
+    const codes = (envelope.errors ?? []).map((e) => e.code).filter((c): c is number => typeof c === "number");
+    throw new CloudflareApiError("Cloudflare のエラー", response.status, codes);
   }
   return envelope.result as T;
 }
@@ -151,34 +156,51 @@ async function writeImagesKey() {
   await writeEnv("CLOUDFLARE_IMAGES_SIGNING_KEY", key.value);
 }
 
+// 保存済みの JWK が、保存済みの鍵 ID と対になっているか
+function streamKeyIsComplete(): boolean {
+  const id = process.env.CLOUDFLARE_STREAM_SIGNING_KEY_ID;
+  const jwk = process.env.CLOUDFLARE_STREAM_SIGNING_JWK;
+  if (!id || !jwk) return false;
+  try {
+    const parsed = JSON.parse(Buffer.from(jwk, "base64").toString("utf8")) as { kid?: unknown };
+    return typeof parsed === "object" && parsed !== null && parsed.kid === id;
+  } catch {
+    return false;
+  }
+}
+
 async function createStreamKey() {
-  if (process.env.CLOUDFLARE_STREAM_SIGNING_KEY_ID && !forceStreamKey) {
+  if (streamKeyIsComplete() && !forceStreamKey) {
     console.log("Stream の署名の鍵はすでにあります。作り直すときは --stream-key --force を付けてください。");
     return;
   }
   const key = await cf<{ id: string; jwk: string }>("POST", "/stream/keys");
-  await writeEnv("CLOUDFLARE_STREAM_SIGNING_KEY_ID", key.id);
+  // JWK を先に、鍵 ID をあとに書く。途中で止まっても「そろった」とは見なされない
   await writeEnv("CLOUDFLARE_STREAM_SIGNING_JWK", key.jwk);
+  await writeEnv("CLOUDFLARE_STREAM_SIGNING_KEY_ID", key.id);
 }
 
 async function registerWebhook(url: string) {
   console.log("注意：Stream の通知先はアカウントに1つだけです。登録し直すと、前の通知先は使われなくなります。");
-  let target = url;
-  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-  const isPreview = new URL(url).hostname.endsWith(".vercel.app");
-  if (bypass && isPreview) {
-    // プレビューの保護を通るための付け足し。URL は画面に出さない
-    const u = new URL(url);
-    u.searchParams.set("x-vercel-protection-bypass", bypass);
-    target = u.toString();
-    console.log("保護を通る設定を付けました");
+  let target: URL;
+  try {
+    target = new URL(url);
+  } catch {
+    throw new StageFailure("通知先の URL の形が正しくありません");
   }
-  const put = await cf<{ secret?: string }>("PUT", "/stream/webhook", { notificationUrl: target });
+  // 保護を通る付け足しは、--preview のときだけ。URL は画面に出さない
+  if (isPreview) {
+    const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    if (bypass) {
+      target.searchParams.set("x-vercel-protection-bypass", bypass);
+      console.log("保護を通る設定を付けました");
+    } else {
+      console.log("VERCEL_AUTOMATION_BYPASS_SECRET がないため、保護を通る設定なしで登録します");
+    }
+  }
+  const put = await cf<{ secret?: string }>("PUT", "/stream/webhook", { notificationUrl: target.toString() });
   const secret = put.secret ?? (await cf<{ secret?: string }>("GET", "/stream/webhook")).secret;
-  if (!secret) {
-    console.error("通知の秘密を取り出せませんでした。もう一度試してください。");
-    process.exit(1);
-  }
+  if (!secret) throw new StageFailure("通知の秘密を取り出せませんでした。もう一度試してください");
   const previous = process.env.CLOUDFLARE_STREAM_WEBHOOK_SECRET;
   await writeEnv("CLOUDFLARE_STREAM_WEBHOOK_SECRET", secret);
   console.log(
@@ -188,18 +210,22 @@ async function registerWebhook(url: string) {
   );
 }
 
-try {
-  if (checkOnly) {
-    await check();
-  } else {
-    await ensureVariants();
-    await writeImagesKey();
-    if (wantStreamKey) await createStreamKey();
-    if (webhookUrl) await registerWebhook(webhookUrl);
-    console.log("終わりました。Vercel に入れる値は、.env.local を開いてコピーしてください。");
+// 段階ごとに包み、失敗したときは段階の名前と番号だけを出す
+async function stage(name: string, fn: () => Promise<void>) {
+  try {
+    await fn();
+  } catch (error) {
+    console.error(formatStageError(name, error));
+    process.exit(1);
   }
-} catch (error) {
-  // メッセージには秘密を入れていない
-  console.error((error as Error).message);
-  process.exit(1);
+}
+
+if (checkOnly) {
+  await stage("読み取りの確認", check);
+} else {
+  await stage("バリアントの設定", ensureVariants);
+  await stage("Images の署名の鍵", writeImagesKey);
+  if (wantStreamKey) await stage("Stream の署名の鍵", createStreamKey);
+  if (webhookUrl) await stage("Stream の通知先", () => registerWebhook(webhookUrl));
+  console.log("終わりました。Vercel に入れる値は、.env.local を開いてコピーしてください。");
 }

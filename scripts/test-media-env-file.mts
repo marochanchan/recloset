@@ -64,3 +64,39 @@ test("ファイルがまだない：作って added", async () => {
     assert.equal(await readFile(path, "utf8"), "NAME=v\n");
   });
 });
+
+// 対応していない形は、何も書かずに例外にする（メッセージには変数名だけ。値は入れない）
+async function assertRefused(content: string, name: string, value: string, secretInFile?: string) {
+  await withTempDir(async (dir) => {
+    const path = join(dir, ".env");
+    await writeFile(path, content);
+    await assert.rejects(upsertEnvFile(path, name, value), (error: Error) => {
+      assert.ok(error.message.includes(name));
+      if (secretInFile) assert.ok(!error.message.includes(secretInFile));
+      assert.ok(!error.message.includes(value));
+      return true;
+    });
+    assert.equal(await readFile(path, "utf8"), content);
+  });
+}
+
+test("同じ名前が2回ある：書かずに例外（ファイルは変わらない）", async () => {
+  await assertRefused("NAME=old1\nA=1\nNAME=old2\n", "NAME", "VALUE-X");
+});
+
+test("引用符つきで複数行の値がある：書かずに例外（ファイルは変わらない）", async () => {
+  await assertRefused('KEY="line1\nNAME=inside\nline3"\nNAME=old\n', "NAME", "VALUE-X", "inside");
+});
+
+test("書く値に改行がある：書かずに例外（ファイルは変わらない）", async () => {
+  await assertRefused("A=1\n", "NAME", "a\nb");
+});
+
+test("1行で閉じた引用符つきの値は、そのまま通る", async () => {
+  await withTempDir(async (dir) => {
+    const path = join(dir, ".env");
+    await writeFile(path, 'Q="one line"\nNAME=old\n');
+    assert.equal(await upsertEnvFile(path, "NAME", "new"), "updated");
+    assert.equal(await readFile(path, "utf8"), 'Q="one line"\nNAME=new\n');
+  });
+});
