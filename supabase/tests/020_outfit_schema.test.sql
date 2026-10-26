@@ -271,4 +271,26 @@ select test.assert(
   'service_role は outfits を delete できる');
 reset role;
 
+-- media_deletion_queue は RLS 有効・ポリシーなし（直接は誰も読めない）
+select test.assert(
+  (select relrowsecurity from pg_class where oid = 'public.media_deletion_queue'::regclass)
+  and (select count(*) from pg_policies
+       where schemaname = 'public' and tablename = 'media_deletion_queue') = 0,
+  'media_deletion_queue は RLS 有効でポリシーが 0 件');
+
+-- 多重防御: うっかり grant select されても、ポリシーがないので 0 行しか見えない
+grant select on public.media_deletion_queue to authenticated;
+insert into public.media_deletion_queue (user_id, provider, provider_asset_id)
+values (:'A', 'cf_images', 'defence-in-depth-a');
+set local role authenticated;
+select set_config('request.jwt.claim.sub', :'A', true);
+select test.assert(current_user = 'authenticated' and auth.uid() = :'A'::uuid,
+  'authenticated（A）として確認する');
+select test.assert(
+  (select count(*) from public.media_deletion_queue) = 0,
+  'select を grant されても media_deletion_queue は 0 行しか見えない');
+reset role;
+revoke select on public.media_deletion_queue from authenticated;
+delete from public.media_deletion_queue where provider_asset_id = 'defence-in-depth-a';
+
 rollback;

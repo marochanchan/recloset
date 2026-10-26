@@ -17,7 +17,8 @@
 --   （ユーザーが消えても、外部に残ったメディアの削除は続ける）
 --
 -- 権限:
--- - RLS: 全テーブルで本人（user_id = auth.uid()）の行だけ SELECT できる
+-- - RLS: media_deletion_queue 以外の全テーブルで本人（user_id = auth.uid()）の行だけ SELECT できる
+--   media_deletion_queue は RLS 有効・ポリシーなし（直接は誰も読めない。サーバーは service_role で読み、RLS を通らない）
 -- - authenticated には SELECT だけ（キューには何も与えない）。anon・PUBLIC には何も与えない。
 --   service_role には SELECT・INSERT・UPDATE・DELETE
 -- - Supabase は新しいテーブルに広い権限を自動で付けるため、最初に revoke all してから必要な分だけ grant する
@@ -229,8 +230,6 @@ create policy "item_monthly_stats_select_own" on public.item_monthly_stats
 create policy "item_pair_monthly_stats_select_own" on public.item_pair_monthly_stats
   for select using (user_id = (select auth.uid()));
 create policy "outfit_combo_monthly_stats_select_own" on public.outfit_combo_monthly_stats
-  for select using (user_id = (select auth.uid()));
-create policy "media_deletion_queue_select_own" on public.media_deletion_queue
   for select using (user_id = (select auth.uid()));
 
 revoke all on table
