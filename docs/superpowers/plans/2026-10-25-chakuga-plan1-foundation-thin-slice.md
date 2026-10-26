@@ -1082,8 +1082,10 @@ git commit -m "feat: add thin outfit recording flow with relation lines"
   - 実行したら、`select to_regclass('public.outfits'), to_regclass('public.media_deletion_queue');` が両方とも null でないことを確かめる。
   - 今の本番のアプリで「今日着た」と服の登録が、今までどおり動くことを確かめる。
 
-- [ ] **Step 2: ローカルで細い流れを確かめる**
-  - `npm run dev`（ローカルは本番の DB と、同じ Cloudflare のアカウントにつながる）で、下の Step 6 の確認リストの上から3つを通す。
+- [ ] **Step 2: プレビューで細い流れと webhook を確かめる**（2026-10-27 ユーザー承認：ローカルの確認と Task 3 Step 7 の webhook の確認を、Vercel のプレビューでの1回にまとめる。Step 3 で Preview の環境変数を入れたあとに行う）
+  - ブランチのプレビュー（本番の DB と、同じ Cloudflare のアカウントにつながる）で、下の Step 6 の確認リストの上から3つを通す。
+  - 既存の機能（「今日着た」、服の登録（1着ずつと、写真からまとめて）、編集、削除）もプレビューで確かめる。省かない。
+  - Task 3 Step 7 の webhook の確認も、ここで行う（`--webhook <プレビューの URL> --preview`。Vercel の Requests のログで 200 を確かめる）。
   - 作ったコーデは、確かめたあと消してよい（消すとメディアは削除待ちに入る）。
 
 - [ ] **Step 3: Vercel の本番の環境変数を入れる（ユーザー）**
