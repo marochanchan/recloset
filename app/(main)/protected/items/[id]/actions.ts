@@ -22,7 +22,6 @@ import {
   getCurrentSeasonJst,
   getDaysSinceLastWorn,
   getDaysSincePurchase,
-  hasWornToday,
 } from "@/lib/wear-logs";
 import { revalidatePath } from "next/cache";
 
@@ -87,57 +86,21 @@ export async function recordWearToday(
     return { error: "ログイン情報が確認できませんでした" };
   }
 
-  // RLSにより、自分が所有する服でなければ取得できない
-  const { data: item, error: itemError } = await supabase
-    .from("clothing_items")
-    .select("id, wear_count")
-    .eq("id", itemId)
-    .maybeSingle();
-
-  if (itemError) {
-    console.error("recordWearToday: fetch item error", itemError);
-    return { error: "服の情報を取得できませんでした" };
-  }
-  if (!item) {
-    return { error: "対象の服が見つかりません" };
-  }
-
-  if (await hasWornToday(supabase, itemId)) {
-    // 既に今日の記録がある場合は何もしない（二重登録防止）
-    revalidatePath(`/protected/items/${itemId}`);
-    revalidatePath("/today");
-    return { error: null };
-  }
-
-  const now = new Date();
-
-  const { error: insertError } = await supabase.from("wear_logs").insert({
-    clothing_item_id: itemId,
-    worn_at: now.toISOString(),
+  // 着用記録・wear_count・last_worn_at・月ごとのサマリーは、RPC が1つのトランザクションで更新する。
+  // 持ち主の確認も RPC の中で行う（自分の服でなければ item_not_found）
+  const { error } = await supabase.rpc("record_wear_today", {
+    p_item_id: itemId,
   });
-  if (insertError) {
-    console.error("recordWearToday: insert wear_logs error", insertError);
+  if (error) {
+    if (error.message === "item_not_found") {
+      return { error: "対象の服が見つかりません" };
+    }
+    console.error("recordWearToday: record_wear_today failed", error.code);
     return { error: "着用記録の登録に失敗しました" };
   }
 
-  // wear_logsが一次データ、wear_count/last_worn_atは派生値。
-  // ここでの失敗はrace conditionと合わせて将来RPC化するTODO。
-  const { error: updateError } = await supabase
-    .from("clothing_items")
-    .update({
-      wear_count: item.wear_count + 1,
-      last_worn_at: now.toISOString(),
-    })
-    .eq("id", itemId);
-  if (updateError) {
-    console.error("recordWearToday: update clothing_items error", updateError);
-    revalidatePath(`/protected/items/${itemId}`);
-    return {
-      error:
-        "着用記録は保存されましたが、回数の更新に失敗しました。再読み込みしてご確認ください。",
-    };
-  }
-
+  // created: false は、今日の記録が既にあって何もしなかった場合（二重登録防止）。
+  // どちらの場合も成功として扱う
   revalidatePath(`/protected/items/${itemId}`);
   // Todayの「今日のRe:try」も着用状態に合わせて更新する
   revalidatePath("/today");
@@ -357,12 +320,15 @@ export async function deleteClothingItem(
     (image: { image_path: string }) => image.image_path,
   );
 
-  const { error: deleteError } = await supabase
-    .from("clothing_items")
-    .delete()
-    .eq("id", itemId);
+  // コーデに入っている服も、RPC がコーデを残したまま消す（その服の紐づけだけ外れる）
+  const { error: deleteError } = await supabase.rpc("hard_delete_item", {
+    p_item_id: itemId,
+  });
   if (deleteError) {
-    console.error("deleteClothingItem: delete error", deleteError);
+    if (deleteError.message === "item_not_found") {
+      return { error: "対象の服が見つかりません" };
+    }
+    console.error("deleteClothingItem: hard_delete_item failed", deleteError.code);
     return { error: "服の削除に失敗しました" };
   }
 

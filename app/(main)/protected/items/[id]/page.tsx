@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { DeleteItemButton } from "@/components/delete-item-button";
 import { ItemDetailSkeleton } from "@/components/loading-skeletons";
 import { MarketplaceLinks } from "@/components/marketplace-links";
+import { RelationLines } from "@/components/relation-lines";
 import { PublishToggle } from "@/components/publish-toggle";
 import { WearTodayButton } from "@/components/wear-today-button";
 import {
@@ -212,6 +213,20 @@ async function ClothingItemDetail({
 
       <section className="flex flex-col gap-3">
         <StatusSelector itemId={item.id} currentStatus={item.status} />
+      </section>
+
+      <section aria-labelledby="item-relations-title" className="flex flex-col gap-3">
+        <h2 id="item-relations-title" className="text-base font-semibold">
+          よく合わせる服
+        </h2>
+        <Suspense
+          fallback={<p className="text-sm text-muted-foreground">読み込んでいます</p>}
+        >
+          <RelationLines itemId={item.id} />
+        </Suspense>
+        <Button asChild variant="outline" className="w-full">
+          <Link href={`/protected/looks/new?item=${item.id}`}>この服で着画を記録</Link>
+        </Button>
       </section>
 
       <section aria-labelledby="item-records-title" className="flex flex-col gap-3">

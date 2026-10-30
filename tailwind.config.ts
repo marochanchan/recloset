@@ -95,5 +95,6 @@ export default {
       },
     },
   },
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- tailwind の plugins は require で読む
   plugins: [require("tailwindcss-animate")],
 } satisfies Config;

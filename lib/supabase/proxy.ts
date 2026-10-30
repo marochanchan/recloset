@@ -57,6 +57,12 @@ export async function updateSession(request: NextRequest) {
   // 未ログインで取得するため許可する（拡張子がなくmatcherの除外対象外のため）。
   const isOpenGraphImagePath = request.nextUrl.pathname === "/opengraph-image";
 
+  // 外部サービスの通知（/api/webhooks/）と定期実行（/api/cron/）はログインなしで届く。
+  // 認証は各ルートが署名や秘密で行うため、ログインへの転送の対象外にする。
+  const isMachineApiPath =
+    request.nextUrl.pathname.startsWith("/api/webhooks/") ||
+    request.nextUrl.pathname.startsWith("/api/cron/");
+
   // ログイン中のトップ（/）はTodayへ。未ログインの / はRe:Closet Loopを表示する。
   // getClaims()で更新されたセッションcookieを失わないよう、
   // supabaseResponseのcookieをリダイレクトのレスポンスへ引き継ぐ。
@@ -75,6 +81,7 @@ export async function updateSession(request: NextRequest) {
     !user &&
     !isDiscoverPath &&
     !isOpenGraphImagePath &&
+    !isMachineApiPath &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth")
   ) {

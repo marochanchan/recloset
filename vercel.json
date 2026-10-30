@@ -1,0 +1,1 @@
+{"crons":[{"path":"/api/cron/media-deletions","schedule":"0 18 * * *"}]}
