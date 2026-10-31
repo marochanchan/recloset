@@ -1,0 +1,438 @@
+#!/usr/bin/env python3
+"""
+aidev-radio — VOICEVOX Audio Generator
+
+「海外AIコーディングツール最前線」解説ラジオ（AI Business Radio）用。
+src/agent-workflows-radio/generate_audio.py をベースに、出力パス・発音マップを差し替えた
+独立スクリプト（feedback_pipeline_separation: シナリオ毎に独立スクリプト）。
+
+話者:
+  松尾悠人  = 解説役 / 玄野武宏・ノーマル (id 11, 50021)
+  桜井ひなた = 質問役 / 四国めたん・ノーマル (id 2, 50021)
+
+Usage:
+    python generate_audio.py ep01
+    python generate_audio.py all
+    python generate_audio.py all --workers 3
+"""
+
+import argparse, contextlib, hashlib, json, os, re, runpy, subprocess, sys, tempfile, threading, urllib.request
+from urllib.parse import urlsplit
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+VOICEVOX_NORMAL_URL = "http://127.0.0.1:50021"
+
+_NORMAL_SEM = threading.Semaphore(6)
+_SEM_MAP    = {VOICEVOX_NORMAL_URL: _NORMAL_SEM}
+_LOG_LOCK   = threading.Lock()
+
+# 松尾悠人=解説役(玄野武宏ノーマル), 桜井ひなた=質問役(四国めたん)
+SPEAKER_MAP: dict[str, tuple[int, str]] = {
+    "松尾悠人":  (11, VOICEVOX_NORMAL_URL),  # 玄野武宏・ノーマル（穏やかな解説役）
+    "桜井ひなた": (2,  VOICEVOX_NORMAL_URL),  # 四国めたん・ノーマル（質問役）
+}
+
+BASE_PARAMS: dict[str, dict] = {
+    "松尾悠人":  {"speedScale": 1.00, "pitchScale": 0.00, "intonationScale": 1.05},
+    "桜井ひなた": {"speedScale": 1.07, "pitchScale": 0.00, "intonationScale": 1.20},
+}
+
+EMOTION_OVERRIDES: dict[str, dict] = {
+    "normal":       {"speed": 1.00, "intonation": 1.00},
+    "surprise":     {"speed": 1.16, "intonation": 1.50},
+    "excited":      {"speed": 1.13, "intonation": 1.42},
+    "calm_explain": {"speed": 0.93, "intonation": 0.92},
+    "laugh":        {"speed": 0.98, "intonation": 1.25},
+    "thinking":     {"speed": 0.89, "intonation": 0.84},
+    "serious":      {"speed": 0.93, "intonation": 1.00},
+    "happy":        {"speed": 1.09, "intonation": 1.28},
+    "empathy":      {"speed": 0.95, "intonation": 1.10},
+    "warmth":       {"speed": 0.94, "intonation": 1.06},
+    "worried":      {"speed": 0.95, "intonation": 1.05},
+}
+
+# VOICEVOX が誤読しやすい語 → カタカナ読み（長い語を先に置換）。脚本は基本カタカナ済みだが安全網。
+PRONUNCIATION_MAP: dict[str, str] = {
+    "Herdr": "ハーダー",
+    "Hunk": "ハンク",
+    "tmux": "ティーマックス",
+    "DeepSeek": "ディープシーク",
+    "Qwen": "クウェン",
+    "Z.ai": "ゼットエーアイ",
+    "z.ai": "ゼットエーアイ",
+    "GLM": "ジーエルエム",
+    "MiniMax": "ミニマックス",
+    "Gemini": "ジェミニ",
+    "Copilot": "コパイロット",
+    "Cursor": "カーソル",
+    "Cline": "クライン",
+    "Aider": "エイダー",
+    "Windsurf": "ウィンドサーフ",
+    "VS Code": "ブイエスコード",
+    "VSCode": "ブイエスコード",
+    "SWE-bench": "スウィーベンチ",
+    "API": "エーピーアイ",
+    "LLM": "エルエルエム",
+    "OSS": "オーエスエス",
+    "Claude Code": "クロードコード",
+    "Claude": "クロード",
+    "OpenClaw": "オープンクロウ",
+    "Hermes Agent": "ハーメスエージェント",
+    "Hermes": "ハーメス",
+    "Codex": "コーデックス",
+    "Archon": "アルコン",
+    "LangGraph": "ラングラフ",
+    "Ralph": "ラルフ",
+    "GitHub": "ギットハブ",
+    "gh api": "ジーエイチエーピーアイ",
+    "Pi": "パイ",
+    "Discord": "ディスコード",
+    "Telegram": "テレグラム",
+    "Slack": "スラック",
+    "Qiita": "キータ",
+    "Zenn": "ゼン",
+    "CVE": "シーブイイー",
+    "PRD": "ピーアールディー",
+    "MCP": "エムシーピー",
+    "CLI": "シーエルアイ",
+    "TDD": "ティーディーディー",
+    "AGENTS.md": "エージェンツドットエムディー",
+    "OpenAI": "オープンエーアイ",
+    "Anthropic": "アンソロピック",
+    "Web": "ウェブ",
+    "AI": "エーアイ",
+    "OK": "オーケー",
+}
+
+
+def normalize_pronunciation(text: str) -> str:
+    for wrong, correct in PRONUNCIATION_MAP.items():
+        text = text.replace(wrong, correct)
+    return text
+
+
+SILENCE_NORMAL  = 0.4
+SILENCE_CHAPTER = 0.8
+
+PRODUCTIONS_DIR = None
+AUDIO_DIR = None
+
+_FORCE_STRIP_INNER: frozenset[str] = frozenset({"笑", "笑い", "苦笑", "照笑"})
+
+EMOTION_JA = {
+    "笑": "laugh", "笑い": "laugh", "くすくす": "laugh",
+    "驚": "surprise", "びっくり": "surprise", "衝撃": "surprise", "前のめり": "excited",
+    "興奮": "excited", "元気": "excited", "熱": "excited", "わくわく": "excited",
+    "静か": "calm_explain", "囁": "calm_explain", "声を抑え": "serious", "声が低": "serious",
+    "考": "thinking", "うーん": "thinking", "ゆっくり": "calm_explain", "落ち着": "calm_explain", "穏やか": "calm_explain",
+    "真剣": "serious", "真面目": "serious", "嬉しそう": "happy", "満足": "happy", "楽しそう": "happy",
+    "焦": "worried", "困": "worried", "心配": "worried", "不安": "worried",
+    "温か": "warmth", "しみじみ": "warmth", "ニヤリ": "laugh",
+}
+
+
+def _log(msg: str) -> None:
+    with _LOG_LOCK:
+        print(msg, flush=True)
+
+
+def _is_hiragana(c: str) -> bool:
+    return "ぁ" <= c <= "ゖ"
+
+
+def _looks_like_acting_note(inner: str) -> bool:
+    s = inner.strip()
+    if s in _FORCE_STRIP_INNER:
+        return True
+    if all(c.isascii() for c in s):
+        return False
+    if re.search(r"\d+年", s):
+        return False
+    if "「" in s or "『" in s:
+        return False
+    return any(_is_hiragana(c) for c in s)
+
+
+def _strip_acting_notes(text: str) -> str:
+    text = re.sub(
+        r"（([^）]+)）",
+        lambda m: "" if _looks_like_acting_note(m.group(1)) else m.group(0),
+        text,
+    )
+    text = text.replace("**", "").replace("__", "")
+    return text.strip()
+
+
+def detect_emotion(text: str) -> str:
+    for jp, key in EMOTION_JA.items():
+        if jp in text:
+            return key
+    return "normal"
+
+
+def normalize_speaker(raw: str) -> str:
+    for short in SPEAKER_MAP:
+        if short in raw:
+            return short
+    return raw
+
+
+def parse_script(md_path: Path) -> list[dict]:
+    with open(md_path, encoding="utf-8") as f:
+        content = f.read()
+    if content.startswith("---"):
+        parts = content.split("---", 2)
+        if len(parts) == 3:
+            content = parts[2]
+    entries = []
+    last_speaker = None
+    chapter_count = 0
+    pending_speaker: str | None = None
+    pending_emotion: str = "normal"
+    for line in content.split("\n"):
+        s = line.strip()
+        if s.startswith(">") or re.match(r"\[ト書き", s):
+            continue
+        if re.match(r"^##\s+", s):
+            pending_speaker = None
+            if chapter_count > 0:
+                entries.append({"type": "silence", "duration": SILENCE_CHAPTER})
+            entries.append({"type": "chapter", "title": re.sub(r"^##\s*", "", s)})
+            chapter_count += 1
+            continue
+        if pending_speaker and re.match(r"^[「『]", s):
+            raw = s
+            te = "normal"
+            pm = re.match(r"[「『]（([^）]+)）(.+)", raw)
+            if pm:
+                te = detect_emotion(pm.group(1))
+                raw = "「" + pm.group(2)
+            emotion = te if te != "normal" else pending_emotion
+            text = re.sub(r"^[「『]|[」』]$", "", raw).strip()
+            text = _strip_acting_notes(text)
+            if text:
+                speaker = pending_speaker
+                sid, url = SPEAKER_MAP[speaker]
+                if last_speaker and last_speaker != speaker:
+                    entries.append({"type": "silence", "duration": SILENCE_NORMAL})
+                entries.append({"type": "speech", "speaker": speaker,
+                                "speaker_id": sid, "vv_url": url,
+                                "emotion": emotion, "text": text})
+                last_speaker = speaker
+            pending_speaker = None
+            pending_emotion = "normal"
+            continue
+        m = re.match(r"\*\*(.+?)\*\*(?:（[^）]*）)?[:：]\s*(.*)", s)
+        if not m:
+            if s and not s.startswith("#"):
+                pending_speaker = None
+            continue
+        raw_speaker = m.group(1).strip()
+        raw_text    = m.group(2).strip()
+        speaker = normalize_speaker(raw_speaker)
+        if speaker not in SPEAKER_MAP:
+            pending_speaker = None
+            continue
+        em = re.match(r"\*\*.+?\*\*（([^）]+)）", s)
+        se_str = em.group(1) if em else ""
+        se = detect_emotion(se_str) if se_str else "normal"
+        if not raw_text:
+            pending_speaker = speaker
+            pending_emotion = se
+            continue
+        te = "normal"
+        pm = re.match(r"[「『]?（([^）]+)）(.+)", raw_text)
+        if pm:
+            te = detect_emotion(pm.group(1))
+            raw_text = pm.group(2)
+        emotion = te if te != "normal" else se
+        text = re.sub(r"^[「『]|[」』]$", "", raw_text).strip()
+        text = _strip_acting_notes(text)
+        if not text:
+            continue
+        sid, url = SPEAKER_MAP[speaker]
+        if last_speaker and last_speaker != speaker:
+            entries.append({"type": "silence", "duration": SILENCE_NORMAL})
+        entries.append({"type": "speech", "speaker": speaker,
+                        "speaker_id": sid, "vv_url": url,
+                        "emotion": emotion, "text": text})
+        last_speaker = speaker
+        pending_speaker = None
+    return entries
+
+
+_ALLOWED_VV_PREFIXES = (VOICEVOX_NORMAL_URL,)
+
+
+def _vv_post(url: str, timeout: int, data: bytes | None = None) -> bytes:
+    """VOICEVOX ローカルendpoint への POST。許可リスト外URLは拒否（CWE-939対策）。"""
+    parsed = urlsplit(url)
+    if parsed.scheme != "http" or parsed.hostname != "127.0.0.1" or parsed.port != 50021 or parsed.path not in ("/audio_query", "/synthesis"):
+        raise ValueError(f"Refusing non-allowlisted URL: {url[:40]}")
+    headers = {"Content-Type": "application/json"} if data is not None else {}
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *args, **kwargs):
+            raise ValueError("VOICEVOX redirect refused")
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+    with opener.open(req, timeout=timeout) as r:  # nosemgrep: dynamic-urllib-use-detected
+        return r.read()
+
+
+def synthesize(text: str, speaker_id: int, vv_url: str, char_name: str, emotion: str, query_path: Path | None = None) -> bytes:
+    text = normalize_pronunciation(text)
+    sem = _SEM_MAP.get(vv_url, threading.Semaphore(3))
+    with sem:
+        q_url = f"{vv_url}/audio_query?speaker={speaker_id}&text={urllib.request.quote(text)}"
+        query = json.loads(_vv_post(q_url, timeout=30))
+        base = BASE_PARAMS.get(char_name, {})
+        for k, v in base.items():
+            if k in query:
+                query[k] = v
+        ov = EMOTION_OVERRIDES.get(emotion, {})
+        if "speed" in ov:
+            query["speedScale"] = base.get("speedScale", 1.0) * ov["speed"]
+        if "intonation" in ov:
+            query["intonationScale"] = base.get("intonationScale", 1.0) * ov["intonation"]
+        s_url = f"{vv_url}/synthesis?speaker={speaker_id}"
+        data = json.dumps(query).encode("utf-8")
+        if query_path is not None:
+            query_path.write_bytes(data)
+        return _vv_post(s_url, timeout=60, data=data)
+
+
+def make_silence_wav(tmpdir: str, duration: float) -> str:
+    path = f"{tmpdir}/silence_{int(duration*1000)}ms.wav"
+    if Path(path).exists():
+        return path
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "lavfi", "-i",
+         "anullsrc=channel_layout=mono:sample_rate=24000",
+         "-t", str(duration), path],
+        capture_output=True, check=True
+    )
+    return path
+
+
+def generate_episode(ep_num: int) -> bool:
+    md_path = PRODUCTIONS_DIR / f"ep-{ep_num:02d}" / "script.md"
+    if not md_path.exists():
+        _log(f"  [EP{ep_num:02d}] ✗ Script not found: {md_path}")
+        return False
+
+    _log(f"\n{'='*60}\n  [EP{ep_num:02d}] {md_path}\n{'='*60}")
+    entries = parse_script(md_path)
+    speeches = [e for e in entries if e["type"] == "speech"]
+    lint=runpy.run_path(str(Path(__file__).resolve().with_name('kukuri-radio-lint')))['lint_file']
+    violations,stats=lint(str(md_path))
+    if violations or stats['utterances']!=len(speeches):
+        _log('STOP: script syntax or unsupported speakers; no dialogue will be omitted')
+        return False
+    _log(f"  [EP{ep_num:02d}] Parsed: {len(speeches)} speeches")
+    if not speeches:
+        _log(f"  [EP{ep_num:02d}] ✗ No speeches parsed (記法/話者名を確認)")
+        return False
+
+    AUDIO_DIR.mkdir(parents=True, exist_ok=False)
+    (AUDIO_DIR / "segments").mkdir()
+    (AUDIO_DIR / "queries").mkdir()
+    record = {"status":"incomplete", "source":str(md_path), "sha256":hashlib.sha256(md_path.read_bytes()).hexdigest(), "speeches":len(speeches), "voices":SPEAKER_MAP, "base_params":BASE_PARAMS, "emotions":EMOTION_OVERRIDES, "silences":[SILENCE_NORMAL,SILENCE_CHAPTER], "entries":entries}
+    (AUDIO_DIR / "production.json").write_text(json.dumps(record,ensure_ascii=False,indent=2))
+    out_mp3 = AUDIO_DIR / f"aidev-ep{ep_num:02d}.mp3"
+
+    with contextlib.nullcontext(str(AUDIO_DIR / "segments")) as tmpdir:
+        wav_list = []
+        futures = {}
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            for idx, entry in enumerate(entries):
+                if entry["type"] == "speech":
+                    fut = pool.submit(
+                        synthesize,
+                        entry["text"], entry["speaker_id"], entry["vv_url"],
+                        entry["speaker"], entry["emotion"], AUDIO_DIR / "queries" / f"{idx:04d}.json"
+                    )
+                    futures[fut] = (idx, entry)
+
+            results: dict[int, str] = {}
+            for fut in as_completed(futures):
+                idx, entry = futures[fut]
+                wav_path = f"{tmpdir}/speech_{idx:04d}.wav"
+                try:
+                    data = fut.result()
+                    with open(wav_path, "wb") as f:
+                        f.write(data)
+                    results[idx] = wav_path
+                    char = entry["speaker"].ljust(5)
+                    em = entry["emotion"].ljust(12)
+                    preview = entry["text"][:28] + ("…" if len(entry["text"]) > 28 else "")
+                    _log(f"  [EP{ep_num:02d}][{len(results):3d}/{len(speeches)}] {char} [{em}]: {preview}")
+                except Exception as e:
+                    _log(f"  [EP{ep_num:02d}] ✗ Error idx={idx}: {e}")
+
+        if len(results) != len(speeches):
+            _log("STOP: missing speech segments; incomplete MP3 will not be produced")
+            return False
+
+        for idx, entry in enumerate(entries):
+            if entry["type"] == "silence":
+                wav_list.append(make_silence_wav(tmpdir, entry["duration"]))
+            elif entry["type"] == "speech" and idx in results:
+                wav_list.append(results[idx])
+
+        if not wav_list:
+            _log(f"  [EP{ep_num:02d}] ✗ No audio generated")
+            return False
+
+        list_file = f"{tmpdir}/list.txt"
+        with open(list_file, "w") as f:
+            for w in wav_list:
+                f.write(f"file '{w}'\n")
+
+        concat_wav = f"{tmpdir}/concat.wav"
+        subprocess.run(
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", list_file,
+             "-c", "copy", concat_wav],
+            capture_output=True, check=True
+        )
+        subprocess.run(
+            ["ffmpeg", "-n", "-i", concat_wav,
+             "-codec:a", "libmp3lame", "-b:a", "128k", str(out_mp3)],
+            capture_output=True, check=True
+        )
+
+    size_mb = out_mp3.stat().st_size / 1024 / 1024
+    import wave
+    dur_s = 0.0
+    with tempfile.TemporaryDirectory() as td2:
+        tmp_wav = f"{td2}/check.wav"
+        subprocess.run(["ffmpeg", "-y", "-i", str(out_mp3), tmp_wav], capture_output=True)
+        try:
+            with contextlib.closing(wave.open(tmp_wav)) as wf:
+                dur_s = wf.getnframes() / wf.getframerate()
+        except Exception:
+            pass
+    _log(f"  [EP{ep_num:02d}] ✓ Done: {out_mp3.name} ({size_mb:.1f} MB, {dur_s:.1f}s)")
+    record.update(status="complete", duration_seconds=dur_s, bytes=out_mp3.stat().st_size)
+    (AUDIO_DIR / "production.json").write_text(json.dumps(record,ensure_ascii=False,indent=2))
+    return True
+
+
+def main():
+    global PRODUCTIONS_DIR, AUDIO_DIR
+    os.umask(0o077)
+    parser=argparse.ArgumentParser(description="Legacy aidev-radio voices and rendering, isolated output only")
+    parser.add_argument('episode',type=int)
+    parser.add_argument('--source',required=True,type=Path,help='Contains ep-NN/script.md')
+    parser.add_argument('--output',required=True,type=Path,help='New directory inside this workspace')
+    args=parser.parse_args()
+    root=Path(__file__).resolve().parents[1]
+    PRODUCTIONS_DIR=args.source.resolve(); AUDIO_DIR=args.output.resolve()
+    if root not in AUDIO_DIR.parents or AUDIO_DIR.exists():
+        parser.error('output must be a new directory inside this workspace; no overwrite')
+    if not 1 <= args.episode <= 999: parser.error('episode must be 1..999')
+    return 0 if generate_episode(args.episode) else 2
+
+
+if __name__ == '__main__':
+    sys.exit(main())
