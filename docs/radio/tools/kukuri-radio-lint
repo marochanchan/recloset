@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+"""script_linter.py — VOICEVOX 台本記法リンタ（media-write-script スキル準拠）
+
+工程上の位置づけ（2026-07-26 Matthew 判断）:
+  演出 → 台本 → 微修正 → リンタ
+  リンタは最後の「微修正の確認」であり、書き方を縛るものではない。
+  現場の記法に合わせて許容範囲を広げるのが正しい方向。
+
+許可パターン:
+  A1: **話者**:（演出）「本文」   ※コロンが先（演出重視でない場合の既定）
+  A2: **話者**（演出）:「本文」   ※演出が先（全体の演出が重要な作品はこちら）
+  B:  **話者**: 「本文」          ※演出なし
+  C:  [ト書き: 場面説明]
+  D:  [BGM-01 フェードイン] [SE-02 エンドジングル] [間] [END]  ※音声キュー
+  E:  **BGM**: … / **キャスト**: … / **尺目安**: …            ※メタ情報行
+
+  ※ A1 と A2 はどちらも正。作品ごとに一貫していればよい（Matthew 判断・2026-07-26）。
+     演出（表情・トーン）が作品全体の要である場合は A2 を使う。
+     いずれも演出は「」の外・左側に置く（セリフ内の演出は禁止）。
+
+検出する違反:
+  - 記法違反（A/B/C のいずれにも一致しないセリフ行）
+  - セリフ途中/末尾の演出（セリフ内のひらがなを含む括弧。例:「本文（笑）」）
+  - 発話なしの演出のみ行（例: （ため息））
+  - 空発話 「」
+  - 1発話 200字超
+
+使い方:
+  python3 script_linter.py <script.md> [<script.md> ...]
+
+終了コード: 違反ゼロ=0 / 違反あり=1
+"""
+
+import re
+import sys
+import unicodedata
+
+MAX_UTTERANCE_LEN = 200
+
+# A1: **話者**:（演出）「本文」  … コロンが先
+PAT_A1 = re.compile(
+    r"^\*\*(?P<speaker>[^*]+)\*\*\s*[:：]\s*（(?P<emotion>[^（）]*)）\s*「(?P<body>.*)」\s*$"
+)
+# A2: **話者**（演出）:「本文」  … 演出が先（演出重視の作品用）
+PAT_A2 = re.compile(
+    r"^\*\*(?P<speaker>[^*]+)\*\*\s*（(?P<emotion>[^（）]*)）\s*[:：]\s*「(?P<body>.*)」\s*$"
+)
+# B: **話者**: 「本文」
+PAT_B = re.compile(r"^\*\*(?P<speaker>[^*]+)\*\*\s*[:：]\s*「(?P<body>.*)」\s*$")
+# C: [ト書き: 場面説明]
+PAT_C = re.compile(r"^\[ト書き\s*[:：]\s*.+\]\s*$")
+# D: 音声キュー [BGM-01 フェードイン] [SE-02 エンドジングル] 等
+PAT_CUE = re.compile(r"^\[(?:BGM|SE|ME|ジングル|ナレーション)\s*[-–—]?\s*\d*\s*[^\]]*\]\s*$")
+# D': 単独マーカー [間] [END] 等
+PAT_MARK = re.compile(r"^\[(?:間|END|FIN|START|以下略|続く)\]\s*$")
+
+# E: セリフではないメタ情報行のラベル（**ラベル**: 値）
+META_LABELS = {
+    "BGM", "SE", "ME", "キャスト", "尺目安", "尺", "想定尺", "備考", "メモ",
+    "収録メモ", "タイトル", "フォーマット", "出典", "話者", "登場人物", "構成",
+}
+
+HIRAGANA = re.compile(r"[ぁ-ゟ]")
+PAREN_IN_BODY = re.compile(r"[（(]([^（）()]*)[）)]")
+
+SKIP_PREFIXES = ("#", ">", "-", "*", "|", "```", "---", "===")
+
+
+def is_skippable(line: str) -> bool:
+    """ヘッダ・箇条書き・引用・表・罫線など、セリフ以外の行か"""
+    s = line.strip()
+    if not s:
+        return True
+    if s.startswith("**"):  # セリフ行（リストの * とは区別）
+        return False
+    for p in SKIP_PREFIXES:
+        if s.startswith(p):
+            return True
+    # 数字付きリスト "1. " など
+    if re.match(r"^\d+[.)]\s", s):
+        return True
+    return False
+
+
+def lint_file(path: str):
+    violations = []
+    stats = {"utterances": 0, "chars": 0, "speakers": {}, "stage_directions": 0,
+             "audio_cues": 0, "meta_lines": 0, "emotion_style": None}
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except OSError as e:
+        return [f"(ファイルを開けません: {e})"], stats
+
+    for idx, raw in enumerate(lines, start=1):
+        line = raw.strip()
+
+        # 発話なしの演出のみ行
+        if re.match(r"^[（(].*[）)]\s*$", line):
+            violations.append(f"L{idx}: 発話なしの演出のみ行は禁止 → {line}")
+            continue
+
+        if line.startswith("["):
+            if PAT_C.match(line):
+                stats["stage_directions"] += 1
+            elif PAT_CUE.match(line) or PAT_MARK.match(line):
+                stats["audio_cues"] += 1
+            else:
+                violations.append(
+                    f"L{idx}: 角括弧行は [ト書き: 場面説明] / [BGM-01 …] / [SE-01 …]"
+                    f" / [間] / [END] のいずれか → {line}"
+                )
+            continue
+
+        if is_skippable(line):
+            continue
+
+        if line.startswith("**"):
+            # セリフではないメタ情報行（**BGM**: … 等）はスキップ
+            lm = re.match(r"^\*\*([^*]+)\*\*\s*[:：]", line)
+            if lm and lm.group(1).strip() in META_LABELS:
+                stats["meta_lines"] += 1
+                continue
+
+            m = PAT_A1.match(line) or PAT_A2.match(line) or PAT_B.match(line)
+            if not m:
+                violations.append(
+                    f"L{idx}: 記法違反（A1/A2/B パターン不一致。演出は「」の左側・"
+                    f"セリフは「」で閉じる） → {line[:60]}"
+                )
+                continue
+            speaker = m.group("speaker").strip()
+            body = m.group("body")
+
+            # 演出位置の一貫性（ファイル内で A1 と A2 を混在させない）
+            if "emotion" in m.groupdict() and m.groupdict().get("emotion") is not None:
+                style = "A1" if PAT_A1.match(line) else "A2"
+                if stats["emotion_style"] is None:
+                    stats["emotion_style"] = style
+                elif stats["emotion_style"] != style:
+                    violations.append(
+                        f"L{idx}: 演出位置が混在（このファイルは {stats['emotion_style']} 形式）"
+                        f" → {line[:40]}"
+                    )
+
+            # 空発話
+            if not body.strip():
+                violations.append(f"L{idx}: 空発話「」は禁止（話者: {speaker}）")
+                continue
+
+            # セリフ内の括弧（ひらがなを含む場合は演出とみなし禁止）
+            for pm in PAREN_IN_BODY.finditer(body):
+                if HIRAGANA.search(pm.group(1)):
+                    violations.append(
+                        f"L{idx}: セリフ内の演出括弧は禁止（ひらがな含み括弧:"
+                        f" （{pm.group(1)}））"
+                    )
+
+            # 200字制限
+            if len(body) > MAX_UTTERANCE_LEN:
+                violations.append(
+                    f"L{idx}: 1発話{MAX_UTTERANCE_LEN}字超（{len(body)}字・話者: {speaker}）"
+                )
+
+            stats["utterances"] += 1
+            stats["chars"] += len(body)
+            stats["speakers"][speaker] = stats["speakers"].get(speaker, 0) + 1
+            continue
+
+        # セリフらしいのに ** が無い行（例: ナビ: 「…」）
+        if re.match(r"^[^\s#>\-|*\[].{0,20}[:：]\s*「", line):
+            violations.append(f"L{idx}: 話者名は **話者**: 形式で書く → {line[:40]}")
+
+    return violations, stats
+
+
+def main(argv):
+    if len(argv) < 2:
+        print(__doc__)
+        return 2
+
+    exit_code = 0
+    for path in argv[1:]:
+        violations, stats = lint_file(path)
+        print(f"== {path} ==")
+        print(
+            f"発話数: {stats['utterances']} / セリフ総文字数: {stats['chars']}"
+            f" / ト書き: {stats['stage_directions']}"
+            + (f" / 音声キュー: {stats['audio_cues']}" if stats["audio_cues"] else "")
+            + (f" / メタ行: {stats['meta_lines']}" if stats["meta_lines"] else "")
+        )
+        if stats["emotion_style"]:
+            print(f"演出位置: {stats['emotion_style']} 形式"
+                  f"（{'コロンが先' if stats['emotion_style'] == 'A1' else '演出が先'}）")
+        if stats["speakers"]:
+            ratio = ", ".join(f"{k}: {v}" for k, v in stats["speakers"].items())
+            print(f"話者内訳: {ratio}")
+        # 目安: 320字/分（対話ラジオ・間込み）
+        if stats["chars"]:
+            print(f"推定尺: 約{stats['chars'] / 320:.1f}分（320字/分換算）")
+        if violations:
+            exit_code = 1
+            print(f"違反: {len(violations)}件")
+            for v in violations:
+                print(f"  NG {v}")
+        else:
+            print("違反: 0件 (PASS)")
+        print()
+    return exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
