@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Re:Closet 現状レポート</title>
+<style>
+:root {
+  --bg: #f7f6f2; --panel: #ffffff; --ink: #24262b; --muted: #676b73; --line: #dedcd4;
+  --accent: #2f5fa8; --accent-soft: #e4ecf8;
+  --ok: #2c7a4f; --ok-soft: #dff2e7;
+  --warn: #9a6200; --warn-soft: #fbeed3;
+  --no: #b23a3a; --no-soft: #f9e2e0;
+  --bar: #c4c8d0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17191d; --panel: #212429; --ink: #eceded; --muted: #a2a6ae; --line: #383c43;
+    --accent: #8ab0ec; --accent-soft: #233450;
+    --ok: #74cf9c; --ok-soft: #1c3a2a;
+    --warn: #e6b45e; --warn-soft: #3d2f14;
+    --no: #ef9191; --no-soft: #432323;
+    --bar: #5a5f68;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17191d; --panel: #212429; --ink: #eceded; --muted: #a2a6ae; --line: #383c43;
+  --accent: #8ab0ec; --accent-soft: #233450;
+  --ok: #74cf9c; --ok-soft: #1c3a2a;
+  --warn: #e6b45e; --warn-soft: #3d2f14;
+  --no: #ef9191; --no-soft: #432323;
+  --bar: #5a5f68;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
+  overflow-wrap: anywhere;
+}
+main { max-width: 900px; margin: 0 auto; padding: 40px 24px 72px; }
+h1 { font-size: 30px; line-height: 1.35; margin: 0 0 6px; letter-spacing: .01em; }
+h2 { font-size: 22px; line-height: 1.45; margin: 56px 0 14px; padding-top: 18px; border-top: 2px solid var(--ink); }
+h3 { font-size: 17px; line-height: 1.5; margin: 30px 0 10px; }
+p { margin: 0 0 12px; }
+ul, ol { margin: 0 0 12px; padding-left: 1.4em; }
+li { margin-bottom: 6px; }
+code {
+  font: .86em/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: color-mix(in srgb, var(--ink) 8%, transparent); padding: .08em .35em; border-radius: 4px;
+}
+a { color: var(--accent); }
+.meta { color: var(--muted); font-size: 14px; margin-bottom: 26px; }
+.note { color: var(--muted); font-size: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; margin: 0 0 14px; }
+
+.lead { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.lead li { display: grid; grid-template-columns: 34px 1fr; gap: 12px; margin: 0; align-items: start; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.lead .n { width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 15px; }
+.lead strong { display: block; font-size: 17px; line-height: 1.55; }
+.lead span.sub { color: var(--muted); font-size: 14px; display: block; margin-top: 3px; }
+
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 0 0 16px; }
+.kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.kpi b { display: block; font-size: 26px; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.kpi span { font-size: 13px; color: var(--muted); line-height: 1.45; display: block; }
+
+.pipe { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0 0 8px; }
+.step { border-radius: 10px; padding: 12px 10px; text-align: center; border: 1px solid transparent; }
+.step b { display: block; font-size: 15px; line-height: 1.4; }
+.step i { font-style: normal; font-size: 13px; font-weight: 600; display: block; margin-top: 2px; }
+.step small { display: block; font-size: 12px; line-height: 1.45; margin-top: 6px; color: var(--muted); }
+.s-ok { background: var(--ok-soft); border-color: var(--ok); } .s-ok i { color: var(--ok); }
+.s-pt { background: var(--warn-soft); border-color: var(--warn); } .s-pt i { color: var(--warn); }
+.s-no { background: var(--no-soft); border-color: var(--no); } .s-no i { color: var(--no); }
+
+.chart { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); gap: 4px; align-items: end; height: 176px; margin-top: 8px; position: relative; }
+.col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; font-size: 12px; color: var(--muted); }
+.col .v { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.col .b { width: 100%; max-width: 30px; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 0; }
+.col .d { margin-top: 4px; font-variant-numeric: tabular-nums; }
+.col.roll { background: var(--warn-soft); border-radius: 4px; }
+.legend { font-size: 13px; color: var(--muted); margin-top: 8px; }
+.swatch { display: inline-block; width: 11px; height: 11px; border-radius: 2px; vertical-align: -1px; margin-right: 4px; }
+
+.stack { display: flex; height: 26px; border-radius: 6px; overflow: hidden; margin: 8px 0 10px; }
+.stack div { height: 100%; }
+.kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 2px 16px; font-size: 14px; margin: 0; padding: 0; list-style: none; }
+.kv li { margin: 0; }
+
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; line-height: 1.6; }
+th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+th { font-size: 13px; color: var(--muted); font-weight: 600; }
+td:first-child { font-weight: 600; }
+.tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+.t-no { background: var(--no-soft); color: var(--no); }
+.t-pt { background: var(--warn-soft); color: var(--warn); }
+.t-ok { background: var(--ok-soft); color: var(--ok); }
+
+.answer { background: var(--accent-soft); border-left: 4px solid var(--accent); border-radius: 0 10px 10px 0; padding: 16px 18px; margin: 0 0 18px; }
+.answer strong { font-size: 18px; line-height: 1.55; display: block; }
+.answer p { margin: 8px 0 0; }
+
+.ladder { display: grid; gap: 14px; margin: 0 0 14px; }
+.rung > .lbl { font-size: 13.5px; font-weight: 700; margin-bottom: 5px; }
+.boxes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.bx { border-radius: 8px; padding: 9px 6px; text-align: center; font-size: 14px; line-height: 1.4; border: 1px solid var(--line); background: var(--panel); display: grid; place-items: center; min-height: 62px; }
+.bx.same { color: var(--muted); }
+.bx.new { background: var(--accent-soft); border-color: var(--accent); font-weight: 700; }
+.bx.gap { border: 1.5px dashed var(--no); color: var(--no); background: transparent; }
+.bx.goal { background: var(--ok-soft); border-color: var(--ok); font-weight: 700; }
+
+.tl { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--line); }
+.tl li { position: relative; padding: 0 0 14px 18px; margin: 0; }
+.tl li::before { content: ""; position: absolute; left: -6px; top: 8px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.tl .when { font-weight: 700; font-size: 14px; display: block; }
+.tl .src { color: var(--muted); font-size: 13px; }
+
+.flow { display: grid; gap: 4px; }
+.fl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 12px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; line-height: 1.5; background: var(--panel); align-items: center; }
+.fl.add { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+.fl code { font-size: 12.5px; }
+.down { text-align: center; color: var(--muted); font-size: 12px; line-height: 1; }
+
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.todo { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.todo li { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.todo .lv { display: inline-block; font-size: 12px; font-weight: 700; color: var(--no); margin-right: 6px; }
+.todo .lv.opt { color: var(--muted); }
+.todo b { font-size: 15.5px; }
+.todo span.why { display: block; font-size: 14px; color: var(--muted); margin-top: 3px; }
+details { margin-top: 12px; }
+summary { cursor: pointer; font-weight: 600; }
+footer { margin-top: 48px; color: var(--muted); font-size: 13px; }
+
+@media (max-width: 640px) {
+  main { padding: 26px 16px 56px; }
+  h1 { font-size: 25px; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pipe { grid-template-columns: 1fr; }
+  .step { display: grid; grid-template-columns: 100px 70px 1fr; align-items: center; gap: 8px; text-align: left; padding: 10px; }
+  .step i, .step small { margin: 0; }
+  .col .d, .col { font-size: 10.5px; }
+  .chart { gap: 2px; }
+  .two { grid-template-columns: 1fr; }
+  .bx { font-size: 12.5px; padding: 8px 3px; }
+  .fl { grid-template-columns: 1fr; gap: 2px; }
+  table.resp thead { display: none; }
+  table.resp, table.resp tbody, table.resp tr, table.resp td { display: block; width: 100%; }
+  table.resp tr { border-bottom: 1px solid var(--line); padding: 8px 0; }
+  table.resp td { border: 0; padding: 2px 0; }
+}
+</style>
+</head>
+<body>
+<main>
+
+<h1>Re:Closet 現状レポート</h1>
+<p class="meta">2026-10-31 16:20 時点／対象：<code>marochanchan/recloset</code> の <code>main</code>（a9d5639）と全ブランチ、PR 2件、Issue 0件／期間：10/17〜10/31／AI生成（Claude Code）</p>
+<p class="card" style="font-size:14.5px">このレポートのあとに、デバイス構成の変更案が出ました（同じフォルダーの <code>ai-wardrobe-mirror-concept.md</code>）。鏡とカメラの部分は、変更案を優先してください。また、この時点のあとに Plan 2a のプランとブランチ <code>feature/chakuga-webcam-photo</code> が GitHub に上がりました。「撮る」の「コードなし」と、Plan 2a のプランを読めていないという記述は、16:20 時点のものです。カメラも、PR #7 の確認で Logicool BRIO 100、保存は 1920×1080 と分かりました。720p を前提にした記述は当てはまりません。</p>
+
+<ul class="lead">
+  <li><span class="n">1</span><div><strong>土台は本番に入りました。</strong><span class="sub">Plan 1（着画 → 手で服を選ぶ → 確定 → 線）は本番の通し確認まで完了と記録されています。DB と単体の試験は手元でも再現しました。</span></div></li>
+  <li><span class="n">2</span><div><strong>デモの5段階のうち、できているのは「確定」だけです。</strong><span class="sub">「つながる」と「スマホの取り込み」は一部だけ。「撮る」「見分ける」の処理は GitHub 上にありません。11/10 まで残り10日です。</span></div></li>
+  <li><span class="n">3</span><div><strong>Webカメラは、コードより順番が危うくなっています。</strong><span class="sub">カメラが完成しても、今の「写真を選ぶ」が「ボタンで撮る」に変わるだけです。成功基準1の中心である AI のプランはまだなく、TODO ではカメラの完成判定に続けて書かれています。今日から並行で始めてください。</span></div></li>
+</ul>
+
+<h2>いまの現状</h2>
+
+<div class="kpis">
+  <div class="kpi"><b>10日</b><span>11/10 本番で通しで動く期限まで</span></div>
+  <div class="kpi"><b>16日</b><span>11/16 GGA の発表まで</span></div>
+  <div class="kpi"><b>11項目</b><span>Plan 1 の本番確認はすべて正常（TODO の記録）</span></div>
+  <div class="kpi"><b>0</b><span>型検査と ESLint のエラー（手元で実行）</span></div>
+</div>
+
+<h3>デモの5段階（TODO 7行目の定義）</h3>
+<div class="pipe">
+  <div class="step s-no"><b>撮る</b><i>コードなし</i><small>カメラの API を使うコードが全ブランチで0件</small></div>
+  <div class="step s-no"><b>見分ける</b><i>コードなし</i><small>解析のテーブルと処理はなし（列と画像の下準備のみ）</small></div>
+  <div class="step s-ok"><b>確定</b><i>完了</i><small>送り直し・同時実行まで試験済み</small></div>
+  <div class="step s-pt"><b>つながる</b><i>一部</i><small>動かない線だけ。伸びる・再生はなし</small></div>
+  <div class="step s-pt"><b>スマホの取り込み</b><i>一部</i><small>写真1枚だけ。複数・撮影日・動画はなし</small></div>
+</div>
+
+<h3>この2週間のコミット（<code>main</code>、マージを除く57件）</h3>
+<div class="card">
+  <div class="chart" role="img" aria-label="10月25日に33件のコミットが集中し、10月28日から30日はコミットがない">
+    <div class="col"><span class="v">2</span><span class="b" style="height:8px"></span><span class="d">17</span></div>
+    <div class="col"><span class="v">4</span><span class="b" style="height:17px"></span><span class="d">18</span></div>
+    <div class="col"><span class="d">19</span></div>
+    <div class="col"><span class="d">20</span></div>
+    <div class="col"><span class="d">21</span></div>
+    <div class="col"><span class="d">22</span></div>
+    <div class="col"><span class="v">1</span><span class="b" style="height:4px"></span><span class="d">23</span></div>
+    <div class="col"><span class="v">1</span><span class="b" style="height:4px"></span><span class="d">24</span></div>
+    <div class="col"><span class="v">33</span><span class="b" style="height:132px"></span><span class="d">25</span></div>
+    <div class="col"><span class="v">8</span><span class="b" style="height:32px"></span><span class="d">26</span></div>
+    <div class="col"><span class="v">6</span><span class="b" style="height:24px"></span><span class="d">27</span></div>
+    <div class="col roll"><span class="d">28</span></div>
+    <div class="col roll"><span class="d">29</span></div>
+    <div class="col roll"><span class="d">30</span></div>
+    <div class="col"><span class="v">2</span><span class="b" style="height:8px"></span><span class="d">31</span></div>
+  </div>
+  <p class="legend"><span class="swatch" style="background:var(--warn-soft);border:1px solid var(--warn)"></span>10/28〜30 はコミットなし。TODO の記録ではプレビューの確認と本番への適用の期間です。コードの最後の変更は 10/27 02:58（e1b6bfc）。</p>
+</div>
+
+<h3>PR #1 の中身：+10,046行のうち、画面は8%</h3>
+<div class="card">
+  <div class="stack" role="img" aria-label="試験38%、文書19%、DB変更13%、lib12%、appとcomponents12%、スクリプトほか5%">
+    <div style="width:38.3%;background:var(--ok)"></div>
+    <div style="width:19.3%;background:var(--bar)"></div>
+    <div style="width:13.3%;background:var(--warn)"></div>
+    <div style="width:11.8%;background:var(--accent)"></div>
+    <div style="width:11.8%;background:var(--no)"></div>
+    <div style="width:5.5%;background:var(--muted)"></div>
+  </div>
+  <ul class="kv">
+    <li><span class="swatch" style="background:var(--ok)"></span>試験 3,849行（38%）</li>
+    <li><span class="swatch" style="background:var(--bar)"></span>文書 1,943行（19%）</li>
+    <li><span class="swatch" style="background:var(--warn)"></span>DB 変更 1,334行（13%）</li>
+    <li><span class="swatch" style="background:var(--accent)"></span><code>lib</code> 1,190行（12%）</li>
+    <li><span class="swatch" style="background:var(--no)"></span><code>app</code> と <code>components</code> 1,182行（12%、うち画面 837行）</li>
+    <li><span class="swatch" style="background:var(--muted)"></span>スクリプトほか 548行（5%）</li>
+  </ul>
+  <p class="note" style="margin:10px 0 0">仕様書の「今回の中心は、画面よりもデータの構造」のとおりです。土台は堅い一方、デモで見える部分はこれからです。</p>
+</div>
+
+<h3>GitHub の状況</h3>
+<ul>
+  <li><b>PR #1：</b>48コミット、67ファイル。10/31 03:23 に作成し 03:33 にマージ。GitHub 上のレビューは0件で、本文に Codex の最終レビューの結果が書かれています。</li>
+  <li><b>PR #2：</b>TODO の更新だけ。10/31 16:14 にマージ。</li>
+  <li><b>Issue：</b>0件。進み具合の管理は <code>docs/project/TODO.md</code> に一本化されています。</li>
+  <li><b>CI：</b>なし（<code>.github/</code> がない）。自動で動くのは Vercel のビルドだけで、試験は手で実行しています。</li>
+</ul>
+
+<h2>実装できていないもの</h2>
+
+<p>TODO の未完了は、〜10/31 に3件、〜11/5 に7件（完了0）、〜11/9 に4件（完了0）です。コードと突き合わせた結果は次のとおりです。</p>
+
+<div class="card" style="padding:6px 14px">
+<table class="resp">
+  <thead><tr><th>機能</th><th>状態</th><th>今のコード</th><th>TODO の期限</th></tr></thead>
+  <tbody>
+    <tr><td>Webカメラで撮る</td><td><span class="tag t-no">なし</span></td><td><code>getUserMedia</code> など0件。ブランチも GitHub にない</td><td>10/31 → 未完</td></tr>
+    <tr><td>見分ける（AI）</td><td><span class="tag t-no">なし</span></td><td><code>outfit_analysis_runs</code> と <code>outfit_detections</code> がない。今の AI は1枚から1着だけ返す（<code>lib/clothing-image-analysis.ts:147</code>）</td><td>11/5</td></tr>
+    <tr><td>候補の順位付け</td><td><span class="tag t-no">なし</span></td><td>該当するコードなし</td><td>11/5</td></tr>
+    <tr><td>確認画面</td><td><span class="tag t-no">なし</span></td><td>今は手で選ぶ <code>outfit-item-picker.tsx</code> のみ</td><td>11/5</td></tr>
+    <tr><td>判断の記録・正解率</td><td><span class="tag t-no">なし</span></td><td>解析のテーブルに依存</td><td>11/5</td></tr>
+    <tr><td>スマホの取り込み</td><td><span class="tag t-pt">一部</span></td><td>写真1枚を選ぶだけ。着画の複数選択、撮影日の読み取りはなし</td><td>11/5</td></tr>
+    <tr><td>動画</td><td><span class="tag t-pt">一部</span></td><td>Stream の webhook は本番にあるが、動画を送る画面も再生もない</td><td>11/5 に採否</td></tr>
+    <tr><td>新しく登録（切り出し）</td><td><span class="tag t-no">なし</span></td><td>該当するコードなし</td><td>11/5 に採否</td></tr>
+    <tr><td>小物のカテゴリー</td><td><span class="tag t-no">なし</span></td><td><code>lib/clothing-options.ts</code> になし。Plan 1 の対応表では Plan 2 だが <b>TODO に載っていない</b></td><td>なし</td></tr>
+    <tr><td>＋記録ボタン</td><td><span class="tag t-no">なし</span></td><td>入口は服の詳細の「この服で着画を記録」だけ（<code>items/[id]/page.tsx:228</code>）</td><td>11/5（Plan 1 の対応表では Plan 3）</td></tr>
+    <tr><td>つながりのマップ</td><td><span class="tag t-pt">一部</span></td><td>線と服へのリンクのみ（<code>relation-lines.tsx</code>）。来た道、再生、ドラッグはなし</td><td>11/9</td></tr>
+    <tr><td>確定直後の演出</td><td><span class="tag t-no">なし</span></td><td>確定後はコーデの画面へ移るだけ</td><td>11/9</td></tr>
+    <tr><td>Looks</td><td><span class="tag t-no">なし</span></td><td>タブも一覧もない。記録したコーデに、あとから画面でたどり着けない</td><td>11/9</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="note">11/10以降の予定：アーカイブの画面、写真なしで記録、「今日着た」からの提案、自分で付ける関係、季節の比較、撮影待機の全画面、マップの残りの仕掛け。</p>
+
+<h3>TODO の項目だけでは見えない不足</h3>
+<div class="two">
+  <div class="card"><b>Plan 2 のプランがない</b><p style="margin:6px 0 0;font-size:14.5px">11/5 の項目は、ほぼこのプランにかかっています。Plan 1 はプラン作成（10/25）から本番完了（10/31）まで約6.6日。コードは2日で、残りは本番切り替えの期間でした。今日から同じだけかかると 11/7 で、マップと演出と録画に残るのは3日です。</p></div>
+  <div class="card"><b>「見分ける」の試作がない</b><p style="margin:6px 0 0;font-size:14.5px">10/27 の確認で着画について記録された判定は <code>tops</code> だけです（TODO 24行目）。使ったのは1枚から1着を返す平置き用の解析で、「AI に写真を渡せる」ことの確認でした。複数の服を位置つきで見分けられるかを試した記録はありません。</p></div>
+  <div class="card"><b>撮影の置き方が決まっていない</b><p style="margin:6px 0 0;font-size:14.5px">仕様書と TODO に、全身が入る距離、カメラの向き、シャッターを押してから立つ位置の記述がありません。5秒のタイマーで間に合うかも、ここで決まります。</p></div>
+  <div class="card"><b>GitHub にない重要な資料</b><p style="margin:6px 0 0;font-size:14.5px">Plan 2a のプランとブランチ、Plan 3 の基準になる <code>relation-map-demo.html</code>（<code>.gitignore</code> された <code>.superpowers/</code> の中。仕様書542行目）。手元の Mac にしかないと思われ、外からレビューできず、壊れたときに戻せません。</p></div>
+</div>
+<div class="card" style="border-color:var(--no)"><b>デモの前に本番が止まる可能性：Supabase の Egress</b><p style="margin:6px 0 0;font-size:14.5px">10/27 時点の試算で、5GB を超えるのは 11/10 ごろ。期限の当日です。もう一度超えると猶予なしで制限されます（TODO 92行目）。最初の確認日は明日 11/1 です。10/27 より後の数字は見ていません。</p></div>
+
+<h2>Webカメラ：ゴールは迷子になっていないか</h2>
+
+<div class="answer">
+  <strong>コードは迷子ではありません。GitHub 上にはまだ書かれていないからです。迷子になりかけているのは順番で、完了の定義も確認できません。</strong>
+  <p>Plan 2a の範囲（写真だけ）は妥当です。問題は、TODO 54行目で Plan 2 のプラン開始がカメラの完成判定に続けて書かれていて、上から順に進めると AI の着手がカメラのあとになることです。カメラが間に合わなくても、スマホの写真で「見分ける → 確定 → つながる」は見せられます。AI が間に合わないと、カメラがあっても手で服を選ぶデモになります。鏡の前で撮る体験は将来の構想につながるので、カメラが不要という話ではなく、順番の話です。</p><p class="note">Plan 2a のプランは GitHub にないため、この判定は仕様書、TODO、コードからのものです。</p>
+</div>
+
+<h3>Plan 2a が終わると何が変わるか</h3>
+<div class="ladder">
+  <div class="rung"><div class="lbl">今の本番</div><div class="boxes">
+    <div class="bx same">ファイルを選ぶ</div><div class="bx gap">AI なし</div><div class="bx same">手で服を選ぶ</div><div class="bx same">確定</div>
+  </div></div>
+  <div class="rung"><div class="lbl">Plan 2a の完了後</div><div class="boxes">
+    <div class="bx new">ボタンで撮る</div><div class="bx gap">AI なし</div><div class="bx same">手で服を選ぶ</div><div class="bx same">確定</div>
+  </div></div>
+  <div class="rung"><div class="lbl">ゴール（仕様書 17行目の成功基準1）</div><div class="boxes">
+    <div class="bx goal">鏡の前で撮る</div><div class="bx goal">AI が服を見分ける</div><div class="bx goal">候補が選ばれた状態で並ぶ</div><div class="bx goal">確定1回</div>
+  </div></div>
+</div>
+
+<h3>カメラの計画はこう動きました</h3>
+<div class="card">
+<ol class="tl">
+  <li><span class="when">10/24〜25　仕様書</span>カメラの選択、左右反転、カウントダウン、写真＋動画。期限は 11/5 で AI と同じ段階。<br><span class="src">2ad2998、3100a2f</span></li>
+  <li><span class="when">10/27 01:54　前倒し</span>写真だけを Plan 2a に切り出して 10/31 へ。AI は 11/5 のまま。開発者の承認は記録されていますが（TODO 37行目）、理由は書かれていません。<br><span class="src">bd1d8d9</span></li>
+  <li><span class="when">10/27 02:13　追加と変更</span>「5秒の動画から静止画を選び、両方を保存する」を追加（開発者の希望）。外付けカメラの購入をやめ、手持ちの Logicool（720p と書いてある）に変更（開発者の決定）。<br><span class="src">540a3e5</span></li>
+  <li><span class="when">10/27〜31　本番切り替え</span>予定の 10/27〜28 が 10/31 まで延び、Plan 2a の枠（10/29〜30）がなくなりました。</li>
+  <li><span class="when">10/31 15:48　TODO の更新</span>プランはレビュー済みと記録。実装の日付が消え、「10/31 に仕上げる」の一文と遅れたときの決まりは残りました。<br><span class="src">0be8dc9</span></li>
+</ol>
+</div>
+
+<h3>迷子のサイン</h3>
+<div class="card" style="padding:6px 14px">
+<table class="resp">
+  <thead><tr><th>サイン</th><th>根拠</th></tr></thead>
+  <tbody>
+    <tr><td>AI の開始がカメラの後ろに置かれている</td><td>TODO 54行目は「本番で完成の判定。Plan 2 のプランを書き始める」です。開始条件と書かれているわけではなく、もとは 10/31 予備日の2つの作業でした（bd1d8d9）。日付が消えて順番に見えるようになり、上から進めると AI の着手がカメラのあとになります。AI の期限は 11/5 のままです。</td></tr>
+    <tr><td>カメラの動作の定義が2つある</td><td>仕様書 347行目（写真を撮り、続けて動画）が 10/24 の文のまま残り、10/27 の 348行目（動画から静止画を選ぶ）・TODO 60行目と合っていません。動画は 11/5 に採否を決める対象（642行目）で、デモの流れにも静止画の選択はありません。</td></tr>
+    <tr><td>完了の定義を確認できない</td><td>「本番で完成の判定」の中身は <code>main</code> の文書にありません。未読の Plan 2a のプランに書かれている可能性はあります。確かめたいのは、その写真を AI が見分けられるかが条件に入っているかです。</td></tr>
+    <tr><td>AI の精度を測る手段がカメラのあとにある</td><td>「画質や AI の認識の精度が足りないときだけ、新しいカメラを買う」（TODO 102行目）とありますが、複数の服を見分ける AI はカメラのあとです。実物のカメラの確認は予定にあります（53行目）。720p と書いてある手持ちのカメラ（型番は未確認）なら、長辺は 1280px で、着画の想定 2560px（仕様書358行目）の半分、画素数は 1/4 です。拡大はしません（<code>lib/image-processing.ts:148</code>）。横長のまま全身を入れると、人の高さは最大 720px です。</td></tr>
+    <tr><td>期限が文書ごとに違う</td><td>TODO 37行目は 10/31 に仕上げる、52〜54行目は日付なし、仕様書 632行目は 11/5。12章の変更は Plan 2a のプランに含まれていると TODO 51行目にありますが、GitHub にはまだ入っていません。カメラを丸ごと 11/5 へ移す手（TODO 55行目）を使うかどうかの記録もありません。</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>ずれていない点</h3>
+<ul>
+  <li><b>写真だけに絞った判断。</b>動画を先に持ち込まなかったのは正しい切り方です。</li>
+  <li><b>ゴールと期限は動いていない。</b>成功基準1と 11/10 は 10/24 から同じです。</li>
+  <li><b>遅れたときに削る順が決まっている。</b>あとは今、使うかどうかを決めるだけです。</li>
+  <li><b>追加の量は小さく見える。</b>DB は <code>mirror</code> を受け付け済みで、カメラを妨げるヘッダーもありません（<code>next.config.ts</code>、<code>proxy.ts</code>）。入口は次の1か所です。</li>
+</ul>
+
+<h3>カメラが今のコードに入る場所</h3>
+<p class="note">パスは Repo のルートからの相対です。Plan 2a のプランは読めていないので、これはコードから見た入口で、プランの設計そのものではありません。</p>
+<div class="flow">
+  <div class="fl add"><span>追加：カメラの映像 → 静止画 → ファイル</span><span>新しい部品（<code>getUserMedia</code>、<code>video</code>、<code>canvas</code>）</span></div>
+  <div class="down">↓ ファイル選択と合流</div>
+  <div class="fl"><span>今：ファイルの選択</span><code>components/outfit-quick-record-form.tsx:276</code></div>
+  <div class="down">↓</div>
+  <div class="fl"><span>長辺 2560px に縮小</span><code>components/outfit-quick-record-form.tsx:175</code></div>
+  <div class="down">↓</div>
+  <div class="fl add"><span>変更：下書きの作成（<code>"upload"</code> 固定 → <code>"mirror"</code> も渡す）</span><code>app/(main)/protected/looks/actions.ts:84</code></div>
+  <div class="down">↓</div>
+  <div class="fl"><span>Cloudflare へ直接送る → 完了の確認</span><span><code>components/outfit-quick-record-form.tsx:106</code><br><code>app/(main)/protected/looks/actions.ts:107</code></span></div>
+  <div class="down">↓</div>
+  <div class="fl"><span>手で服を選ぶ → 確定 → 線</span><code>supabase/migrations/022_outfit_rpcs.sql</code></div>
+</div>
+
+<h2>次にやること</h2>
+
+<ul class="todo">
+  <li><span class="lv">【必須で修正】</span><b>今日：Plan 2a のブランチとプランを GitHub に push する。</b><span class="why">TODO 51行目が指すファイルが <code>main</code> にも GitHub のどのブランチにもありません。push するまで、この判定は仕様書とコードからの推定のままです。</span></li>
+  <li><span class="lv">【必須で修正】</span><b>今日：Plan 2a の完了を1文に固定する。</b><span class="why">案：「Mac の Chrome で撮った1枚が <code>source = mirror</code> で今の流れに乗り、確定まで進む」。区切りは 11/1 中を提案します。過ぎたら、TODO 55行目にあるカメラを丸ごと 11/5 へ移す手を使い、AI を先に進めます。</span></li>
+  <li><span class="lv">【必須で修正】</span><b>今日：Plan 2 のプランを始める。Plan 2a の完了を待たない。</b><span class="why">TODO 54行目から Plan 2 の開始を切り離します。最初の範囲は「見分ける → 候補 → 確認画面 → 確定」だけにします。</span></li>
+  <li><span class="lv">【必須で修正】</span><b>11/1：720p の全身写真を1枚、見分ける試作に通す。</b><span class="why">カメラの画面は要りません。Photo Booth など、720p のカメラで撮れるアプリのファイルで足ります。撮影の置き方、買い替えの要否、AI の難しさの手がかりが一度に得られます。</span></li>
+  <li><span class="lv">【必須で修正】</span><b>動画と静止画の選択を 11/5 の判定のあとへ移す。</b><span class="why">仕様書 347行目を 10/27 の 348行目にそろえるか、決めて書き直します。</span></li>
+  <li><span class="lv">【必須で修正】</span><b>11/1：Supabase の Egress を確かめ、Pro にするか決める。</b><span class="why">TODO の予定どおりです。有料プランにするかは開発者の判断です。</span></li>
+</ul>
+
+<h3>日程の案</h3>
+<div class="card" style="padding:6px 14px">
+<table class="resp">
+  <thead><tr><th>日付</th><th>到達点</th></tr></thead>
+  <tbody>
+    <tr><td>10/31</td><td>push。完了の1文を決める。Plan 2 のプランを開始。</td></tr>
+    <tr><td>11/1</td><td>Plan 2a を完了するか 11/5 へ移すかを決める。720p の1枚を試す。Egress を確認。</td></tr>
+    <tr><td>11/2〜4</td><td>見分ける → 候補 → 確認画面 → 確定。DB の追加と本番への適用もこの中に含める。</td></tr>
+    <tr><td>11/5</td><td>スマホの取り込みの最低限。動画・見比べ・切り出しの採否を判定（仕様書の合格条件どおり）。</td></tr>
+    <tr><td>11/6〜9</td><td>線が伸びる、タップでたどる、再生。Looks の最低限、＋記録。本番で通しの確認と録画。</td></tr>
+    <tr><td>11/10</td><td>固める。</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>余裕があれば</h3>
+<ul class="todo">
+  <li><span class="lv opt">【任意】</span><b>着画のアップロード上限を Plan 2 から切り離す。</b><span class="why">デモには不要で「一般公開の前」の項目です。ただ、コード上は新規登録が開いています（<code>components/sign-up-form.tsx:43</code>）。Supabase 側で閉じているかは未確認なので、確かめてから決めてください。</span></li>
+  <li><span class="lv opt">【任意】</span><b>GitHub Actions で試験と型検査を PR ごとに動かす。</b><span class="why">PR の確認に使った <code>test:outfits</code> は102件で、ほかの単体試験229件は入っていません。今は全部通っています。</span></li>
+  <li><span class="lv opt">【任意】</span><b>発表の前に、ほかの人に1回触ってもらう。</b><span class="why">TODO と仕様書に、ほかの人に試してもらう予定がありません。</span></li>
+  <li><span class="lv opt">【任意】</span><b>README を差し替える。</b><span class="why">公開 Repo の README が、スターターキットの内容のままです。</span></li>
+</ul>
+
+<h2>調べた範囲</h2>
+<ul>
+  <li><b>読んだもの：</b>コミット履歴、PR 2件、TODO、仕様書、Plan 1 の関係する部分、着画の流れのコード。</li>
+  <li><b>手元で実行したもの：</b><code>origin/main</code> のコピーで実行。Node は 25.2.1（Repo の指定は 24）。
+    <ul>
+      <li><code>npm run test:outfits</code>：102件成功</li>
+      <li>ほかの単体試験：229件成功（<code>test-gemini</code> は実行すると課金されるので除外。<code>test-jev</code> と <code>test-jev-cases</code> は AI Gateway の鍵がないと失敗する疎通用のスクリプトなので除外）</li>
+      <li><code>bash supabase/tests/run-outfits.sh</code>：終了コード 0、<code>ok:</code> 157件（使い捨ての Docker の Postgres）</li>
+      <li><code>npx tsc --noEmit</code> と <code>npx eslint .</code>：エラー0</li>
+    </ul>
+  </li>
+  <li><b>確かめていないこと：</b>本番の画面、Vercel・Supabase・Cloudflare のダッシュボード、<code>next build</code>、実物のカメラ。本番が正常という記述は TODO の記録です。</li>
+  <li><b>読めていないもの：</b>Plan 2a のプランと <code>feature/chakuga-webcam-photo</code> ブランチ。開発者の手元で実装が進んでいれば、「撮る」の状態は変わります。</li>
+</ul>
+
+<footer>🤖 AI生成（Claude Code）</footer>
+</main>
+</body>
+</html>
