@@ -8,6 +8,7 @@ import { registerHooks } from "node:module";
 import { test } from "node:test";
 import type { TestContext } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import type { CameraDevice } from "../lib/camera/camera-source.ts";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 registerHooks({
@@ -56,7 +57,11 @@ function dummyStorage(initial?: unknown) {
 
 function setup(
   t: TestContext,
-  options: { stored?: unknown; supported?: boolean } = {},
+  options: {
+    stored?: unknown;
+    supported?: boolean;
+    devices?: CameraDevice[];
+  } = {},
 ) {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const source = createFakeCameraSource({
