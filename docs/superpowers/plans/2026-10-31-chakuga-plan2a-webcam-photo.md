@@ -111,8 +111,8 @@ test("toCameraError maps browser error names", () => {
   // name → reason（new DOMException("x", name) で作る）
   // NotAllowedError, SecurityError → permission_denied
   // NotFoundError, OverconstrainedError → not_found
-  // NotReadableError, AbortError → in_use
-  // TypeError、文字列、null → failed
+  // NotReadableError → in_use
+  // AbortError、TypeError、文字列、null → failed
   // CameraError はそのまま同じものを返す
 });
 test("cameraErrorMessage has a message for every reason and none is raw", () => {
@@ -161,7 +161,7 @@ Expected: FAIL（`lib/camera/` のファイルがない）
 | `unsupported` | このブラウザではカメラを使えません。写真を選んで記録できます |
 | `permission_denied` | カメラの使用が許可されていません。ブラウザの設定で許可するか、写真を選んで記録できます |
 | `not_found` | カメラが見つかりませんでした。つなぎ直すか、写真を選んで記録できます |
-| `in_use` | カメラがほかのアプリで使われているようです。閉じてから、もう一度お試しください |
+| `in_use` | カメラを使えませんでした。ほかのアプリで使っているときは閉じてから、もう一度お試しください |
 | `disconnected` | カメラとのつながりが切れました。つなぎ直して、もう一度お試しください |
 | `failed` | カメラを開けませんでした。時間をおいて、もう一度お試しください |
 

@@ -32,7 +32,6 @@ export function toCameraError(error: unknown): CameraError {
     case "OverconstrainedError":
       return new CameraError("not_found");
     case "NotReadableError":
-    case "AbortError":
       return new CameraError("in_use");
     default:
       return new CameraError("failed");
@@ -44,7 +43,7 @@ const MESSAGES: Record<CameraErrorReason, string> = {
   permission_denied:
     "カメラの使用が許可されていません。ブラウザの設定で許可するか、写真を選んで記録できます",
   not_found: "カメラが見つかりませんでした。つなぎ直すか、写真を選んで記録できます",
-  in_use: "カメラがほかのアプリで使われているようです。閉じてから、もう一度お試しください",
+  in_use: "カメラを使えませんでした。ほかのアプリで使っているときは閉じてから、もう一度お試しください",
   disconnected: "カメラとのつながりが切れました。つなぎ直して、もう一度お試しください",
   failed: "カメラを開けませんでした。時間をおいて、もう一度お試しください",
 };

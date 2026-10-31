@@ -38,7 +38,7 @@ test("toCameraError maps browser error names", () => {
     ["NotFoundError", "not_found"],
     ["OverconstrainedError", "not_found"],
     ["NotReadableError", "in_use"],
-    ["AbortError", "in_use"],
+    ["AbortError", "failed"],
   ];
   for (const [name, reason] of cases) {
     const error = toCameraError(new DOMException("x", name));
@@ -75,7 +75,7 @@ test("cameraErrorMessage has a message for every reason and none is raw", () => 
   }
   assert.equal(
     cameraErrorMessage("in_use"),
-    "カメラがほかのアプリで使われているようです。閉じてから、もう一度お試しください",
+    "カメラを使えませんでした。ほかのアプリで使っているときは閉じてから、もう一度お試しください",
   );
 });
 
