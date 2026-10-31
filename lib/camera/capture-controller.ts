@@ -86,6 +86,8 @@ export function createCaptureController(deps: {
 
   // 開くたび・止めるたびに増やす世代。await のあとで古ければ、何も変えずに手を引く
   let generation = 0;
+  // 機器一覧の取得ごとに増やす連番。古い応答が新しい一覧を上書きしないようにする
+  let listSequence = 0;
   let camera: OpenedCamera | null = null;
   let video: HTMLVideoElement | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -233,6 +235,7 @@ export function createCaptureController(deps: {
 
       await opened.ready();
       if (generation !== myGeneration) return;
+      const listId = ++listSequence;
       let devices: CameraDevice[];
       try {
         devices = await source.listDevices();
@@ -240,6 +243,8 @@ export function createCaptureController(deps: {
         devices = [];
       }
       if (generation !== myGeneration) return;
+      // 取得中に、より新しい一覧の要求があった。この古い一覧は捨てて、状態遷移だけ続ける
+      if (listId !== listSequence) devices = state.devices;
 
       unsubscribeTrigger = trigger.subscribe(handleTrigger);
       preferences = { ...preferences, lastDeviceId: opened.deviceId };
@@ -257,9 +262,10 @@ export function createCaptureController(deps: {
   }
 
   async function refreshDevices(myGeneration: number) {
+    const listId = ++listSequence;
     try {
       const devices = await source.listDevices();
-      if (generation !== myGeneration) return;
+      if (generation !== myGeneration || listId !== listSequence) return;
       setState({ devices });
     } catch {
       // 一覧を取り直せなくても、今のカメラはそのまま使える

@@ -103,6 +103,11 @@ export function createFakeCameraSource(
   const readyHolds: Deferred<void>[] = [];
   const listHolds: Deferred<null>[] = [];
 
+  function defaultDeviceId(): string {
+    if (devices.length === 0) throw new CameraError("not_found");
+    return devices[0].deviceId;
+  }
+
   function makeCamera(requested: string | null): FakeOpenedCamera {
     if (
       requested !== null &&
@@ -111,7 +116,7 @@ export function createFakeCameraSource(
       throw new CameraError("not_found");
     }
     const camera = createFakeCamera(
-      requested ?? devices[0].deviceId,
+      requested ?? defaultDeviceId(),
       readyHolds.shift() ?? null,
     );
     source.opened.push(camera);
@@ -131,9 +136,11 @@ export function createFakeCameraSource(
       return makeCamera(requested);
     },
     async listDevices(): Promise<CameraDevice[]> {
+      // 止めた呼び出しは、呼んだ時点の一覧を、完了させた時に返す（古い一覧が遅れて届く状況を作れる）
+      const snapshot = devices;
       const hold = listHolds.shift();
       if (hold) await hold.promise;
-      return devices;
+      return snapshot;
     },
     onDevicesChanged(listener: () => void) {
       deviceListeners.add(listener);

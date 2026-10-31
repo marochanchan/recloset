@@ -60,7 +60,7 @@ function setup(
 ) {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const source = createFakeCameraSource({
-    devices: DEVICES,
+    devices: options.devices ?? DEVICES,
     supported: options.supported,
   });
   const manual = createManualTrigger();
@@ -679,4 +679,51 @@ test("start and retake do nothing outside their phases", async (t) => {
   await h.startLive();
   await h.controller.start();
   assert.deepEqual(h.source.openCalls, [null]);
+});
+
+test("stale device list does not overwrite a newer one", async (t) => {
+  const h = setup(t);
+  await h.startLive();
+  const releaseOld = h.source.holdNextListDevices();
+  const withC = [...DEVICES, { deviceId: "cam-c", label: "カメラC" }];
+  h.source.setDevices(withC); // 古い要求（A, B, C）が保留される
+  h.source.setDevices(DEVICES); // 新しい要求（A, B）はすぐ返る
+  await flush();
+  assert.deepEqual(h.controller.getState().devices, DEVICES);
+  releaseOld();
+  await flush();
+  assert.deepEqual(h.controller.getState().devices, DEVICES);
+  assert.equal(h.controller.getState().phase, "live");
+});
+
+test("initial device list does not overwrite a newer change", async (t) => {
+  const h = setup(t);
+  const releaseInitial = h.source.holdNextListDevices();
+  const starting = h.controller.start();
+  await flush();
+  h.source.setDevices([DEVICES[0]]);
+  await flush();
+  releaseInitial();
+  await starting;
+  assert.equal(h.controller.getState().phase, "live");
+  assert.deepEqual(h.controller.getState().devices, [DEVICES[0]]);
+});
+
+test("no camera at all: unavailable with not_found", async (t) => {
+  const h = setup(t, { devices: [] });
+  await h.controller.start();
+  assert.deepEqual(h.source.openCalls, [null]);
+  assert.equal(h.controller.getState().phase, "unavailable");
+  assert.equal(h.controller.getState().errorReason, "not_found");
+});
+
+test("remembered camera and default both gone: not_found", async (t) => {
+  const h = setup(t, {
+    devices: [],
+    stored: { lastDeviceId: "cam-a", rotations: {} },
+  });
+  await h.controller.start();
+  assert.deepEqual(h.source.openCalls, ["cam-a", null]);
+  assert.equal(h.controller.getState().phase, "unavailable");
+  assert.equal(h.controller.getState().errorReason, "not_found");
 });
