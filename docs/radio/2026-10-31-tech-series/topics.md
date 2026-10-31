@@ -31,8 +31,8 @@
 - Capacitor、Expo／React Native、PWA の違い。今のコード（26画面、Server Actions、Cookie のログイン）で Capacitor を選ぶ理由
 - `server.url` は本番向けではない
 - 審査の Guideline 4.2。実機か TestFlight で見せる
-- Intel Mac の Xcode 26.x で iOS 27 の iPhone に入れられるか（未確認で、最大の不安）
-- Xcode 27 は Intel Mac で使えない見込み。macOS の版と空き容量 40〜60GB
+- 開発環境を Intel Mac から M1 MacBook Air（16GB、1TB）へ移す（Issue #11）。Xcode 27 が使える見込みで、容量の問題もなくなる
+- iOS 27 の iPhone に入れられるかは、実機で確かめる（未確認）
 
 **キーワード：** Capacitor 8、Expo、React Native、PWA、静的書き出し、Server Actions、Xcode、Apple Developer Program、TestFlight、クラウドビルド
 

@@ -44,7 +44,7 @@
 
 ## 確かめていないこと
 
-- Xcode 26.x で iOS 27 の iPhone にアプリを入れられるか
+- M1 MacBook Air の Xcode 27 で、iOS 27 の iPhone にアプリを入れられるか
 - `CapacitorHttp` で mixed content を避けられるか（公式の文書に mixed content の記載はなく、関門 1 で確かめる）
 - App Transport Security の例外が要るか
 - アプリが Wi-Fi のパスワードを読めないこと（一般的な知識で、公式の文書では確かめていない）
@@ -66,7 +66,8 @@
 - `docs/research/2026-10-31-garment-similarity/report.md`（ブランチ `docs/garment-similarity`、PR #9）
 - `docs/superpowers/specs/2026-10-24-chakuga-outfit-relations-design.md`、`docs/superpowers/plans/2026-10-31-chakuga-plan2a-webcam-photo.md`
 - `lib/image-processing.ts`、`lib/signed-image-url-cache.ts`、`lib/clothing-image-analysis.ts`、`supabase/migrations/020_create_outfit_schema.sql`
-- Issue #3、#5、#6、#8、PR #4、#7、#9
+- Issue #3、#5、#6、#8、#10、#11（開発環境を M1 MacBook Air に移す）、PR #4、#7、#9
+- プラン B の計画の文書にはまだ「Intel Mac」と書かれています。第2話は、新しい Issue #11 に合わせています
 
 ### Repo の外（2026-10-31 に確認）
 
