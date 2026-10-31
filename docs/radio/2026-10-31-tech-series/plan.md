@@ -1,4 +1,4 @@
-# 企画：リクローゼット技術ラジオ（全7話）
+# 企画：リクローゼット技術ラジオ（全7話＋番外編）
 
 - 作成：2026-10-31
 - 🤖 AI生成（Claude Code）。台本も音声も AI で作っています。
@@ -34,6 +34,7 @@
 - **第5話 同期処理：** 3つの区間 → 今ある仕組みと冪等性 → スマホにためると増える問題 → バックグラウンドの壁 → 構想と計画のずれ → Egress は減らない
 - **第6話 服を当てる：** 難しさ3つ → 6つの候補 → 推薦の流れ → ベクトル検索は要らないのか → 確かめていないこと → データの形
 - **第7話 お金：** Egress → 増える原因 → Cloudflare の枠 → 画像を小さくすると何が減るか → 全体の費用 → 日付で見る次の一手
+- **番外編 マックブックの引っ越し：** 今までのマックでは足りなかった → M1 MacBook Air → ファミレスでセットアップ → 回線が足りない → 家に帰ってからの宿題 → 英語キーボード
 
 ## 話の中で分けたもの
 
@@ -66,6 +67,7 @@
 - `docs/research/2026-10-31-garment-similarity/report.md`（PR #9）
 - `docs/superpowers/specs/2026-10-24-chakuga-outfit-relations-design.md`、`docs/superpowers/plans/2026-10-31-chakuga-plan2a-webcam-photo.md`
 - `lib/image-processing.ts`、`lib/signed-image-url-cache.ts`、`lib/clothing-image-analysis.ts`、`supabase/migrations/020_create_outfit_schema.sql`
+- 番外編：Matthew の話（2026-10-31）と Issue #11
 - Issue #3、#5、#6、#8、#10、#11（開発環境を M1 MacBook Air に移す）、PR #4、#7、#9
 - プラン B の計画の文書にはまだ「Intel Mac」と書かれています。第2話は、新しい Issue #11 に合わせています
 
@@ -86,4 +88,4 @@
 
 ## 公開の扱い
 
-このブランチは公開 Repo にあります。台本、音声、この企画は誰でも読めて聞けます。秘密の値、個人の連絡先、ほかの案件の話は入れていません。
+このブランチは公開 Repo にあります。台本、音声、この企画は誰でも読めて聞けます。秘密の値、個人の連絡先、ほかの案件の話は入れていません。番外編では、実名と、ご家族についての細かい話は省きました。

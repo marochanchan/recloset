@@ -142,6 +142,18 @@
 
 **【追加】：** LAN 内の認証、ペアリングの鍵、オンデバイス処理、同意と保持期間
 
+## 12. 開発機の移行（番外編）
+
+**課題**
+
+- Intel Mac（メモリ 8GB、空き 16GB、共用）では開発できない。M1 MacBook Air（16GB、1TB）へ移す
+- 古い Mac を最新の macOS にしてから、Xcode と開発環境を入れる順番
+- お店の回線では進まない作業。テザリング
+- GitHub にないファイルの移し方。確認が終わるまで前の Mac を消さない
+- 英語キーボードへの変更
+
+**キーワード：** Issue #11、macOS Tahoe、FileVault、Homebrew、fnm、Docker Desktop、デベロッパモード、USB-C
+
 ## 主な日付
 
 - 11/1：Egress を確認
