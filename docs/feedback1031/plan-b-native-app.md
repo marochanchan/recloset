@@ -3,7 +3,8 @@
 - 作成日：2026-10-31
 - Issue：#6
 - 決定者：marochanchan
-- 🤖 AI生成（Claude Code）。Codex のレビューは受けていません（Matthew の判断）。
+- 状態：**レビュー前**
+- 🤖 AI生成（Claude Code）
 
 ## 決めてほしいこと
 
