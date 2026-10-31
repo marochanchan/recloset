@@ -62,8 +62,8 @@
 
 ### Repo の中（2026-10-31 時点）
 
-- `docs/feedback1031/ai-wardrobe-mirror-concept.md`、`docs/feedback1031/plan-b-native-app.md`、`docs/project/TODO.md`（ブランチ `docs/feedback1031`）
-- `docs/research/2026-10-31-garment-similarity/report.md`（ブランチ `docs/garment-similarity`、PR #9）
+- `docs/feedback1031/ai-wardrobe-mirror-concept.md`、`docs/feedback1031/plan-b-native-app.md`、`docs/project/TODO.md`
+- `docs/research/2026-10-31-garment-similarity/report.md`（PR #9）
 - `docs/superpowers/specs/2026-10-24-chakuga-outfit-relations-design.md`、`docs/superpowers/plans/2026-10-31-chakuga-plan2a-webcam-photo.md`
 - `lib/image-processing.ts`、`lib/signed-image-url-cache.ts`、`lib/clothing-image-analysis.ts`、`supabase/migrations/020_create_outfit_schema.sql`
 - Issue #3、#5、#6、#8、#10、#11（開発環境を M1 MacBook Air に移す）、PR #4、#7、#9
