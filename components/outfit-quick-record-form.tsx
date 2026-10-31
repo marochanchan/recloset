@@ -6,6 +6,7 @@ import {
   retryOutfitMedia,
   startOutfitPhotoUpload,
 } from "@/app/(main)/protected/looks/actions";
+import { OutfitCameraCapture } from "@/components/outfit-camera-capture";
 import { OutfitItemPicker, type PickerItem } from "@/components/outfit-item-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +62,8 @@ export function OutfitQuickRecordForm({
   const [note, setNote] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
+  // 増やすと撮影の部品が作り直される（カウントダウンも確認中の写真もやめる）
+  const [cameraKey, setCameraKey] = useState(0);
 
   // Activity で隠れると effect の後始末が走り、また表示されると作り直される。
   // 作った URL をその場で解放するので、戻ってきたときも新しい URL で表示できる
@@ -97,6 +100,7 @@ export function OutfitQuickRecordForm({
     setNote("");
     setMessage(null);
     setIsConfirming(false);
+    setCameraKey((k) => k + 1);
   };
 
   // 縮小した写真を Cloudflare へ直接送る（ファイルの欄の名前は file）
@@ -160,11 +164,30 @@ export function OutfitQuickRecordForm({
     await upload(started.uploadUrl, started.mediaId, image);
   };
 
+  // 処理に成功した写真で、下書きごと作り直す（ファイルでもカメラでも同じ）
+  const beginDraft = async (image: ProcessedImage) => {
+    setOutfitId(null);
+    startedMediaIdRef.current = null;
+    clientRequestIdRef.current = crypto.randomUUID();
+    processedRef.current = image;
+    const mediaId = crypto.randomUUID();
+    mediaIdRef.current = mediaId;
+    setPreviewBlob(image.blob);
+    await start(mediaId, image);
+  };
+
+  const handleCameraPhoto = (image: ProcessedImage) => {
+    if (isConfirmingRef.current || phase === "processing" || phase === "uploading") return;
+    setMessage(null);
+    void beginDraft(image);
+  };
+
   // 写真を選ぶたびに、下書きごと作り直す（1つの下書きに写真は1枚だけ）
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file || isConfirmingRef.current) return;
+    setCameraKey((k) => k + 1);
 
     // 処理に失敗したら、できあがっている下書きはそのまま残す
     const previousPhase = phase;
@@ -183,15 +206,7 @@ export function OutfitQuickRecordForm({
       return;
     }
 
-    // 処理に成功してから、下書きごと作り直す
-    setOutfitId(null);
-    startedMediaIdRef.current = null;
-    clientRequestIdRef.current = crypto.randomUUID();
-    processedRef.current = image;
-    const mediaId = crypto.randomUUID();
-    mediaIdRef.current = mediaId;
-    setPreviewBlob(image.blob);
-    await start(mediaId, image);
+    await beginDraft(image);
   };
 
   const handleRetry = async () => {
@@ -262,7 +277,7 @@ export function OutfitQuickRecordForm({
     <div className="flex flex-col gap-6">
       <section aria-labelledby="look-photo-title" className="flex flex-col gap-3">
         <h2 id="look-photo-title" className="text-base font-semibold">
-          1. 着画を選ぶ
+          1. 着画を撮る・選ぶ
         </h2>
         {previewUrl && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -272,6 +287,11 @@ export function OutfitQuickRecordForm({
             className="max-h-96 w-full rounded-2xl bg-photo object-contain"
           />
         )}
+        <OutfitCameraCapture
+          key={cameraKey}
+          disabled={isConfirming || phase === "processing" || phase === "uploading"}
+          onPhoto={handleCameraPhoto}
+        />
         <Input
           type="file"
           accept="image/*"
