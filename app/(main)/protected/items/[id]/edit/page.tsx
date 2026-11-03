@@ -1,4 +1,5 @@
 import { ClothingItemForm } from "@/components/clothing-item-form";
+import { fetchBrandSuggestions } from "@/lib/brand-suggestions-query";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
@@ -40,6 +41,9 @@ async function EditClothingItemContent({
   if (!item) {
     notFound();
   }
+
+  // ブランド入力の候補（自分がすでに登録したブランド）
+  const brandSuggestions = await fetchBrandSuggestions(supabase);
 
   const claims = await getCurrentClaims();
   const signedUrlMap = await getPrivateSignedImageUrls(
@@ -92,6 +96,7 @@ async function EditClothingItemContent({
           },
         }}
         initialImages={initialImages}
+        brandSuggestions={brandSuggestions}
       />
     </div>
   );

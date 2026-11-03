@@ -7,6 +7,7 @@ import {
   normalizeDraftFields,
   MAX_DRAFT_IMAGES,
 } from "@/lib/clothing-drafts";
+import { fetchBrandSuggestions } from "@/lib/brand-suggestions-query";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { ChevronLeft } from "lucide-react";
@@ -44,10 +45,15 @@ async function NewClothingItemContent({
   searchParams: SearchParamsPromise;
 }) {
   const { draft: rawDraftId, mode } = await searchParams;
+  // ブランド入力の候補（自分がすでに登録したブランド。RLSで本人の服だけ）
+  const brandSuggestions = await fetchBrandSuggestions(await createClient());
   if (rawDraftId === undefined) {
     // ?mode=photo（Closet・見直し画面の「写真だけで登録」）なら、写真だけで登録する画面で開く
     return (
-      <NewClothingItemForm entryMode={mode === "photo" ? "photo" : "normal"} />
+      <NewClothingItemForm
+        entryMode={mode === "photo" ? "photo" : "normal"}
+        brandSuggestions={brandSuggestions}
+      />
     );
   }
   if (!isDraftId(rawDraftId)) {
@@ -86,6 +92,7 @@ async function NewClothingItemContent({
         fields: normalizeDraftFields(draft.fields),
         imagePaths,
       }}
+      brandSuggestions={brandSuggestions}
     />
   );
 }
