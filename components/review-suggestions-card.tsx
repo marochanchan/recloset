@@ -2,10 +2,7 @@ import { DoodleHanger, DoodleSparkle, DoodleTag } from "@/components/doodle-icon
 import { ScrollToHashTarget } from "@/components/scroll-to-hash-target";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  PHOTO_ONLY_DISPLAY_LABEL,
-  PHOTO_ONLY_TITLE,
-} from "@/lib/clothing-options";
+import { PHOTO_ONLY_DISPLAY_LABEL } from "@/lib/clothing-options";
 import type { ReviewSuggestion } from "@/lib/review-suggestions";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -73,7 +70,7 @@ export function ReviewSuggestionsCard({
         <ul className="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
           {suggestions.map(({ item, reason, inSeason }) => {
             const imageUrl = imageUrls.get(item.id);
-            const isPhotoOnly = item.title === PHOTO_ONLY_TITLE;
+            const isPhotoOnly = item.title === PHOTO_ONLY_DISPLAY_LABEL;
             return (
               <li
                 key={item.id}
@@ -117,7 +114,7 @@ export function ReviewSuggestionsCard({
                         isPhotoOnly && "text-muted-foreground",
                       )}
                     >
-                      {isPhotoOnly ? PHOTO_ONLY_DISPLAY_LABEL : item.title}
+                      {item.title}
                     </Link>
                     <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
                       {reason}

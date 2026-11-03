@@ -21,6 +21,7 @@ import {
   type ClosetFilters,
   type RawSearchParams,
 } from "@/lib/closet-filters";
+import { displayClothingTitle } from "@/lib/clothing-display-title";
 import {
   CATEGORY_OPTIONS,
   SEASON_OPTIONS,
@@ -218,7 +219,7 @@ async function ClothingItemsList({
   let query = supabase
     .from("clothing_items")
     .select(
-      "id, title, brand, category, seasons, favorite, status, last_worn_at, is_public, clothing_images(image_path, sort_order)",
+      "id, title, brand, category, subcategory, category_classified_at, seasons, favorite, status, last_worn_at, is_public, clothing_images(image_path, sort_order)",
     );
   if (filters.category) query = query.eq("category", filters.category);
   // 季節は「その季節を含む服」で絞り込む。オールシーズンは4季節すべてを含む服
@@ -313,6 +314,8 @@ async function ClothingItemsList({
               title={item.title}
               brand={item.brand}
               category={item.category}
+              subcategory={item.subcategory}
+              categoryClassifiedAt={item.category_classified_at}
               seasons={item.seasons ?? []}
               favorite={item.favorite}
               status={item.status}
@@ -358,7 +361,9 @@ async function ReviewSuggestions() {
       .select("*", { count: "exact", head: true }),
     supabase
       .from("clothing_items")
-      .select("id, title, status, seasons, favorite, last_worn_at, purchase_date")
+      .select(
+        "id, title, category, subcategory, category_classified_at, status, seasons, favorite, last_worn_at, purchase_date",
+      )
       .in("status", ["closet", "candidate"])
       .order("created_at", { ascending: true })
       .limit(REVIEW_ITEMS_LIMIT),
@@ -393,7 +398,13 @@ async function ReviewSuggestions() {
 
   const items: ReviewItemInput[] = itemsResult.data.map((item) => ({
     id: item.id,
-    title: item.title,
+    // 写真だけ登録の仮タイトルは、仕分けの結果に合わせた表示名にして渡す
+    title: displayClothingTitle({
+      title: item.title,
+      category: item.category,
+      subcategory: item.subcategory,
+      categoryClassifiedAt: item.category_classified_at,
+    }),
     status: item.status,
     seasons: item.seasons ?? [],
     favorite: item.favorite,

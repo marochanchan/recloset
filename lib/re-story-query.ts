@@ -14,6 +14,7 @@ import {
   type StoryMonthSummary,
   type StoryTimelineDay,
 } from "@/lib/re-story";
+import { displayClothingTitle } from "@/lib/clothing-display-title";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // ============================================================
@@ -26,7 +27,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // ============================================================
 
 const EVENT_COLUMNS =
-  "id, kind, action, clothing_item_id, occurred_at, revoked_at, clothing_items(title)";
+  "id, kind, action, clothing_item_id, occurred_at, revoked_at, clothing_items(title, category, subcategory, category_classified_at)";
 
 export type StoryPageData = {
   nav: StoryMonthNav;
@@ -49,7 +50,14 @@ type EventRow = {
   clothing_item_id: string | null;
   occurred_at: string;
   revoked_at: string | null;
-  clothing_items: { title: unknown } | { title: unknown }[] | null;
+  clothing_items: ItemColumns | ItemColumns[] | null;
+};
+
+type ItemColumns = {
+  title: unknown;
+  category?: unknown;
+  subcategory?: unknown;
+  category_classified_at?: unknown;
 };
 
 /** DBの行を StoryEvent にする（知らない種類・行動は除く） */
@@ -57,7 +65,22 @@ export function toStoryEvents(rows: EventRow[]): StoryEvent[] {
   return rows.flatMap((row) => {
     if (!isStoryKind(row.kind) || !isStoryAction(row.action)) return [];
     const item = Array.isArray(row.clothing_items) ? row.clothing_items[0] : row.clothing_items;
-    const title = item && typeof item.title === "string" ? item.title : null;
+    // 写真だけ登録の仮タイトルは、仕分けの結果に合わせた表示名にする
+    // （列が揃っていないときは、タイトルをそのまま使う）
+    const title =
+      item && typeof item.title === "string"
+        ? typeof item.category === "string"
+          ? displayClothingTitle({
+              title: item.title,
+              category: item.category,
+              subcategory: typeof item.subcategory === "string" ? item.subcategory : null,
+              categoryClassifiedAt:
+                typeof item.category_classified_at === "string"
+                  ? item.category_classified_at
+                  : null,
+            })
+          : item.title
+        : null;
     return [
       {
         id: row.id,

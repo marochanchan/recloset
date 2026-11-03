@@ -5,7 +5,7 @@ import {
   REVIEW_SESSION_DECISION_LABELS,
   type ReviewSessionDecision,
 } from "@/lib/closet-review";
-import { PHOTO_ONLY_TITLE } from "@/lib/clothing-options";
+import { PHOTO_ONLY_DISPLAY_LABEL } from "@/lib/clothing-options";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { DoodleHanger, DoodleLoop } from "@/components/doodle-icons";
@@ -357,7 +357,7 @@ export function ClosetReviewSession({
           <p
             className={cn(
               "truncate px-4 py-3",
-              current.title === PHOTO_ONLY_TITLE
+              current.title === PHOTO_ONLY_DISPLAY_LABEL
                 ? "text-sm text-muted-foreground"
                 : "font-medium",
             )}
