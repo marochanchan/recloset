@@ -1,4 +1,8 @@
 import {
+  getCategoryLabel,
+  getColorLabel,
+  getSubcategoryLabel,
+  getSubcategoryOptions,
   isSubcategoryForCategory,
   normalizeSeasons,
   PHOTO_ONLY_CATEGORY,
@@ -16,18 +20,32 @@ import {
 //   null の服。category='other' だけでは未分類と決めつけない。
 //   仕分けで「その他」を選んだ服も category_classified_at を記録するため、次回は出ない
 // - 季節未分類: seasons が空配列の服
+// - 種類: subcategory が null で、カテゴリに種類がある服 / カラー: main_color が null /
+//   ブランド: brand が null / タイトル: 仮タイトルのまま（カテゴリ未分類の服は除く。
+//   タイトルを付けるとカテゴリ仕分けの対象から外れてしまうため）
 // - 見直し（closet_review_*）とは別の機能。見直しの記録には触れない
 // ============================================================
 
 export const MAX_CLASSIFY_ITEMS = 10;
 
-export const CLASSIFY_MODES = ["category", "season"] as const;
+export const CLASSIFY_MODES = [
+  "category",
+  "subcategory",
+  "color",
+  "season",
+  "title",
+  "brand",
+] as const;
 
 export type ClassifyMode = (typeof CLASSIFY_MODES)[number];
 
 export const CLASSIFY_MODE_LABELS: Record<ClassifyMode, string> = {
   category: "カテゴリを仕分ける",
+  subcategory: "種類を仕分ける",
+  color: "カラーを仕分ける",
   season: "シーズンを仕分ける",
+  title: "タイトルを付ける",
+  brand: "ブランドを入れる",
 };
 
 /** 仕分けの対象にする服の状態（売却済みは対象外） */
@@ -68,8 +86,46 @@ export type ClassifyCandidate = {
   status: string;
   seasons: readonly unknown[] | null;
   categoryClassifiedAt: string | null;
+  subcategory: string | null;
+  mainColor: string | null;
+  brand: string | null;
   createdAt: string;
 };
+
+/** 種類が未設定で、種類を選べるカテゴリの服か */
+export function isSubcategoryUnclassified(item: {
+  category: string;
+  subcategory: string | null;
+}): boolean {
+  return item.subcategory === null && getSubcategoryOptions(item.category).length > 0;
+}
+
+/** タイトルが仮のままで、カテゴリは未分類でない服か */
+export function isTitleUnclassified(item: {
+  title: string;
+  category: string;
+  categoryClassifiedAt: string | null;
+}): boolean {
+  return item.title === PHOTO_ONLY_TITLE && !isCategoryUnclassified(item);
+}
+
+/** モードごとの「未分類」の判定 */
+export function isUnclassifiedFor(mode: ClassifyMode, item: ClassifyCandidate): boolean {
+  switch (mode) {
+    case "category":
+      return isCategoryUnclassified(item);
+    case "subcategory":
+      return isSubcategoryUnclassified(item);
+    case "color":
+      return item.mainColor === null;
+    case "season":
+      return isSeasonUnclassified(item);
+    case "title":
+      return isTitleUnclassified(item);
+    case "brand":
+      return item.brand === null;
+  }
+}
 
 /**
  * 仕分ける服のIDを、見せる順に最大 limit 着選ぶ。
@@ -82,11 +138,7 @@ export function selectClassifyItems(
 ): string[] {
   return items
     .filter((item) => isClassifyStatus(item.status))
-    .filter((item) =>
-      mode === "category"
-        ? isCategoryUnclassified(item)
-        : isSeasonUnclassified(item),
-    )
+    .filter((item) => isUnclassifiedFor(mode, item))
     .sort((a, b) => {
       const aTime = new Date(a.createdAt).getTime();
       const bTime = new Date(b.createdAt).getTime();
@@ -132,6 +184,36 @@ export function getCategoryClassifiedPatch(
   return initialCategory !== category
     ? { category_classified_at: now.toISOString() }
     : {};
+}
+
+/**
+ * タイトルの候補（最大3件、重なりなし）。
+ * 1. カラー＋種類（なければカテゴリ） 2. ブランド＋種類 3. 種類だけ。
+ * 種類もカテゴリ名もない（カテゴリ「その他」で種類なし）ときは候補を作らない
+ */
+export function buildTitleSuggestions(item: {
+  category: string;
+  subcategory: string | null;
+  mainColor: string | null;
+  brand: string | null;
+}): string[] {
+  // 種類「その他」は名前として弱いので、カテゴリ名に落とす
+  const noun =
+    item.subcategory && item.subcategory !== "other"
+      ? getSubcategoryLabel(item.subcategory)
+      : item.category !== PHOTO_ONLY_CATEGORY
+        ? getCategoryLabel(item.category)
+        : null;
+  if (!noun) return [];
+
+  const candidates: string[] = [];
+  if (item.mainColor && item.mainColor !== "other") {
+    candidates.push(`${getColorLabel(item.mainColor)}の${noun}`);
+  }
+  const brand = item.brand?.trim();
+  if (brand) candidates.push(`${brand} の${noun}`);
+  candidates.push(noun);
+  return [...new Set(candidates)].slice(0, 3);
 }
 
 /**
