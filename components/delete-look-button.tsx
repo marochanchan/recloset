@@ -46,7 +46,7 @@ export function DeleteLookButton({ outfitId }: { outfitId: string }) {
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-destructive/40 bg-destructive/5 p-4">
       <p className="text-sm text-destructive">
-        この着画を消します。写真と記録がなくなり、服の着用回数と線は計算し直されます。元に戻せません。
+        写真と記録を消します。元に戻せません。
       </p>
       <div className="flex gap-2">
         <Button
