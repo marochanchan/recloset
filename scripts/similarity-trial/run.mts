@@ -235,7 +235,10 @@ for (const f of flatItems) {
 console.log(`段階1：平置き ${flatItems.length} 件のタグ付け完了`);
 const flatList = flatItems.map((f) => ({ id: f.id, tags: flatTags.get(f.id)! }));
 // 検出の割合の正解は、人が登録した DB の category を優先する（AI のタグの誤りを混ぜない）
-const dbCategory = new Map(flatItems.map((f) => [f.id, f.category ?? null]));
+// 「写真だけで登録」のままの服は category が仮の other なので、AI のタグで代用する
+const dbCategory = new Map(
+  flatItems.map((f) => [f.id, f.category && f.category !== "other" ? f.category : null]),
+);
 const categoryOf = (id: string) => dbCategory.get(id) ?? flatTags.get(id)?.category ?? null;
 
 // ---------------- 段階 2：着画の検出 ----------------
