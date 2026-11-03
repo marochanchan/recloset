@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { outfitPathsToRevalidate } from "../lib/outfits/revalidate.ts";
 
-const all = ["/protected/looks/o1", "/protected/items/a", "/protected/items/b"];
+const all = ["/protected/looks/o1", "/protected/looks", "/protected/items/a", "/protected/items/b"];
 
 test("confirmed は、コーデと選んだ服すべての画面", () => {
   assert.deepEqual(outfitPathsToRevalidate("confirmed", "o1", ["a", "b", "a"]), all);
@@ -19,4 +19,13 @@ test("unchanged も同じ（応答が失われた再送でも画面を新しく�
 
 test("stale は何も再取得しない", () => {
   assert.deepEqual(outfitPathsToRevalidate("stale", "o1", ["a", "b"]), []);
+});
+
+test("編集では、外した服の画面も再取得する（重複なし）", () => {
+  assert.deepEqual(outfitPathsToRevalidate("confirmed", "o1", ["a"], ["a", "c"]), [
+    "/protected/looks/o1",
+    "/protected/looks",
+    "/protected/items/a",
+    "/protected/items/c",
+  ]);
 });

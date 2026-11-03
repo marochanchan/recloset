@@ -191,6 +191,17 @@ export async function confirmOutfitAction(input: {
     return { error: INVALID_INPUT_ERROR };
   }
 
+  // 編集（服を外す）のとき、外した服の画面も新しくするため、直す前の服を控えておく。
+  // 取れなくても確定は止めない（その場合は今の服の画面だけ新しくなる）
+  let previousItemIds: string[] = [];
+  if (input.expectedRevision > 0) {
+    const { data: prev } = await supabase
+      .from("outfit_items")
+      .select("item_id")
+      .eq("outfit_id", input.outfitId);
+    previousItemIds = (prev ?? []).map((row) => row.item_id as string);
+  }
+
   const { data, error } = await supabase.rpc("confirm_outfit", {
     p_outfit_id: input.outfitId,
     p_expected_revision: input.expectedRevision,
@@ -224,7 +235,7 @@ export async function confirmOutfitAction(input: {
     return { error: GENERIC_ERROR };
   }
 
-  for (const path of outfitPathsToRevalidate(status, input.outfitId, input.itemIds)) {
+  for (const path of outfitPathsToRevalidate(status, input.outfitId, input.itemIds, previousItemIds)) {
     revalidatePath(path);
   }
   return { status, revision };
