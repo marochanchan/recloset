@@ -205,9 +205,6 @@ export function OutfitCameraCapture({ disabled, onPhoto }: OutfitCameraCapturePr
               className="max-h-96 w-full rounded-2xl bg-photo object-contain"
             />
           )}
-          <p className="text-sm text-muted-foreground">
-            {state.photo.width}×{state.photo.height}
-          </p>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
