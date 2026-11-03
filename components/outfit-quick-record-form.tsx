@@ -245,7 +245,8 @@ export function OutfitQuickRecordForm({
   };
 
   const handleRetry = async () => {
-    if (isConfirmingRef.current) return;
+    // 確認中の別の写真があるときは、前の写真を送り直さない（使うなら新しい下書きで送る）
+    if (isConfirmingRef.current || staged) return;
     const mediaId = mediaIdRef.current;
     const image = processedRef.current;
     if (!image || !mediaId) return;
@@ -358,7 +359,7 @@ export function OutfitQuickRecordForm({
           {phase === "uploading" && "写真を送っています"}
           {phase === "done" && "写真が届きました"}
         </p>
-        {phase === "failed" && (
+        {phase === "failed" && !staged && (
           <Button
             type="button"
             variant="outline"
