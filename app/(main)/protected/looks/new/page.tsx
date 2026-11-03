@@ -83,7 +83,7 @@ export default function NewLookPage({
 }) {
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-6">
-      <Suspense fallback={<span className="min-h-10" />}>
+      <Suspense fallback={<span className="block min-h-10" />}>
         <NewLookBackLink searchParams={searchParams} />
       </Suspense>
       <h1 className="text-xl font-semibold">着画を記録</h1>

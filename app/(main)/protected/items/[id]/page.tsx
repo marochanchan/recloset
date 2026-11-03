@@ -318,7 +318,7 @@ export default function ClothingItemDetailPage({
 }) {
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-6">
-      <Suspense fallback={<span className="min-h-10" />}>
+      <Suspense fallback={<span className="block min-h-10" />}>
         <ItemBackLink searchParams={searchParams} />
       </Suspense>
 

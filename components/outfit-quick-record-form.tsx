@@ -346,7 +346,7 @@ export function OutfitQuickRecordForm({
         <Button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isConfirming || phase === "processing" || phase === "uploading" || staged !== null}
+          disabled={isConfirming || phase === "processing" || phase === "uploading"}
           className="w-fit"
         >
           写真を選ぶ
