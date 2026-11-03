@@ -31,7 +31,7 @@ import { ChevronLeft } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useReducer, useRef, useState } from "react";
+import { useEffect, useId, useReducer, useRef, useState } from "react";
 
 // ============================================================
 // クイック仕分け（1着ずつ写真を大きく見せて、カテゴリ・種類・カラー・季節をタップで選ぶ。
@@ -299,6 +299,12 @@ export function ClothingClassifySession({
   const [dragX, setDragX] = useState(0);
   // 入力欄にフォーカスがある間はスワイプを受け付けない（文字の選択の操作と取り合わないように）
   const textFocusedRef = useRef(false);
+  // 入力欄にフォーカスしたまま次の服へ進むと、入力欄が作り直されて blur が届かないことがある。
+  // 服が変わったらフォーカスの印を戻し、スワイプが効かないままにならないようにする
+  const currentId = current?.id ?? null;
+  useEffect(() => {
+    textFocusedRef.current = false;
+  }, [currentId]);
 
   const resetDrag = () => {
     dragRef.current = null;
