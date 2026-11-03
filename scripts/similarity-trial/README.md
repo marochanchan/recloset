@@ -7,7 +7,7 @@
 ## 準備
 
 1. `looks/` に着画（jpg）を置く。
-2. 平置きを本番から取る（読むだけ。既にあるファイルは取り直さない）：
+2. 平置きを本番から取る（読むだけ。既にあるファイルは取り直さない）。秘密鍵は不要。各アカウントのパスワードを順に聞かれる（入力は表示されない）：
 
 ```
 node --env-file=.env.local scripts/similarity-trial/fetch-flats.mts --email a@example.com --email b@example.com
