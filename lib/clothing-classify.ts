@@ -27,7 +27,7 @@ export type ClassifyMode = (typeof CLASSIFY_MODES)[number];
 
 export const CLASSIFY_MODE_LABELS: Record<ClassifyMode, string> = {
   category: "カテゴリを仕分ける",
-  season: "季節を仕分ける",
+  season: "シーズンを仕分ける",
 };
 
 /** 仕分けの対象にする服の状態（売却済みは対象外） */

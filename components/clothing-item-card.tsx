@@ -1,8 +1,8 @@
 import { DoodleHanger } from "@/components/doodle-icons";
+import { displayClothingTitle } from "@/lib/clothing-display-title";
 import {
   getStatusLabel,
   PHOTO_ONLY_DISPLAY_LABEL,
-  PHOTO_ONLY_TITLE,
 } from "@/lib/clothing-options";
 import { getWearRecencyLabel } from "@/lib/wear-logs";
 import { Heart } from "lucide-react";
@@ -12,6 +12,8 @@ type ClothingItemCardProps = {
   title: string;
   brand: string | null;
   category: string;
+  subcategory: string | null;
+  categoryClassifiedAt: string | null;
   seasons: string[];
   favorite: boolean;
   status: string;
@@ -27,14 +29,24 @@ const PHOTO_LABEL_CLASS =
 export function ClothingItemCard({
   title,
   brand,
+  category,
+  subcategory,
+  categoryClassifiedAt,
   favorite,
   status,
   lastWornAt,
   isPublic,
   imageUrl,
 }: ClothingItemCardProps) {
-  // 写真だけ登録した服は、仮タイトルを並べず「未仕分け」と短く出す（表示のみ）
-  const isPhotoOnly = title === PHOTO_ONLY_TITLE;
+  // 写真だけ登録した服は、仮タイトルを並べず「未仕分け」（仕分け済みなら種類・カテゴリ名）と
+  // 短く出す（表示のみ）
+  const displayTitle = displayClothingTitle({
+    title,
+    category,
+    subcategory,
+    categoryClassifiedAt,
+  });
+  const isPhotoOnly = displayTitle === PHOTO_ONLY_DISPLAY_LABEL;
   // ふだんの「クローゼット」以外（手放し候補・出品中・売却済み）だけ状態を示す
   const showStatus = status !== "closet";
 
@@ -49,7 +61,7 @@ export function ClothingItemCard({
         {imageUrl ? (
           <Image
             src={imageUrl}
-            alt={title}
+            alt={displayTitle}
             fill
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
             className="object-contain motion-safe:transition-transform motion-safe:duration-300 group-hover:scale-[1.03]"
@@ -86,7 +98,7 @@ export function ClothingItemCard({
         {isPhotoOnly ? (
           <p className="text-sm text-muted-foreground">{PHOTO_ONLY_DISPLAY_LABEL}</p>
         ) : (
-          <p className="truncate text-sm leading-snug">{title}</p>
+          <p className="truncate text-sm leading-snug">{displayTitle}</p>
         )}
         {/* 見直しの判断材料になる「最後に着た時期」は控えめに1行で残す */}
         <p className="truncate text-[11px] text-muted-foreground">

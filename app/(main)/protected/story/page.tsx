@@ -4,7 +4,7 @@ import { ReStoryMonthNav } from "@/components/re-story-month-nav";
 import { ReStoryMonthSummary } from "@/components/re-story-month-summary";
 import { ReStoryTimeline } from "@/components/re-story-timeline";
 import { Button } from "@/components/ui/button";
-import { PHOTO_ONLY_TITLE } from "@/lib/clothing-options";
+import { PHOTO_ONLY_DISPLAY_LABEL } from "@/lib/clothing-options";
 import {
   RE_STORY_EMPTY_MONTH_MESSAGE,
   RE_STORY_LEAD,
@@ -39,7 +39,7 @@ async function ReStoryContent({ requestedMonth }: { requestedMonth: string | und
   const result = await fetchStoryPage(supabase, {
     userId: claims.sub,
     requestedMonth,
-    photoOnlyTitle: PHOTO_ONLY_TITLE,
+    photoOnlyTitle: PHOTO_ONLY_DISPLAY_LABEL,
   });
 
   // 取得エラー・上限超過は、記録0件として表示しない
@@ -79,7 +79,7 @@ async function ReStoryContent({ requestedMonth }: { requestedMonth: string | und
       <ReStoryMonthNav nav={nav} />
       <ReStoryMonthSummary summary={summary} showTrackingNote={showTrackingNote} />
       {timeline.length > 0 ? (
-        <ReStoryTimeline days={timeline} photoOnlyTitle={PHOTO_ONLY_TITLE} />
+        <ReStoryTimeline days={timeline} photoOnlyTitle={PHOTO_ONLY_DISPLAY_LABEL} />
       ) : (
         <p className="rounded-2xl bg-secondary/60 px-4 py-8 text-center text-sm text-muted-foreground">
           {RE_STORY_EMPTY_MONTH_MESSAGE}

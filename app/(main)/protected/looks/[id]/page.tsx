@@ -102,7 +102,7 @@ async function LookDetail({ params }: { params: Promise<{ id: string }> }) {
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold">{outfit.worn_on}</h1>
         {outfit.status === "pending" && (
-          <p className="text-xs text-muted-foreground">まだ確定していません</p>
+          <p className="text-xs text-muted-foreground">未確定</p>
         )}
         {outfit.note && <p className="text-sm text-muted-foreground">{outfit.note}</p>}
       </div>
@@ -119,7 +119,7 @@ async function LookDetail({ params }: { params: Promise<{ id: string }> }) {
               return (
                 <li key={item.id}>
                   <Link
-                    href={`/protected/items/${item.id}`}
+                    href={`/protected/items/${item.id}?from=${id}`}
                     className="flex min-h-16 items-center gap-3 rounded-2xl border border-border/70 bg-card p-2 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-photo">

@@ -13,7 +13,7 @@ const FIELD_LABELS: Record<AutofillField, string> = {
   category: "カテゴリー",
   subcategory: "種類",
   mainColor: "メインカラー",
-  seasons: "季節",
+  seasons: "シーズン",
 };
 
 // 写真からの自動入力の状況（画像欄の下に小さく表示する）

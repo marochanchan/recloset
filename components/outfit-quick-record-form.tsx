@@ -48,6 +48,7 @@ export function OutfitQuickRecordForm({
   const startedMediaIdRef = useRef<string | null>(null);
   const mediaIdRef = useRef<string | null>(null);
   const processedRef = useRef<ProcessedImage | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 送る前の確認中の写真。向きを回せるのはここにいる間だけ。
   // 下書きの作成とアップロードは「この写真を使う」を押したときに1回だけ行う
@@ -313,7 +314,7 @@ export function OutfitQuickRecordForm({
     <div className="flex flex-col gap-6">
       <section aria-labelledby="look-photo-title" className="flex flex-col gap-3">
         <h2 id="look-photo-title" className="text-base font-semibold">
-          1. 着画を撮る・選ぶ
+          1. 写真を選ぶ
         </h2>
         {(stagedUrl ?? previewUrl) && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -342,17 +343,27 @@ export function OutfitQuickRecordForm({
             </Button>
           </div>
         )}
+        <Button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isConfirming || phase === "processing" || phase === "uploading"}
+          className="w-fit"
+        >
+          写真を選ぶ
+        </Button>
         <OutfitCameraCapture
           key={cameraKey}
           disabled={isConfirming || phase === "processing" || phase === "uploading"}
           onPhoto={handleCameraPhoto}
         />
-        <Input
+        <input
+          ref={fileInputRef}
           type="file"
           accept="image/*"
           onChange={handleFileChange}
           disabled={isConfirming || phase === "processing" || phase === "uploading"}
           aria-label="着画の写真を選ぶ"
+          className="hidden"
         />
         <p className="text-sm text-muted-foreground" role="status">
           {phase === "processing" && "写真を整えています"}
@@ -372,9 +383,18 @@ export function OutfitQuickRecordForm({
         )}
       </section>
 
+      <section aria-labelledby="look-items-title" className="flex flex-col gap-3">
+        <h2 id="look-items-title" className="text-base font-semibold">
+          2. 着た服を選ぶ
+        </h2>
+        <OutfitItemPicker items={items} selectedIds={validSelectedIds} onChange={setSelectedIds}
+          disabled={isConfirming}
+        />
+      </section>
+
       <section aria-labelledby="look-date-title" className="flex flex-col gap-2">
         <h2 id="look-date-title" className="text-base font-semibold">
-          2. 着た日
+          3. 着た日
         </h2>
         <Label htmlFor="look-worn-on" className="sr-only">
           着た日
@@ -386,15 +406,6 @@ export function OutfitQuickRecordForm({
           onChange={(e) => setWornOn(e.target.value)}
           disabled={isConfirming}
           className="w-fit"
-        />
-      </section>
-
-      <section aria-labelledby="look-items-title" className="flex flex-col gap-3">
-        <h2 id="look-items-title" className="text-base font-semibold">
-          3. 着た服を選ぶ
-        </h2>
-        <OutfitItemPicker items={items} selectedIds={validSelectedIds} onChange={setSelectedIds}
-          disabled={isConfirming}
         />
       </section>
 
@@ -422,7 +433,7 @@ export function OutfitQuickRecordForm({
       </Button>
       {!canConfirm && !isConfirming && (
         <p className="text-xs text-muted-foreground">
-          写真が届いて、服を1つ以上選ぶと確定できます
+          写真と服を選ぶと確定できます
         </p>
       )}
     </div>

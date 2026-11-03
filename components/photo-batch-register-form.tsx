@@ -475,7 +475,7 @@ export function PhotoBatchRegisterForm({
                 <Button asChild className="min-h-11">
                   <Link href="/protected/items/classify">
                     <DoodleTag />
-                    クイック仕分けでカテゴリ・季節を付ける
+                    クイック仕分けでカテゴリ・シーズンを付ける
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="min-h-11">

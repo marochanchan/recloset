@@ -14,7 +14,8 @@ import {
   REVIEW_SESSION_DECISION_LABELS,
   summarizeReviewDecisions,
 } from "@/lib/closet-review";
-import { PHOTO_ONLY_TITLE } from "@/lib/clothing-options";
+import { displayClothingTitle } from "@/lib/clothing-display-title";
+import { PHOTO_ONLY_DISPLAY_LABEL } from "@/lib/clothing-options";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
@@ -61,7 +62,9 @@ async function loadSession(sessionId: string) {
       .order("created_at", { ascending: true }),
     supabase
       .from("clothing_items")
-      .select("id, title, status, clothing_images(image_path, sort_order)")
+      .select(
+        "id, title, category, subcategory, category_classified_at, status, clothing_images(image_path, sort_order)",
+      )
       .in("id", itemIds),
   ]);
   if (decisionsResult.error) throw decisionsResult.error;
@@ -88,7 +91,13 @@ async function loadSession(sessionId: string) {
     const coverPath = coverPathByItem.get(item.id);
     itemById.set(item.id, {
       id: item.id,
-      title: item.title,
+      // 写真だけ登録の仮タイトルは、仕分けの結果に合わせた表示名にする
+      title: displayClothingTitle({
+        title: item.title,
+        category: item.category,
+        subcategory: item.subcategory,
+        categoryClassifiedAt: item.category_classified_at,
+      }),
       status: item.status,
       imageUrl: coverPath ? (urlByPath.get(coverPath) ?? null) : null,
     });
@@ -305,7 +314,7 @@ function ResultItemList({
               </span>
               <span
                 className={
-                  item.title === PHOTO_ONLY_TITLE
+                  item.title === PHOTO_ONLY_DISPLAY_LABEL
                     ? "truncate text-xs text-muted-foreground"
                     : "truncate text-xs"
                 }

@@ -46,6 +46,7 @@ import {
 } from "@/components/use-clothing-images";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { filterBrandSuggestions } from "@/lib/brand-suggestions";
 import { getCategoryClassifiedPatch } from "@/lib/clothing-classify";
 import {
   CATEGORY_OPTIONS,
@@ -128,6 +129,8 @@ type ClothingItemFormProps = {
   initialImages?: ExistingClothingImage[];
   /** 新規登録で再開する下書き（サーバーで本人の下書きと確認済み） */
   draft?: ClothingDraftToResume | null;
+  /** ブランド入力の候補（自分がすでに登録したブランド） */
+  brandSuggestions?: string[];
   /**
    * 新規登録ページで「写真だけ登録」を選んだとき（親が写真からまとめて登録する画面を
    * 表示する）。指定したときだけ、入力方法の切り替えを表示する
@@ -148,6 +151,7 @@ export function ClothingItemForm({
   initialValues,
   initialImages = [],
   draft = null,
+  brandSuggestions = [],
   onEntryModeChange,
   leaveGuardEnabled = true,
   otherEntryPending = false,
@@ -863,7 +867,23 @@ export function ClothingItemForm({
                       type="text"
                       value={brand}
                       onChange={(e) => setBrand(e.target.value)}
+                      autoComplete="off"
                     />
+                    {/* 自分がすでに登録したブランドを、タップで入れられる候補に出す（自由入力はそのまま） */}
+                    {filterBrandSuggestions(brandSuggestions, brand).length > 0 && (
+                      <div className="flex flex-wrap gap-2" role="group" aria-label="前に入れたブランド">
+                        {filterBrandSuggestions(brandSuggestions, brand).map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            onClick={() => setBrand(suggestion)}
+                            className="inline-flex h-8 items-center rounded-full border bg-background px-3 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid gap-2">
@@ -879,7 +899,7 @@ export function ClothingItemForm({
                     />
                     <p id="seasons-description" className="text-sm text-muted-foreground">
                       {autofill.needsCheck("seasons")
-                        ? "季節は写真だけでは判断しにくいため、確認してください"
+                        ? "シーズンは写真だけでは判断しにくいため、確認してください"
                         : "複数選べます（未選択でもOK）"}
                     </p>
                   </div>
@@ -1109,18 +1129,28 @@ function NeedsCheckNote() {
 export function NewClothingItemForm({
   draft = null,
   entryMode = "normal",
+  brandSuggestions = [],
 }: {
   draft?: ClothingDraftToResume | null;
   entryMode?: ClothingEntryMode;
+  brandSuggestions?: string[];
 }) {
   const { bfcacheId } = useRouter();
   if (draft) {
     return (
-      <ClothingItemForm key={`${bfcacheId}:${draft.id}:normal`} draft={draft} />
+      <ClothingItemForm
+        key={`${bfcacheId}:${draft.id}:normal`}
+        draft={draft}
+        brandSuggestions={brandSuggestions}
+      />
     );
   }
   return (
-    <NewClothingItemEntry key={`${bfcacheId}:new:${entryMode}`} entryMode={entryMode} />
+    <NewClothingItemEntry
+      key={`${bfcacheId}:new:${entryMode}`}
+      entryMode={entryMode}
+      brandSuggestions={brandSuggestions}
+    />
   );
 }
 
@@ -1129,7 +1159,13 @@ export function NewClothingItemForm({
 // （写真からまとめて登録する画面は、はじめて選んだときに作る）。
 // 離脱の確認は表示中の画面だけが行い、もう一方の未保存の内容も1回の確認で伝える
 // （隠れた画面の確認ダイアログは見えないため、二重に・見えない確認を出さない）
-function NewClothingItemEntry({ entryMode }: { entryMode: ClothingEntryMode }) {
+function NewClothingItemEntry({
+  entryMode,
+  brandSuggestions,
+}: {
+  entryMode: ClothingEntryMode;
+  brandSuggestions: string[];
+}) {
   const [mode, setMode] = useState<ClothingEntryMode>(entryMode);
   const [isPhotoMounted, setIsPhotoMounted] = useState(entryMode === "photo");
   const [normalDirty, setNormalDirty] = useState(false);
@@ -1143,6 +1179,7 @@ function NewClothingItemEntry({ entryMode }: { entryMode: ClothingEntryMode }) {
     <>
       <div hidden={mode !== "normal"}>
         <ClothingItemForm
+          brandSuggestions={brandSuggestions}
           onEntryModeChange={changeMode}
           leaveGuardEnabled={guards.normal}
           otherEntryPending={photoPending}

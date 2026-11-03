@@ -162,7 +162,7 @@ export function PublishToggle({
           ログインしていない人も含め、誰でも次の情報を見られるようになります。
         </p>
         <ul className="list-disc pl-5">
-          <li>タイトル・ブランド・カテゴリ・季節</li>
+          <li>タイトル・ブランド・カテゴリ・シーズン</li>
           <li>登録しているすべての画像</li>
           <li>あなたの公開名「{displayName}」</li>
           <li>登録している出品先URL（メルカリ・ラクマ・Yahoo!フリマ）</li>
