@@ -46,7 +46,7 @@ import {
 } from "@/components/use-clothing-images";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { filterBrandSuggestions } from "@/lib/brand-suggestions";
+import { BrandSuggestionChips } from "@/components/brand-suggestion-chips";
 import { getCategoryClassifiedPatch } from "@/lib/clothing-classify";
 import {
   CATEGORY_OPTIONS,
@@ -870,20 +870,11 @@ export function ClothingItemForm({
                       autoComplete="off"
                     />
                     {/* 自分がすでに登録したブランドを、タップで入れられる候補に出す（自由入力はそのまま） */}
-                    {filterBrandSuggestions(brandSuggestions, brand).length > 0 && (
-                      <div className="flex flex-wrap gap-2" role="group" aria-label="前に入れたブランド">
-                        {filterBrandSuggestions(brandSuggestions, brand).map((suggestion) => (
-                          <button
-                            key={suggestion}
-                            type="button"
-                            onClick={() => setBrand(suggestion)}
-                            className="inline-flex h-8 items-center rounded-full border bg-background px-3 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    <BrandSuggestionChips
+                      suggestions={brandSuggestions}
+                      input={brand}
+                      onSelect={setBrand}
+                    />
                   </div>
 
                   <div className="grid gap-2">
