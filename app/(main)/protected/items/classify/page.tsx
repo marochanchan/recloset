@@ -21,9 +21,8 @@ import {
 } from "@/lib/clothing-classify";
 import {
   normalizeSeasons,
-  PHOTO_ONLY_CATEGORY,
-  PHOTO_ONLY_TITLE,
 } from "@/lib/clothing-options";
+import { countUnclassified, unclassifiedFilters } from "@/lib/clothing-unclassified-count";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
@@ -40,38 +39,6 @@ type SearchParams = Promise<{ mode?: string | string[]; r?: string | string[] }>
 
 const firstParam = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
-
-type Supabase = Awaited<ReturnType<typeof createClient>>;
-
-// 未分類の服の絞り込み（RLSにより本人の服だけが返る）。
-// カテゴリ: 写真だけ登録したままで、分類した記録がない服（lib/clothing-classify.ts参照）
-// 季節: seasons が空配列の服
-const unclassifiedFilters = (
-  mode: ClassifyMode,
-): [column: string, operator: string, value: string][] =>
-  mode === "category"
-    ? [
-        ["title", "eq", PHOTO_ONLY_TITLE],
-        ["category", "eq", PHOTO_ONLY_CATEGORY],
-        ["category_classified_at", "is", "null"],
-      ]
-    : [["seasons", "eq", "{}"]];
-
-async function countUnclassified(supabase: Supabase, mode: ClassifyMode) {
-  let query = supabase
-    .from("clothing_items")
-    .select("*", { count: "exact", head: true })
-    .in("status", [...CLASSIFY_STATUSES]);
-  for (const [column, operator, value] of unclassifiedFilters(mode)) {
-    query = query.filter(column, operator, value);
-  }
-  const { count, error } = await query;
-  if (error) {
-    console.error("count unclassified items error:", error);
-    return null;
-  }
-  return count ?? 0;
-}
 
 // ---- モード選択 ----
 async function ClassifyMenu() {

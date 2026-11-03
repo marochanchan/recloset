@@ -21,6 +21,7 @@ import {
   type ClosetFilters,
   type RawSearchParams,
 } from "@/lib/closet-filters";
+import { countUnclassified } from "@/lib/clothing-unclassified-count";
 import { displayClothingTitle } from "@/lib/clothing-display-title";
 import {
   CATEGORY_OPTIONS,
@@ -38,7 +39,7 @@ import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { cn } from "@/lib/utils";
 import { getJstDateKey } from "@/lib/weather";
 import { getCurrentSeasonJst } from "@/lib/wear-logs";
-import { Camera, ChevronDown, FileText, Shirt, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, Camera, ChevronDown, FileText, Shirt, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -51,10 +52,6 @@ const CLICKABLE_CARD_LINK_CLASS =
 // 空状態（服が0着・条件に合う服がない）の枠
 const EMPTY_STATE_CLASS =
   "flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-12 text-center";
-
-// 「その他の登録方法」の中の1行
-const MORE_REGISTER_LINK_CLASS =
-  "flex min-h-12 items-center gap-3 rounded-lg px-3 py-2 text-sm outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring active:bg-accent";
 
 function FilterChip({
   href,
@@ -464,9 +461,26 @@ async function ReviewSuggestions() {
   );
 }
 
+// 未仕分けの服（カテゴリが未分類）があるときだけ、クイック仕分けへの入口を出す。
+// 数えるのはカテゴリ未分類の服だけ（クイック仕分けの画面と同じ条件）。0件・取得失敗は何も出さない
+async function UnclassifiedEntry() {
+  const supabase = await createClient();
+  const count = await countUnclassified(supabase, "category");
+  if (!count) return null;
+  return (
+    <Button asChild variant="outline" size="sm" className="h-9 rounded-full px-3">
+      <Link href="/protected/items/classify">
+        未仕分けが{count}着
+        <ArrowRight aria-hidden="true" />
+        仕分ける
+      </Link>
+    </Button>
+  );
+}
+
 // 下書きがあるときだけ、「下書き N」の小さなボタンを出す。
 // 件数を取得できない場合（下書きテーブルの適用前など）は何も出さない。
-// 見出しの横に出すため、読み込み後に下の内容を押し下げない
+// 「1着ずつ詳しく登録」の下に出す
 async function DraftsButton() {
   const supabase = await createClient();
   const { count, error } = await supabase
@@ -493,25 +507,20 @@ export default function ClothingItemsPage({
 }) {
   return (
     <div className="w-full flex flex-col gap-6">
-      {/* 主要な操作は「写真だけで登録」と「まとめて見直す」の2つを横に並べる。
-          スマホで服の写真が早く見えるよう、クイック仕分け・1着ずつの登録は
-          「その他の登録方法」に折りたたむ。下書きがあるときは見出しの横に小さく出す */}
+      {/* 上の段は登録の2つ（写真だけで登録・1着ずつ詳しく登録）を横に並べる。
+          下の段は「整える」（まとめて見直す・未仕分けがあるときだけ仕分ける）。
+          下書きがあるときは「1着ずつ詳しく登録」の下に小さく出す */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold">クローゼット</h1>
-          <div className="flex items-center gap-2">
-            <Suspense fallback={null}>
-              <DraftsButton />
-            </Suspense>
-            <Button asChild variant="outline" size="sm" className="h-9 shrink-0 rounded-full px-3">
-              <Link href="/protected/looks">
-                <Shirt aria-hidden="true" />
-                着画
-              </Link>
-            </Button>
-          </div>
+          <Button asChild variant="outline" size="sm" className="h-9 shrink-0 rounded-full px-3">
+            <Link href="/protected/looks">
+              <Shirt aria-hidden="true" />
+              着画
+            </Link>
+          </Button>
         </div>
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
+        <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-2 sm:flex">
             {/* 写真を選ぶだけで、1着でもまとめてでも登録できる入口（いちばん手軽な始め方） */}
             <Button asChild size="lg" className="h-12 px-3 sm:h-10 sm:px-6">
@@ -520,34 +529,30 @@ export default function ClothingItemsPage({
                 写真だけで登録
               </Link>
             </Button>
+            <div className="flex min-w-0 flex-col items-start gap-1">
+              <Button asChild variant="outline" size="lg" className="h-12 w-full px-3 sm:h-10 sm:w-auto sm:px-6">
+                <Link href="/protected/items/new">
+                  <DoodleHangerPlus className="text-primary" />
+                  1着ずつ詳しく登録
+                </Link>
+              </Button>
+              <Suspense fallback={null}>
+                <DraftsButton />
+              </Suspense>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             {/* 1着ずつスワイプで見直す（最大10着。開始・再開は見直しの画面で選ぶ） */}
-            <Button asChild variant="outline" size="lg" className="h-12 px-3 sm:h-10 sm:px-6">
+            <Button asChild variant="outline" size="sm" className="h-9 rounded-full px-3">
               <Link href="/protected/review">
                 <DoodleTag className="text-primary" />
                 まとめて見直す
               </Link>
             </Button>
+            <Suspense fallback={null}>
+              <UnclassifiedEntry />
+            </Suspense>
           </div>
-          <details className="group/more sm:relative">
-            <summary className="flex min-h-10 w-fit cursor-pointer list-none items-center gap-1 rounded-lg px-1 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-              その他の登録方法
-              <ChevronDown
-                className="h-4 w-4 transition-transform group-open/more:rotate-180"
-                aria-hidden="true"
-              />
-            </summary>
-            <div className="mt-1 flex flex-col rounded-xl border border-border/70 bg-card p-1 sm:absolute sm:left-0 sm:z-20 sm:w-72 sm:shadow-lg">
-              {/* 写真だけで登録した服などに、カテゴリ・季節をカードで付けていく入口 */}
-              <Link href="/protected/items/classify" className={MORE_REGISTER_LINK_CLASS}>
-                <DoodleTag size={20} className="text-primary" />
-                <span className="font-medium">クイック仕分け</span>
-              </Link>
-              <Link href="/protected/items/new" className={MORE_REGISTER_LINK_CLASS}>
-                <DoodleHangerPlus size={20} className="text-primary" />
-                <span className="font-medium">1着ずつ詳しく登録</span>
-              </Link>
-            </div>
-          </details>
         </div>
       </div>
 
