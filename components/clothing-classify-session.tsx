@@ -455,7 +455,7 @@ function SeasonChoices({
   return (
     <div className="flex flex-col gap-3">
       <p id="classify-season-label" className="text-sm font-medium">
-        着る季節を選ぶ（複数OK）
+        着るシーズンを選ぶ（複数OK）
       </p>
       <SeasonSelector
         value={seasons}
@@ -512,7 +512,7 @@ function ClassifyDone({
           className="min-h-11"
           onClick={onContinue}
         >
-          {mode === "category" ? "カテゴリをもう少し仕分ける" : "季節をもう少し仕分ける"}
+          {mode === "category" ? "カテゴリをもう少し仕分ける" : "シーズンをもう少し仕分ける"}
         </Button>
         <Button asChild variant="ghost" size="sm">
           <Link href="/protected/items/classify">仕分けメニューへ</Link>

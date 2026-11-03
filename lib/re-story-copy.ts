@@ -28,7 +28,7 @@ export const RE_STORY_NO_EVENTS_MESSAGE =
 
 /** 019 適用前の月への注記（状態の変更・季節の仕分けは、当時の記録が残っていない） */
 export const RE_STORY_TRACKING_NOTE =
-  "この頃の「手放し候補・出品・売却」と「季節の仕分け」は、記録が残っていないことがあります。";
+  "この頃の「手放し候補・出品・売却」と「シーズンの仕分け」は、記録が残っていないことがあります。";
 
 export const DELETED_ITEM_LABEL = "削除した服";
 
@@ -44,7 +44,7 @@ export function getStoryActionSentence(group: StoryTimelineGroup): string {
     ai_diagnosis: `AIと一緒に${n}着を見直しました`,
     swipe_review: `${n}着をまとめて見直しました`,
     category_classified: `${n}着のカテゴリを仕分けました`,
-    seasons_classified: `${n}着の季節を仕分けました`,
+    seasons_classified: `${n}着のシーズンを仕分けました`,
     status_candidate: `${n}着を手放し候補にしました`,
     status_letting_go: `${n}着を出品しました`,
     status_sold: `${n}着が新しい持ち主のもとへ旅立ちました`,

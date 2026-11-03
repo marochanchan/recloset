@@ -147,7 +147,7 @@ async function ClosetFilterBar({
         <details className="group/filters min-w-0 flex-1" open={hasSecondaryFilters}>
           <summary className="flex min-h-10 w-fit cursor-pointer list-none items-center gap-1.5 rounded-lg pr-2 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
             <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-            季節・状態で絞り込む
+            シーズン・状態で絞り込む
             {hasSecondaryFilters && (
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                 {secondaryLabels.join("・")}

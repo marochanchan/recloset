@@ -879,7 +879,7 @@ export function ClothingItemForm({
                     />
                     <p id="seasons-description" className="text-sm text-muted-foreground">
                       {autofill.needsCheck("seasons")
-                        ? "季節は写真だけでは判断しにくいため、確認してください"
+                        ? "シーズンは写真だけでは判断しにくいため、確認してください"
                         : "複数選べます（未選択でもOK）"}
                     </p>
                   </div>

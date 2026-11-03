@@ -198,7 +198,7 @@ async function ClassifyContent({ mode }: { mode: ClassifyMode }) {
         <p className="text-sm text-muted-foreground">
           {mode === "category"
             ? "カテゴリが未分類の服はありません"
-            : "季節が未設定の服はありません"}
+            : "シーズンが未設定の服はありません"}
         </p>
         <Button asChild variant="outline">
           <Link href="/protected/items/classify">仕分けメニューへ</Link>
