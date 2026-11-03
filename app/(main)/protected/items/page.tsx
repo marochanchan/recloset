@@ -37,7 +37,7 @@ import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import { cn } from "@/lib/utils";
 import { getJstDateKey } from "@/lib/weather";
 import { getCurrentSeasonJst } from "@/lib/wear-logs";
-import { Camera, ChevronDown, FileText, SlidersHorizontal } from "lucide-react";
+import { Camera, ChevronDown, FileText, Shirt, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -488,9 +488,17 @@ export default function ClothingItemsPage({
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold">クローゼット</h1>
-          <Suspense fallback={null}>
-            <DraftsButton />
-          </Suspense>
+          <div className="flex items-center gap-2">
+            <Suspense fallback={null}>
+              <DraftsButton />
+            </Suspense>
+            <Button asChild variant="outline" size="sm" className="h-9 shrink-0 rounded-full px-3">
+              <Link href="/protected/looks">
+                <Shirt aria-hidden="true" />
+                着画
+              </Link>
+            </Button>
+          </div>
         </div>
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3">
           <div className="grid grid-cols-2 gap-2 sm:flex">

@@ -16,6 +16,7 @@ import {
   processImageForOutfitUpload,
   type ProcessedImage,
 } from "@/lib/image-processing";
+import { rotateStaged, stagePhoto, type StagedPhoto } from "@/lib/outfits/photo-rotation";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -48,6 +49,13 @@ export function OutfitQuickRecordForm({
   const mediaIdRef = useRef<string | null>(null);
   const processedRef = useRef<ProcessedImage | null>(null);
 
+  // 送る前の確認中の写真。向きを回せるのはここにいる間だけ。
+  // 下書きの作成とアップロードは「この写真を使う」を押したときに1回だけ行う
+  // （回すたびに下書きを作ると、使われない未確定の着画が溜まるため）。
+  // source は元の写真（ファイル、またはカメラで撮った縮小済みの写真）。回すたびに元から作り直す
+  const [staged, setStaged] = useState<(StagedPhoto<Blob> & { image: ProcessedImage }) | null>(null);
+  const [stagedUrl, setStagedUrl] = useState<string | null>(null);
+  const stagedBlob = staged?.image.blob ?? null;
   const [phase, setPhase] = useState<UploadPhase>("idle");
   const [outfitId, setOutfitId] = useState<string | null>(null);
   // 縮小した写真。表示用の URL は、これをもとに effect の中で作る
@@ -77,6 +85,16 @@ export function OutfitQuickRecordForm({
     return () => URL.revokeObjectURL(url);
   }, [previewBlob]);
 
+  useEffect(() => {
+    if (!stagedBlob) {
+      setStagedUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(stagedBlob);
+    setStagedUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [stagedBlob]);
+
   // 選んでいる服のうち、今の一覧にあるものだけ（消えた服は外れる）
   const validSelectedIds = selectedIds.filter((id) => items.some((item) => item.id === id));
   const entryItemIds = () =>
@@ -95,6 +113,7 @@ export function OutfitQuickRecordForm({
     setPhase("idle");
     setOutfitId(null);
     setPreviewBlob(null);
+    setStaged(null);
     setWornOn(defaultWornOn);
     setSelectedIds(entryItemIds());
     setNote("");
@@ -179,6 +198,38 @@ export function OutfitQuickRecordForm({
   const handleCameraPhoto = (image: ProcessedImage) => {
     if (isConfirmingRef.current || phase === "processing" || phase === "uploading") return;
     setMessage(null);
+    // カメラの確認はここで閉じ、送る前の確認（向きを回せる）に渡す
+    setCameraKey((k) => k + 1);
+    setStaged({ ...stagePhoto<Blob>(image.blob), image });
+  };
+
+  // 元の写真を指定の向きで処理して、確認中の写真にする。失敗したら今の確認中の写真・下書きはそのまま
+  const stageFrom = async (staging: StagedPhoto<Blob>) => {
+    const previousPhase = phase;
+    setMessage(null);
+    setPhase("processing");
+    try {
+      const image = await processImageForOutfitUpload(staging.source, staging.rotation);
+      setStaged({ ...staging, image });
+    } catch (error) {
+      setMessage(
+        error instanceof ImageProcessingError
+          ? error.message
+          : "画像を処理できませんでした。時間をおいてお試しください",
+      );
+    }
+    setPhase(previousPhase);
+  };
+
+  const handleRotate = () => {
+    if (!staged || isConfirmingRef.current || phase === "processing" || phase === "uploading") return;
+    void stageFrom(rotateStaged(staged));
+  };
+
+  const handleUseStaged = () => {
+    if (!staged || isConfirmingRef.current || phase === "processing" || phase === "uploading") return;
+    const image = staged.image;
+    setStaged(null);
     void beginDraft(image);
   };
 
@@ -189,28 +240,13 @@ export function OutfitQuickRecordForm({
     if (!file || isConfirmingRef.current) return;
     setCameraKey((k) => k + 1);
 
-    // 処理に失敗したら、できあがっている下書きはそのまま残す
-    const previousPhase = phase;
-    setMessage(null);
-    setPhase("processing");
-    let image: ProcessedImage;
-    try {
-      image = await processImageForOutfitUpload(file, 0);
-    } catch (error) {
-      setMessage(
-        error instanceof ImageProcessingError
-          ? error.message
-          : "画像を処理できませんでした。時間をおいてお試しください",
-      );
-      setPhase(previousPhase);
-      return;
-    }
-
-    await beginDraft(image);
+    // 処理に失敗したら、できあがっている下書きや確認中の写真はそのまま残す
+    await stageFrom(stagePhoto<Blob>(file));
   };
 
   const handleRetry = async () => {
-    if (isConfirmingRef.current) return;
+    // 確認中の別の写真があるときは、前の写真を送り直さない（使うなら新しい下書きで送る）
+    if (isConfirmingRef.current || staged) return;
     const mediaId = mediaIdRef.current;
     const image = processedRef.current;
     if (!image || !mediaId) return;
@@ -271,7 +307,7 @@ export function OutfitQuickRecordForm({
     }
   };
 
-  const canConfirm = phase === "done" && validSelectedIds.length > 0 && !isConfirming;
+  const canConfirm = !staged && phase === "done" && validSelectedIds.length > 0 && !isConfirming;
 
   return (
     <div className="flex flex-col gap-6">
@@ -279,13 +315,32 @@ export function OutfitQuickRecordForm({
         <h2 id="look-photo-title" className="text-base font-semibold">
           1. 着画を撮る・選ぶ
         </h2>
-        {previewUrl && (
+        {(stagedUrl ?? previewUrl) && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={previewUrl}
+            src={(stagedUrl ?? previewUrl) as string}
             alt="選んだ着画"
             className="max-h-96 w-full rounded-2xl bg-photo object-contain"
           />
+        )}
+        {staged && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleRotate}
+              disabled={isConfirming || phase === "processing" || phase === "uploading"}
+            >
+              向きを回す
+            </Button>
+            <Button
+              type="button"
+              onClick={handleUseStaged}
+              disabled={isConfirming || phase === "processing" || phase === "uploading"}
+            >
+              この写真を使う
+            </Button>
+          </div>
         )}
         <OutfitCameraCapture
           key={cameraKey}
@@ -304,7 +359,7 @@ export function OutfitQuickRecordForm({
           {phase === "uploading" && "写真を送っています"}
           {phase === "done" && "写真が届きました"}
         </p>
-        {phase === "failed" && (
+        {phase === "failed" && !staged && (
           <Button
             type="button"
             variant="outline"
@@ -345,7 +400,7 @@ export function OutfitQuickRecordForm({
 
       <section aria-labelledby="look-note-title" className="flex flex-col gap-2">
         <h2 id="look-note-title" className="text-base font-semibold">
-          メモ（なくてもだいじょうぶです）
+          メモ（任意）
         </h2>
         <Input
           value={note}

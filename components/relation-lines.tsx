@@ -34,7 +34,7 @@ export async function RelationLines({ itemId }: { itemId: string }) {
   const { data: items, error: itemsError } = await supabase
     .from("clothing_items")
     .select("id, title, clothing_images(image_path, sort_order)")
-    .in("id", lines.map((l) => l.itemId))
+    .in("id", [itemId, ...lines.map((l) => l.itemId)])
     .order("sort_order", { referencedTable: "clothing_images" });
   if (itemsError) {
     console.error("relation lines: fetch items error", itemsError.code);
@@ -52,6 +52,10 @@ export async function RelationLines({ itemId }: { itemId: string }) {
     return <p className="text-sm text-muted-foreground">{EMPTY_COPY}</p>;
   }
   const half = SIZE / 2;
+  // 真ん中の服の写真。なければ今までの円のまま
+  const centerPath = itemById.get(itemId)?.clothing_images[0]?.image_path;
+  const centerUrl = centerPath ? urlByPath.get(centerPath) : undefined;
+  const centerDiameter = CENTER_RADIUS * 2;
 
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[340px]">
@@ -74,6 +78,28 @@ export async function RelationLines({ itemId }: { itemId: string }) {
         ))}
         <circle r={CENTER_RADIUS} className="fill-primary/20 stroke-primary" strokeWidth={2} />
       </svg>
+
+      {centerUrl && (
+        <div
+          aria-hidden="true"
+          className="absolute overflow-hidden rounded-full border-2 border-primary bg-secondary"
+          style={{
+            width: `${(centerDiameter / SIZE) * 100}%`,
+            height: `${(centerDiameter / SIZE) * 100}%`,
+            left: `${((half - CENTER_RADIUS) / SIZE) * 100}%`,
+            top: `${((half - CENTER_RADIUS) / SIZE) * 100}%`,
+          }}
+        >
+          <Image
+            src={centerUrl}
+            alt=""
+            fill
+            sizes="60px"
+            className="object-cover"
+            style={{ objectFit: "cover" }}
+          />
+        </div>
+      )}
 
       {shown.map((line) => {
         const partner = itemById.get(line.itemId)!;
