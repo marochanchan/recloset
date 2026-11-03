@@ -400,7 +400,7 @@ export function OutfitQuickRecordForm({
 
       <section aria-labelledby="look-note-title" className="flex flex-col gap-2">
         <h2 id="look-note-title" className="text-base font-semibold">
-          メモ（なくてもだいじょうぶです）
+          メモ（任意）
         </h2>
         <Input
           value={note}
