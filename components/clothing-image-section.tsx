@@ -1,6 +1,7 @@
 "use client";
 
 import { ClothingImageThumbnail } from "@/components/clothing-image-thumbnail";
+import { FlatSnapButton } from "@/components/flat-snap-button";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { type useClothingImages } from "@/components/use-clothing-images";
 import { cn } from "@/lib/utils";
@@ -96,6 +97,7 @@ export function ClothingImageSection({
           {isFull ? `写真は${maxImages}枚まで追加済みです` : "写真を追加"}
         </label>
       </div>
+      <FlatSnapButton onChange={handleImagesChange} disabled={isFull} />
 
       {images.length > 0 && (
         <div className="flex flex-wrap gap-3">

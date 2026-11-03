@@ -7,6 +7,7 @@ import {
   DoodleTag,
 } from "@/components/doodle-icons";
 import { EntryModeSelector } from "@/components/entry-mode-selector";
+import { FlatSnapButton } from "@/components/flat-snap-button";
 import { LeaveConfirmDialog } from "@/components/leave-confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -401,6 +402,7 @@ export function PhotoBatchRegisterForm({
               {`写真を追加（${photos.length}/${MAX_PHOTO_BATCH_SIZE}枚）`}
             </Button>
           )}
+          <FlatSnapButton onChange={handleFilesChange} disabled={!canAddMore} />
 
           {/* 変換できなかった写真・枚数の上限は、写真が多くても見えるよう一覧の上に出す */}
           {notices.length > 0 && (
