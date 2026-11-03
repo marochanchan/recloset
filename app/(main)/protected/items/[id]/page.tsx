@@ -21,6 +21,7 @@ import {
   getSubcategoryLabel,
   getStatusLabel,
 } from "@/lib/clothing-options";
+import { itemBackLink, parseUuidParam } from "@/lib/outfits/back-links";
 import { getMarketplaceLinks } from "@/lib/marketplace-urls";
 import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
@@ -211,10 +212,6 @@ async function ClothingItemDetail({
         />
       </div>
 
-      <section className="flex flex-col gap-3">
-        <StatusSelector itemId={item.id} currentStatus={item.status} />
-      </section>
-
       <section aria-labelledby="item-relations-title" className="flex flex-col gap-3">
         <h2 id="item-relations-title" className="text-base font-semibold">
           よく合わせる服
@@ -227,6 +224,10 @@ async function ClothingItemDetail({
         <Button asChild variant="outline" className="w-full">
           <Link href={`/protected/looks/new?item=${item.id}`}>この服で着画を記録</Link>
         </Button>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <StatusSelector itemId={item.id} currentStatus={item.status} />
       </section>
 
       <section aria-labelledby="item-records-title" className="flex flex-col gap-3">
@@ -290,20 +291,36 @@ async function ClothingItemDetail({
   );
 }
 
+async function ItemBackLink({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string | string[] }>;
+}) {
+  const { from } = await searchParams;
+  const back = itemBackLink(parseUuidParam(from));
+  return (
+    <Link
+      href={back.href}
+      className="-ml-1 flex min-h-10 w-fit items-center gap-1 rounded-lg pr-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+      {back.label}
+    </Link>
+  );
+}
+
 export default function ClothingItemDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
 }) {
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-6">
-      <Link
-        href="/protected/items"
-        className="-ml-1 flex min-h-10 w-fit items-center gap-1 rounded-lg pr-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-        クローゼット
-      </Link>
+      <Suspense fallback={<span className="min-h-10" />}>
+        <ItemBackLink searchParams={searchParams} />
+      </Suspense>
 
       <Suspense fallback={<ItemDetailSkeleton />}>
         <ClothingItemDetail params={params} />

@@ -6,7 +6,7 @@ import Link from "next/link";
 
 const SIZE = 340; // 描く範囲の一辺（中心 170）
 const CENTER_RADIUS = 28;
-const EMPTY_COPY = "まだ一緒に着た記録がありません。着画を撮ると、ここに線が伸びます";
+const EMPTY_COPY = "着画を記録すると、ここに線が伸びます";
 
 // よく合わせる服：真ん中の服から、一緒に着た服へ線を伸ばす（回数が多いほど近く・太く・大きく）
 export async function RelationLines({ itemId }: { itemId: string }) {
