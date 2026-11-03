@@ -1,4 +1,5 @@
 import { tryCreateMediaStore } from "@/lib/outfits/media-deps";
+import { DeleteLookButton } from "@/components/delete-look-button";
 import { DoodleHanger } from "@/components/doodle-icons";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
@@ -157,6 +158,10 @@ async function LookDetail({ params }: { params: Promise<{ id: string }> }) {
           </Button>
         )}
       </section>
+
+      <div className="mt-4 border-t border-border/60 pt-4">
+        <DeleteLookButton outfitId={id} />
+      </div>
     </div>
   );
 }

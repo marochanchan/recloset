@@ -240,3 +240,48 @@ export async function confirmOutfitAction(input: {
   }
   return { status, revision };
 }
+
+// 着画を消す（確定済みでも未確定でも）。写真は RPC が削除待ちに入れるので、ここでキューを回して消しにいく
+export async function deleteOutfitAction(input: {
+  outfitId: string;
+}): Promise<{ ok: true } | ErrorResult> {
+  const { supabase, userId } = await getUserId();
+  if (!userId) return { error: NOT_LOGGED_IN_ERROR };
+
+  if (!UUID_PATTERN.test(String(input?.outfitId))) {
+    return { error: INVALID_INPUT_ERROR };
+  }
+
+  // 消すと服とのつながりが分からなくなるので、画面を新しくする服を先に控える
+  const { data: prev } = await supabase
+    .from("outfit_items")
+    .select("item_id")
+    .eq("outfit_id", input.outfitId);
+  const itemIds = (prev ?? []).map((row) => row.item_id as string);
+
+  const { error } = await supabase.rpc("delete_outfit", { p_outfit_id: input.outfitId });
+  if (error) {
+    switch (error.message) {
+      case "outfit_not_found":
+        return { error: "この着画が見つかりませんでした。すでに消えているかもしれません" };
+      default:
+        console.error("deleteOutfitAction: delete_outfit failed", error.code);
+        return { error: GENERIC_ERROR };
+    }
+  }
+
+  for (const path of outfitPathsToRevalidate("confirmed", input.outfitId, [], itemIds)) {
+    revalidatePath(path);
+  }
+
+  // 削除待ちの写真をすぐ消しにいく（失敗しても本筋は止めない。残りは定期の処理が消す）
+  after(async () => {
+    try {
+      const { admin, store } = createOutfitMediaDeps();
+      await processMediaDeletionQueue({ ...createSupabaseDeletionQueueDeps(admin), store });
+    } catch {
+      console.error("deleteOutfitAction: deletion queue run failed");
+    }
+  });
+  return { ok: true };
+}
