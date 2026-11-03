@@ -1,17 +1,23 @@
 "use client";
 
+import { BrandSuggestionChips } from "@/components/brand-suggestion-chips";
 import { SeasonSelector } from "@/components/season-selector";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   buildCategoryUpdate,
+  buildTitleSuggestions,
   classifyProgressReducer,
   getClassifyDoneMessage,
   INITIAL_CLASSIFY_PROGRESS,
   toSeasonsArrayLiteral,
   type ClassifyMode,
 } from "@/lib/clothing-classify";
+import { displayClothingTitle } from "@/lib/clothing-display-title";
 import {
   CATEGORY_OPTIONS,
+  COLOR_OPTIONS,
+  getSubcategoryOptions,
   isSameSeasons,
   normalizeSeasons,
   PHOTO_ONLY_DISPLAY_LABEL,
@@ -25,12 +31,16 @@ import { ChevronLeft } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useReducer, useRef, useState } from "react";
+import { useId, useReducer, useRef, useState } from "react";
 
 // ============================================================
-// クイック仕分け（1着ずつ写真を大きく見せて、カテゴリか季節をタップで選ぶ）
+// クイック仕分け（1着ずつ写真を大きく見せて、カテゴリ・種類・カラー・季節をタップで選ぶ。
+// タイトル・ブランドは入力欄に入れる）
 // - カテゴリ: 7つのボタンのどれかをタップすると保存して次へ
 // - 季節: SeasonSelectorで選んで「保存して次へ」
+// - 種類・カラー: ボタンをタップすると保存して次へ
+// - タイトル・ブランド: 入力欄（カードの外）に入れて「保存して次へ」。入力欄にフォーカスが
+//   ある間はスワイプ（スキップ）を受け付けない
 // - 1着ごとに clothing_items へ保存する。途中でやめても保存した分は残る
 // - 戻る: 前の服を再表示するだけ（保存済みの分類は取り消さない。選び直せば上書き保存）
 // - 左スワイプ＝スキップ。縦スクロールはブラウザに任せる（touch-action: pan-y）
@@ -46,6 +56,11 @@ export type ClassifyItem = {
   category: string;
   subcategory: string | null;
   seasons: SeasonValue[];
+  /** DBのタイトルそのもの（title は画面に出す表示名） */
+  rawTitle: string;
+  categoryClassifiedAt: string | null;
+  mainColor: string | null;
+  brand: string | null;
 };
 
 // これ以上左に動かして離したらスキップする（px）
@@ -60,10 +75,13 @@ const CONFLICT_ERROR =
 export function ClothingClassifySession({
   mode,
   initialItems,
+  brandSuggestions = [],
 }: {
   mode: ClassifyMode;
   /** 仕分ける服（見せる順） */
   initialItems: ClassifyItem[];
+  /** 前に入れたブランド（ブランドのモードだけ渡される） */
+  brandSuggestions?: string[];
 }) {
   const router = useRouter();
   // 保存した値は手元の一覧にも反映する（戻ったときの表示と、次の保存前の確認に使う）
@@ -100,7 +118,23 @@ export function ClothingClassifySession({
 
   const markSaved = (item: ClassifyItem, next: Partial<ClassifyItem>) => {
     setItems((prev) =>
-      prev.map((row) => (row.id === item.id ? { ...row, ...next } : row)),
+      prev.map((row) => {
+        if (row.id !== item.id) return row;
+        const merged = { ...row, ...next };
+        // 種類・タイトルを保存したときは、カードの名前も一覧と同じ表示名にする
+        // （カテゴリ・シーズンのときは今のまま変えない）
+        return mode === "subcategory" || mode === "title"
+          ? {
+              ...merged,
+              title: displayClothingTitle({
+                title: merged.rawTitle,
+                category: merged.category,
+                subcategory: merged.subcategory,
+                categoryClassifiedAt: merged.categoryClassifiedAt,
+              }),
+            }
+          : merged;
+      }),
     );
     dispatch({ type: "saved", itemId: item.id, total });
   };
@@ -170,6 +204,73 @@ export function ClothingClassifySession({
     });
   };
 
+  // 種類 / カラー / ブランド: 開始時（または前回保存時）から変わっていないときだけ上書きする
+  const saveColumn = (
+    column: "subcategory" | "main_color" | "brand",
+    value: string,
+  ) => {
+    const item = current;
+    if (!item) return;
+    const field = column === "main_color" ? "mainColor" : column;
+    const before = item[field];
+    const alreadySaved = progress.savedIds.includes(item.id);
+    void run(async () => {
+      if (alreadySaved && value === before) {
+        markSaved(item, {});
+        return;
+      }
+      let query = createClient()
+        .from("clothing_items")
+        .update({ [column]: value })
+        .eq("id", item.id);
+      query = before === null ? query.is(column, null) : query.eq(column, before);
+      // 種類は、カテゴリが変わっていないことも確かめる
+      if (column === "subcategory") query = query.eq("category", item.category);
+      const { data, error: updateError } = await query.select("id");
+      if (updateError) {
+        console.error(`save classify ${column} error:`, updateError);
+        setError(SAVE_ERROR);
+        return;
+      }
+      if (!data || data.length === 0) {
+        setError(CONFLICT_ERROR);
+        return;
+      }
+      markSaved(item, { [field]: value });
+    });
+  };
+
+  const saveTitle = (rawValue: string) => {
+    const item = current;
+    if (!item) return;
+    const title = rawValue.trim();
+    if (!title) return;
+    const alreadySaved = progress.savedIds.includes(item.id);
+    void run(async () => {
+      if (alreadySaved && title === item.rawTitle) {
+        markSaved(item, {});
+        return;
+      }
+      const { data, error: updateError } = await createClient()
+        .from("clothing_items")
+        .update({ title })
+        .eq("id", item.id)
+        // 開始時（または前回保存時）のタイトルから変わっていないときだけ上書きする
+        .eq("title", item.rawTitle)
+        .select("id");
+      if (updateError) {
+        console.error("save classify title error:", updateError);
+        setError(SAVE_ERROR);
+        return;
+      }
+      if (!data || data.length === 0) {
+        setError(CONFLICT_ERROR);
+        return;
+      }
+      markSaved(item, { rawTitle: title });
+    });
+  };
+
   const goNext = () => {
     if (!current || busyRef.current) return;
     setError(null);
@@ -196,6 +297,8 @@ export function ClothingClassifySession({
     isHorizontal: boolean;
   } | null>(null);
   const [dragX, setDragX] = useState(0);
+  // 入力欄にフォーカスがある間はスワイプを受け付けない（文字の選択の操作と取り合わないように）
+  const textFocusedRef = useRef(false);
 
   const resetDrag = () => {
     dragRef.current = null;
@@ -203,7 +306,7 @@ export function ClothingClassifySession({
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (isBusy || !current) return;
+    if (isBusy || !current || textFocusedRef.current) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     dragRef.current = {
       pointerId: event.pointerId,
@@ -348,7 +451,28 @@ export function ClothingClassifySession({
           disabled={isBusy}
           onSelect={saveCategory}
         />
-      ) : (
+      ) : mode === "subcategory" ? (
+        <OptionChoices
+          labelText="種類をタップ（保存して次へ）"
+          options={getSubcategoryOptions(current.category).map((o) => ({
+            value: o.value,
+            label: o.label,
+          }))}
+          columns="grid-cols-2"
+          selected={isCurrentSaved ? current.subcategory : null}
+          disabled={isBusy}
+          onSelect={(value) => saveColumn("subcategory", value)}
+        />
+      ) : mode === "color" ? (
+        <OptionChoices
+          labelText="メインの色をタップ（保存して次へ）"
+          options={COLOR_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          columns="grid-cols-3"
+          selected={isCurrentSaved ? current.mainColor : null}
+          disabled={isBusy}
+          onSelect={(value) => saveColumn("main_color", value)}
+        />
+      ) : mode === "season" ? (
         <SeasonChoices
           // 服が変わったら選択を作り直す
           key={current.id}
@@ -356,6 +480,24 @@ export function ClothingClassifySession({
           isSaved={isCurrentSaved}
           disabled={isBusy}
           onSave={saveSeasons}
+        />
+      ) : (
+        <TextChoices
+          // 服が変わったら入力欄を作り直す（戻ったときは保存した値を入れる）
+          key={current.id}
+          labelText={mode === "title" ? "タイトル" : "ブランド"}
+          initialValue={
+            isCurrentSaved ? (mode === "title" ? current.rawTitle : (current.brand ?? "")) : ""
+          }
+          isSaved={isCurrentSaved}
+          disabled={isBusy}
+          suggestions={mode === "title" ? buildTitleSuggestions(current) : null}
+          brandSuggestions={mode === "brand" ? brandSuggestions : null}
+          onFocusChange={(focused) => {
+            textFocusedRef.current = focused;
+            if (focused) resetDrag();
+          }}
+          onSave={mode === "title" ? saveTitle : (value) => saveColumn("brand", value.trim())}
         />
       )}
       {error && (
@@ -440,6 +582,123 @@ function CategoryChoices({
   );
 }
 
+function OptionChoices({
+  labelText,
+  options,
+  columns,
+  selected,
+  disabled,
+  onSelect,
+}: {
+  labelText: string;
+  options: { value: string; label: string }[];
+  columns: string;
+  /** 保存済みの値（戻ってきたときに強調する）。未保存ならnull */
+  selected: string | null;
+  disabled: boolean;
+  onSelect: (value: string) => void;
+}) {
+  const labelId = useId();
+  return (
+    <div className="flex flex-col gap-2">
+      <p id={labelId} className="text-sm font-medium">
+        {labelText}
+      </p>
+      <div role="group" aria-labelledby={labelId} className={cn("grid gap-2", columns)}>
+        {options.map((option) => (
+          <Button
+            key={option.value}
+            type="button"
+            variant={selected === option.value ? "default" : "outline"}
+            aria-pressed={selected === option.value}
+            className="min-h-12 px-2"
+            disabled={disabled}
+            onClick={() => onSelect(option.value)}
+          >
+            {option.label}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// タイトル・ブランドの入力。Enter でも「保存して次へ」と同じ動き
+function TextChoices({
+  labelText,
+  initialValue,
+  isSaved,
+  disabled,
+  suggestions,
+  brandSuggestions,
+  onFocusChange,
+  onSave,
+}: {
+  labelText: string;
+  initialValue: string;
+  isSaved: boolean;
+  disabled: boolean;
+  /** タイトルの候補（タイトルのモードだけ） */
+  suggestions: string[] | null;
+  /** 前に入れたブランド（ブランドのモードだけ） */
+  brandSuggestions: string[] | null;
+  onFocusChange: (focused: boolean) => void;
+  onSave: (value: string) => void;
+}) {
+  const [value, setValue] = useState(initialValue);
+  const inputId = useId();
+  const canSave = value.trim().length > 0;
+  return (
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (canSave && !disabled) onSave(value);
+      }}
+    >
+      <label htmlFor={inputId} className="text-sm font-medium">
+        {labelText}
+      </label>
+      <Input
+        id={inputId}
+        type="text"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        onFocus={() => onFocusChange(true)}
+        onBlur={() => onFocusChange(false)}
+        autoComplete="off"
+        enterKeyHint="done"
+      />
+      {suggestions && suggestions.length > 0 && (
+        <div className="flex flex-wrap gap-2" role="group" aria-label="タイトルの候補">
+          {suggestions.map((suggestion) => (
+            <button
+              key={suggestion}
+              type="button"
+              disabled={disabled}
+              onClick={() => setValue(suggestion)}
+              className="inline-flex h-8 items-center rounded-full border bg-background px-3 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+      )}
+      {brandSuggestions && (
+        <BrandSuggestionChips
+          suggestions={brandSuggestions}
+          input={value}
+          onSelect={setValue}
+          disabled={disabled}
+        />
+      )}
+      <Button type="submit" size="lg" className="min-h-12" disabled={disabled || !canSave}>
+        {isSaved ? "選び直して保存" : "保存して次へ"}
+      </Button>
+    </form>
+  );
+}
+
 function SeasonChoices({
   initialSeasons,
   isSaved,
@@ -474,6 +733,15 @@ function SeasonChoices({
     </div>
   );
 }
+
+const CONTINUE_LABELS: Record<ClassifyMode, string> = {
+  category: "カテゴリをもう少し仕分ける",
+  subcategory: "種類をもう少し仕分ける",
+  color: "カラーをもう少し仕分ける",
+  season: "シーズンをもう少し仕分ける",
+  title: "タイトルをもう少し付ける",
+  brand: "ブランドをもう少し入れる",
+};
 
 function ClassifyDone({
   mode,
@@ -512,7 +780,7 @@ function ClassifyDone({
           className="min-h-11"
           onClick={onContinue}
         >
-          {mode === "category" ? "カテゴリをもう少し仕分ける" : "シーズンをもう少し仕分ける"}
+          {CONTINUE_LABELS[mode]}
         </Button>
         <Button asChild variant="ghost" size="sm">
           <Link href="/protected/items/classify">仕分けメニューへ</Link>

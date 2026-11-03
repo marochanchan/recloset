@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  CLASSIFY_MODES,
   CLASSIFY_MODE_LABELS,
   CLASSIFY_STATUSES,
   isClassifyMode,
@@ -22,13 +23,18 @@ import {
 import {
   normalizeSeasons,
 } from "@/lib/clothing-options";
+import { fetchBrandSuggestions } from "@/lib/brand-suggestions-query";
 import { displayClothingTitle } from "@/lib/clothing-display-title";
-import { countUnclassified, unclassifiedFilters } from "@/lib/clothing-unclassified-count";
+import {
+  classifyFetchLimit,
+  countUnclassified,
+  unclassifiedFilters,
+} from "@/lib/clothing-unclassified-count";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
 import type { Metadata } from "next";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Palette, Shapes, Tag, Type } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -41,33 +47,56 @@ type SearchParams = Promise<{ mode?: string | string[]; r?: string | string[] }>
 const firstParam = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
 
+const EMPTY_MESSAGES: Record<ClassifyMode, string> = {
+  category: "カテゴリが未分類の服はありません",
+  subcategory: "種類が未設定の服はありません",
+  color: "カラーが未設定の服はありません",
+  season: "シーズンが未設定の服はありません",
+  title: "タイトルを付ける服はありません",
+  brand: "ブランドが未入力の服はありません",
+};
+
 // ---- モード選択 ----
 async function ClassifyMenu() {
   const supabase = await createClient();
-  const [categoryCount, seasonCount] = await Promise.all([
-    countUnclassified(supabase, "category"),
-    countUnclassified(supabase, "season"),
-  ]);
+  const counts = await Promise.all(
+    CLASSIFY_MODES.map((mode) => countUnclassified(supabase, mode)),
+  );
+  const countByMode = Object.fromEntries(
+    CLASSIFY_MODES.map((mode, i) => [mode, counts[i]]),
+  ) as Record<ClassifyMode, number | null>;
 
-  const modes: {
-    mode: ClassifyMode;
-    count: number | null;
-    description: string;
-    icon: React.ReactNode;
-  }[] = [
-    {
-      mode: "category",
-      count: categoryCount,
+  const details: Record<ClassifyMode, { description: string; icon: React.ReactNode }> = {
+    category: {
       description: "トップス・ボトムスなどを付けます",
       icon: <DoodleHanger size={28} />,
     },
-    {
-      mode: "season",
-      count: seasonCount,
+    subcategory: {
+      description: "シャツ・パンツなどを付けます",
+      icon: <Shapes className="h-6 w-6" aria-hidden="true" />,
+    },
+    color: {
+      description: "メインの色を付けます",
+      icon: <Palette className="h-6 w-6" aria-hidden="true" />,
+    },
+    season: {
       description: "春・夏・秋・冬を付けます",
       icon: <DoodleSunCloud size={28} />,
     },
-  ];
+    title: {
+      description: "服に名前を付けます",
+      icon: <Type className="h-6 w-6" aria-hidden="true" />,
+    },
+    brand: {
+      description: "ブランド名を入れます",
+      icon: <Tag className="h-6 w-6" aria-hidden="true" />,
+    },
+  };
+  const modes = CLASSIFY_MODES.map((mode) => ({
+    mode,
+    count: countByMode[mode],
+    ...details[mode],
+  }));
 
   return (
     <div className="flex flex-col gap-3">
@@ -117,7 +146,7 @@ async function ClassifyMenu() {
 function ClassifyMenuSkeleton() {
   return (
     <div className="flex flex-col gap-3">
-      {[0, 1].map((key) => (
+      {[0, 1, 2, 3, 4, 5].map((key) => (
         <Card key={key} className="flex flex-col gap-3 p-4">
           <Skeleton className="h-5 w-1/2" />
           <Skeleton className="h-4 w-full" />
@@ -134,7 +163,7 @@ async function ClassifyContent({ mode }: { mode: ClassifyMode }) {
   let query = supabase
     .from("clothing_items")
     .select(
-      "id, title, status, category, subcategory, seasons, category_classified_at, created_at, clothing_images(image_path, sort_order)",
+      "id, title, status, category, subcategory, main_color, brand, seasons, category_classified_at, created_at, clothing_images(image_path, sort_order)",
     )
     .in("status", [...CLASSIFY_STATUSES]);
   for (const [column, operator, value] of unclassifiedFilters(mode)) {
@@ -142,7 +171,7 @@ async function ClassifyContent({ mode }: { mode: ClassifyMode }) {
   }
   const { data, error } = await query
     .order("created_at", { ascending: false })
-    .limit(MAX_CLASSIFY_ITEMS);
+    .limit(classifyFetchLimit(mode));
   if (error) throw error;
 
   // DB側の絞り込みに加えて、同じ判定・並び順を純粋関数でも確かめる
@@ -155,6 +184,9 @@ async function ClassifyContent({ mode }: { mode: ClassifyMode }) {
       status: item.status,
       seasons: item.seasons,
       categoryClassifiedAt: item.category_classified_at ?? null,
+      subcategory: item.subcategory ?? null,
+      mainColor: item.main_color ?? null,
+      brand: item.brand ?? null,
       createdAt: item.created_at,
     })),
   );
@@ -164,9 +196,7 @@ async function ClassifyContent({ mode }: { mode: ClassifyMode }) {
       <div className="flex flex-col items-center gap-3 rounded-2xl bg-secondary/60 px-6 py-12 text-center">
         <DoodleBox size={40} className="text-primary/60" />
         <p className="text-sm text-muted-foreground">
-          {mode === "category"
-            ? "カテゴリが未分類の服はありません"
-            : "シーズンが未設定の服はありません"}
+          {EMPTY_MESSAGES[mode]}
         </p>
         <Button asChild variant="outline">
           <Link href="/protected/items/classify">仕分けメニューへ</Link>
@@ -200,6 +230,10 @@ async function ClassifyContent({ mode }: { mode: ClassifyMode }) {
       {
         id,
         // 一覧と同じ表示名（仕分け済みなら種類・カテゴリ名、未分類なら「未仕分け」）
+        rawTitle: item.title,
+        categoryClassifiedAt: item.category_classified_at ?? null,
+        mainColor: item.main_color ?? null,
+        brand: item.brand ?? null,
         title: displayClothingTitle({
           title: item.title,
           category: item.category,
@@ -214,7 +248,16 @@ async function ClassifyContent({ mode }: { mode: ClassifyMode }) {
     ];
   });
 
-  return <ClothingClassifySession mode={mode} initialItems={items} />;
+  // ブランドの候補は、ブランドを入れるモードのときだけ取る
+  const brandSuggestions = mode === "brand" ? await fetchBrandSuggestions(supabase) : [];
+
+  return (
+    <ClothingClassifySession
+      mode={mode}
+      initialItems={items}
+      brandSuggestions={brandSuggestions}
+    />
+  );
 }
 
 async function ClassifyPageContent({
