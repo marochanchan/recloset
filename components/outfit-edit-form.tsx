@@ -34,22 +34,23 @@ export function OutfitEditForm({
   const [message, setMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
+  // 最初の服の一覧。page 側の key（版と服の組み合わせ）が変わると作り直されるので、この間は変わらない
+  const initialRef = useRef(initialItemIds);
 
   // Activity で画面が隠れたとき（詳細へ戻ったとき）に入力を最初の状態へ戻す。
   // 戻ってきたときに「保存しています」や前の選択が残らないようにする（版が変われば page の key で作り直される）
+  // 保存中のロックは、その保存の finally が解除する（ここでは触らない）
   useLayoutEffect(
     () => () => {
-      savingRef.current = false;
-      setIsSaving(false);
       setMessage(null);
-      setSelectedIds(initialItemIds);
+      setSelectedIds(initialRef.current);
     },
-    [initialItemIds],
+    [],
   );
 
   // 今の一覧にある服だけ
   const validIds = selectedIds.filter((id) => items.some((item) => item.id === id));
-  const { changed } = diffItemIds(initialItemIds, validIds);
+  const { changed } = diffItemIds(initialRef.current, validIds);
   const canSave = validIds.length > 0 && !isSaving;
   const detailHref = `/protected/looks/${outfitId}`;
 
