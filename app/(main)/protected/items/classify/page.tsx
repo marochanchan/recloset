@@ -22,6 +22,7 @@ import {
 import {
   normalizeSeasons,
 } from "@/lib/clothing-options";
+import { displayClothingTitle } from "@/lib/clothing-display-title";
 import { countUnclassified, unclassifiedFilters } from "@/lib/clothing-unclassified-count";
 import { getCurrentClaims } from "@/lib/supabase/current-user";
 import { createClient } from "@/lib/supabase/server";
@@ -198,7 +199,13 @@ async function ClassifyContent({ mode }: { mode: ClassifyMode }) {
     return [
       {
         id,
-        title: item.title,
+        // 一覧と同じ表示名（仕分け済みなら種類・カテゴリ名、未分類なら「未仕分け」）
+        title: displayClothingTitle({
+          title: item.title,
+          category: item.category,
+          subcategory: item.subcategory ?? null,
+          categoryClassifiedAt: item.category_classified_at ?? null,
+        }),
         imageUrl: coverPath ? (urlByPath.get(coverPath) ?? null) : null,
         category: item.category,
         subcategory: item.subcategory ?? null,

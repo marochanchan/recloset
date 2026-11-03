@@ -14,7 +14,7 @@ import {
   CATEGORY_OPTIONS,
   isSameSeasons,
   normalizeSeasons,
-  PHOTO_ONLY_TITLE,
+  PHOTO_ONLY_DISPLAY_LABEL,
   toLegacySeason,
   type SeasonValue,
 } from "@/lib/clothing-options";
@@ -332,7 +332,7 @@ export function ClothingClassifySession({
           <p
             className={cn(
               "truncate px-4 py-2",
-              current.title === PHOTO_ONLY_TITLE
+              current.title === PHOTO_ONLY_DISPLAY_LABEL
                 ? "text-sm text-muted-foreground"
                 : "font-medium",
             )}

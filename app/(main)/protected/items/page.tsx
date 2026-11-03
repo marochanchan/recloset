@@ -461,16 +461,25 @@ async function ReviewSuggestions() {
   );
 }
 
-// 未仕分けの服（カテゴリが未分類）があるときだけ、クイック仕分けへの入口を出す。
-// 数えるのはカテゴリ未分類の服だけ（クイック仕分けの画面と同じ条件）。0件・取得失敗は何も出さない
+// 仕分けが残っている服があるときだけ、クイック仕分けへの入口を出す（クイック仕分けの画面と同じ条件）。
+// カテゴリ未分類があればその数を、なければシーズン未設定の数を出す（カテゴリを仕分け終えても
+// シーズンの仕分けへ入れるように）。0件・取得失敗は何も出さない
 async function UnclassifiedEntry() {
   const supabase = await createClient();
-  const count = await countUnclassified(supabase, "category");
-  if (!count) return null;
+  const [categoryCount, seasonCount] = await Promise.all([
+    countUnclassified(supabase, "category"),
+    countUnclassified(supabase, "season"),
+  ]);
+  const label = categoryCount
+    ? `未仕分けが${categoryCount}着`
+    : seasonCount
+      ? `シーズン未設定が${seasonCount}着`
+      : null;
+  if (!label) return null;
   return (
     <Button asChild variant="outline" size="sm" className="h-9 rounded-full px-3">
       <Link href="/protected/items/classify">
-        未仕分けが{count}着
+        {label}
         <ArrowRight aria-hidden="true" />
         仕分ける
       </Link>
