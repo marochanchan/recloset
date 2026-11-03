@@ -75,6 +75,8 @@ async function EditLookContent({ params }: { params: Promise<{ id: string }> }) 
 
   return (
     <OutfitEditForm
+      // 版か服の組み合わせが変わったら作り直す（Activity に残った古い入力を使わない）
+      key={`${outfit.revision}:${[...currentIds].sort().join(",")}`}
       outfitId={outfit.id}
       revision={outfit.revision}
       wornOn={outfit.worn_on}

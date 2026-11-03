@@ -5,7 +5,7 @@ import { OutfitItemPicker, type PickerItem } from "@/components/outfit-item-pick
 import { Button } from "@/components/ui/button";
 import { diffItemIds } from "@/lib/outfits/looks";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 type OutfitEditFormProps = {
   outfitId: string;
@@ -35,6 +35,18 @@ export function OutfitEditForm({
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
 
+  // Activity で画面が隠れたとき（詳細へ戻ったとき）に入力を最初の状態へ戻す。
+  // 戻ってきたときに「保存しています」や前の選択が残らないようにする（版が変われば page の key で作り直される）
+  useLayoutEffect(
+    () => () => {
+      savingRef.current = false;
+      setIsSaving(false);
+      setMessage(null);
+      setSelectedIds(initialItemIds);
+    },
+    [initialItemIds],
+  );
+
   // 今の一覧にある服だけ
   const validIds = selectedIds.filter((id) => items.some((item) => item.id === id));
   const { changed } = diffItemIds(initialItemIds, validIds);
@@ -46,7 +58,6 @@ export function OutfitEditForm({
     savingRef.current = true;
     setIsSaving(true);
     setMessage(null);
-    let navigating = false;
     try {
       const result = await confirmOutfitAction({
         outfitId,
@@ -64,15 +75,13 @@ export function OutfitEditForm({
         return;
       }
       // confirmed / unchanged: 詳細へ戻る（confirmed は Server Action 側で詳細・服・一覧を再取得済み）
-      navigating = true;
       router.push(detailHref);
     } catch {
       setMessage(FAILED_MESSAGE);
     } finally {
-      if (!navigating) {
-        savingRef.current = false;
-        setIsSaving(false);
-      }
+      // 成功でも必ず解除する（画面が Activity に残っても、開き直したとき固まらない）
+      savingRef.current = false;
+      setIsSaving(false);
     }
   };
 
