@@ -31,3 +31,23 @@ export function buildBrandSuggestions(
     .slice(0, limit)
     .map((entry) => entry.spelling);
 }
+
+export const MAX_BRAND_CHIPS = 8;
+
+// 入力欄の下に出す候補チップを選ぶ。
+// 欄が空ならよく使う順の先頭から、文字があれば（大文字・小文字を区別せず）含むものを。
+// 入力と完全に同じものは出さない（それだけなら 0 件）
+export function filterBrandSuggestions(
+  suggestions: ReadonlyArray<string>,
+  input: string,
+  limit = MAX_BRAND_CHIPS,
+): string[] {
+  const query = input.trim().toLowerCase();
+  if (!query) return suggestions.slice(0, limit);
+  return suggestions
+    .filter((s) => {
+      const lower = s.toLowerCase();
+      return lower.includes(query) && lower !== query;
+    })
+    .slice(0, limit);
+}

@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { buildBrandSuggestions, MAX_BRAND_SUGGESTIONS } = await import(
+const { buildBrandSuggestions, filterBrandSuggestions, MAX_BRAND_SUGGESTIONS } = await import(
   "../lib/brand-suggestions.ts"
 );
 
@@ -40,4 +40,28 @@ test("最大30件", () => {
 
 test("何もなければ空の配列", () => {
   assert.deepEqual(buildBrandSuggestions([]), []);
+});
+
+test("filterBrandSuggestions: 欄が空なら先頭から最大8件", () => {
+  const list = Array.from({ length: 12 }, (_, i) => `b${i}`);
+  assert.deepEqual(filterBrandSuggestions(list, ""), list.slice(0, 8));
+  assert.deepEqual(filterBrandSuggestions(list, "   "), list.slice(0, 8));
+});
+
+test("filterBrandSuggestions: 入れた文字を含むものを大文字小文字無視で（並びは保つ）", () => {
+  assert.deepEqual(
+    filterBrandSuggestions(["UNIQLO", "ZARA", "Uni Select", "GU"], "uni"),
+    ["UNIQLO", "Uni Select"],
+  );
+});
+
+test("filterBrandSuggestions: 完全一致だけなら出さない、ほかにあれば残す", () => {
+  assert.deepEqual(filterBrandSuggestions(["ZARA"], "zara"), []);
+  assert.deepEqual(filterBrandSuggestions(["ZARA", "ZARA HOME"], "zara"), ["ZARA HOME"]);
+});
+
+test("filterBrandSuggestions: 絞り込みも最大8件、該当なしは空", () => {
+  const list = Array.from({ length: 12 }, (_, i) => `ab${i}`);
+  assert.equal(filterBrandSuggestions(list, "ab").length, 8);
+  assert.deepEqual(filterBrandSuggestions(list, "xyz"), []);
 });
