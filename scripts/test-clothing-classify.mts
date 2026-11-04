@@ -28,10 +28,17 @@ const {
   isCategoryUnclassified,
   isClassifyMode,
   isSeasonUnclassified,
+  isUnclassifiedFor,
+  CLASSIFY_MODES,
+  CLASSIFY_MODE_LABELS,
+  buildTitleSuggestions,
   MAX_CLASSIFY_ITEMS,
   selectClassifyItems,
   toSeasonsArrayLiteral,
 } = await import("../lib/clothing-classify.ts");
+const { unclassifiedFilters, titleCountFilterSets, classifyFetchLimit } = await import(
+  "../lib/clothing-unclassified-count.ts"
+);
 const { PHOTO_ONLY_CATEGORY, PHOTO_ONLY_TITLE } = await import(
   "../lib/clothing-options.ts"
 );
@@ -43,6 +50,9 @@ const candidate = (overrides: Record<string, unknown> = {}) => ({
   status: "closet",
   seasons: [] as unknown[],
   categoryClassifiedAt: null as string | null,
+  subcategory: null as string | null,
+  mainColor: null as string | null,
+  brand: null as string | null,
   createdAt: "2026-10-01T00:00:00Z",
   ...overrides,
 });
@@ -193,6 +203,9 @@ test("toSeasonsArrayLiteral: 正規化した配列リテラル", () => {
 test("isClassifyMode", () => {
   assert.equal(isClassifyMode("category"), true);
   assert.equal(isClassifyMode("season"), true);
+  for (const mode of ["subcategory", "color", "title", "brand"]) {
+    assert.equal(isClassifyMode(mode), true);
+  }
   assert.equal(isClassifyMode("review"), false);
   assert.equal(isClassifyMode(undefined), false);
 });
@@ -253,4 +266,192 @@ describe("classifyProgressReducer", () => {
 test("getClassifyDoneMessage", () => {
   assert.equal(getClassifyDoneMessage(5), "今日は5着仕分けました。少しずつで大丈夫です。");
   assert.match(getClassifyDoneMessage(0), /仕分けませんでした/);
+});
+
+test("モードの並びと見出し", () => {
+  assert.deepEqual(
+    [...CLASSIFY_MODES],
+    ["category", "subcategory", "color", "season", "title", "brand"],
+  );
+  for (const mode of CLASSIFY_MODES) {
+    assert.ok(CLASSIFY_MODE_LABELS[mode]);
+  }
+});
+
+describe("isUnclassifiedFor", () => {
+  test("category / season は今までと同じ判定", () => {
+    assert.equal(isUnclassifiedFor("category", candidate()), true);
+    assert.equal(isUnclassifiedFor("category", candidate({ category: "tops" })), false);
+    assert.equal(isUnclassifiedFor("season", candidate()), true);
+    assert.equal(isUnclassifiedFor("season", candidate({ seasons: ["summer"] })), false);
+  });
+
+  test("subcategory: 種類が null で、カテゴリに種類がある服だけ", () => {
+    assert.equal(isUnclassifiedFor("subcategory", candidate({ category: "tops" })), true);
+    assert.equal(isUnclassifiedFor("subcategory", candidate({ category: "outer" })), true);
+    assert.equal(
+      isUnclassifiedFor("subcategory", candidate({ category: "tops", subcategory: "knit" })),
+      false,
+    );
+    // 種類のないカテゴリ（shoes・bag・other）は対象外
+    for (const category of ["shoes", "bag", "other"]) {
+      assert.equal(isUnclassifiedFor("subcategory", candidate({ category })), false);
+    }
+  });
+
+  test("color: main_color が null の服", () => {
+    assert.equal(isUnclassifiedFor("color", candidate()), true);
+    assert.equal(isUnclassifiedFor("color", candidate({ mainColor: "white" })), false);
+  });
+
+  test("brand: brand が null の服", () => {
+    assert.equal(isUnclassifiedFor("brand", candidate()), true);
+    assert.equal(isUnclassifiedFor("brand", candidate({ brand: "UNIQLO" })), false);
+  });
+
+  test("title: 仮タイトルで、カテゴリが未分類でない服だけ", () => {
+    // カテゴリ未分類（other・日時なし）は外す
+    assert.equal(isUnclassifiedFor("title", candidate()), false);
+    assert.equal(isUnclassifiedFor("title", candidate({ category: "tops" })), true);
+    assert.equal(
+      isUnclassifiedFor("title", candidate({ categoryClassifiedAt: "2026-10-15T00:00:00Z" })),
+      true,
+    );
+    assert.equal(isUnclassifiedFor("title", candidate({ category: "tops", title: "白シャツ" })), false);
+  });
+});
+
+describe("selectClassifyItems（追加モード）", () => {
+  test("title: カテゴリ未分類を外して新しい順に選ぶ", () => {
+    const ids = selectClassifyItems("title", [
+      candidate({ id: "unsorted", createdAt: "2026-10-09T00:00:00Z" }),
+      candidate({ id: "a", category: "tops", createdAt: "2026-10-01T00:00:00Z" }),
+      candidate({ id: "b", category: "bag", createdAt: "2026-10-02T00:00:00Z" }),
+    ]);
+    assert.deepEqual(ids, ["b", "a"]);
+  });
+
+  test("subcategory / color / brand", () => {
+    const items = [
+      candidate({ id: "x", category: "tops" }),
+      candidate({ id: "y", category: "shoes", mainColor: "black", brand: "A" }),
+    ];
+    assert.deepEqual(selectClassifyItems("subcategory", items), ["x"]);
+    assert.deepEqual(selectClassifyItems("color", items), ["x"]);
+    assert.deepEqual(selectClassifyItems("brand", items), ["x"]);
+  });
+
+  test("title は10着に絞る", () => {
+    const items = Array.from({ length: 15 }, (_, i) =>
+      candidate({ id: `t-${String(i).padStart(2, "0")}`, category: "tops" }),
+    );
+    assert.equal(selectClassifyItems("title", items).length, MAX_CLASSIFY_ITEMS);
+  });
+});
+
+describe("unclassifiedFilters（6モード）", () => {
+  test("既存の category / season は変えない", () => {
+    assert.deepEqual(unclassifiedFilters("category"), [
+      ["title", "eq", PHOTO_ONLY_TITLE],
+      ["category", "eq", PHOTO_ONLY_CATEGORY],
+      ["category_classified_at", "is", "null"],
+    ]);
+    assert.deepEqual(unclassifiedFilters("season"), [["seasons", "eq", "{}"]]);
+  });
+
+  test("subcategory: 種類が null かつ種類のあるカテゴリ", () => {
+    assert.deepEqual(unclassifiedFilters("subcategory"), [
+      ["subcategory", "is", "null"],
+      ["category", "in", "(tops,bottoms,dress,outer)"],
+    ]);
+  });
+
+  test("color / brand / title", () => {
+    assert.deepEqual(unclassifiedFilters("color"), [["main_color", "is", "null"]]);
+    assert.deepEqual(unclassifiedFilters("brand"), [["brand", "is", "null"]]);
+    assert.deepEqual(unclassifiedFilters("title"), [["title", "eq", PHOTO_ONLY_TITLE]]);
+  });
+
+  test("title の件数は2つの条件の合計（or を使わない）", () => {
+    assert.deepEqual(titleCountFilterSets(), [
+      [
+        ["title", "eq", PHOTO_ONLY_TITLE],
+        ["category", "neq", PHOTO_ONLY_CATEGORY],
+      ],
+      [
+        ["title", "eq", PHOTO_ONLY_TITLE],
+        ["category", "eq", PHOTO_ONLY_CATEGORY],
+        ["category_classified_at", "not.is", "null"],
+      ],
+    ]);
+  });
+
+  test("取得件数: title は多め、ほかは10着", () => {
+    assert.equal(classifyFetchLimit("title"), 100);
+    assert.equal(classifyFetchLimit("color"), MAX_CLASSIFY_ITEMS);
+  });
+});
+
+describe("buildTitleSuggestions", () => {
+  const base = { category: "tops", subcategory: null, mainColor: null, brand: null };
+
+  test("カラー・ブランド・種類の3件", () => {
+    assert.deepEqual(
+      buildTitleSuggestions({
+        category: "tops",
+        subcategory: "shirt_blouse",
+        mainColor: "white",
+        brand: "UNIQLO",
+      }),
+      ["白のシャツ・ブラウス", "UNIQLO のシャツ・ブラウス", "シャツ・ブラウス"],
+    );
+  });
+
+  test("種類がなければカテゴリの表示名を使う", () => {
+    assert.deepEqual(
+      buildTitleSuggestions({ ...base, category: "bottoms", mainColor: "black" }),
+      ["黒のボトムス", "ボトムス"],
+    );
+  });
+
+  test("ブランドだけ・何もない", () => {
+    assert.deepEqual(buildTitleSuggestions({ ...base, brand: " UNIQLO " }), [
+      "UNIQLO のトップス",
+      "トップス",
+    ]);
+    assert.deepEqual(buildTitleSuggestions(base), ["トップス"]);
+  });
+
+  test("マルチカラーはそのまま使い、「その他」の色は作らない", () => {
+    assert.deepEqual(
+      buildTitleSuggestions({ ...base, category: "dress", subcategory: "dress", mainColor: "multi" }),
+      ["マルチカラーのワンピース", "ワンピース"],
+    );
+    assert.deepEqual(buildTitleSuggestions({ ...base, mainColor: "other" }), ["トップス"]);
+  });
+
+  test("カテゴリ other で種類もなければ候補なし", () => {
+    assert.deepEqual(
+      buildTitleSuggestions({ category: "other", subcategory: null, mainColor: "white", brand: "A" }),
+      [],
+    );
+  });
+
+  test("種類「その他」はカテゴリ名に落とす", () => {
+    assert.deepEqual(
+      buildTitleSuggestions({ ...base, subcategory: "other" }),
+      ["トップス"],
+    );
+  });
+
+  test("最大3件・重なりなし", () => {
+    const list = buildTitleSuggestions({
+      category: "tops",
+      subcategory: "knit",
+      mainColor: "white",
+      brand: "ニット",
+    });
+    assert.ok(list.length <= 3);
+    assert.equal(new Set(list).size, list.length);
+  });
 });
