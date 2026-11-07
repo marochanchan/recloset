@@ -1,0 +1,12 @@
+{
+  "appId": "com.marochanchan.recloset",
+  "appName": "Re:Closet",
+  "webDir": "www",
+  "server": {
+    "url": "https://recloset-sable.vercel.app",
+    "cleartext": false
+  },
+  "ios": {
+    "contentInset": "never"
+  }
+}
