@@ -26,7 +26,7 @@ export interface MediaStore {
   signedStreamUrls(
     assetId: string,
     now: Date,
-  ): { manifestUrl: string; thumbnailUrl: string; previewGifUrl: string };
+  ): { manifestUrl: string; thumbnailUrl: string; previewGifUrl: string; iframeUrl: string };
 }
 
 // Stream の状態の対応。ポーリング・完了の知らせ・webhook のすべてでこれを使う

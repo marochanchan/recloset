@@ -1,24 +1,30 @@
 "use client";
 
 import {
+  addOutfitMediaUpload,
   completeOutfitMedia,
   confirmOutfitAction,
   retryOutfitMedia,
   startOutfitPhotoUpload,
 } from "@/app/(main)/protected/looks/actions";
 import { OutfitCameraCapture } from "@/components/outfit-camera-capture";
+import { OutfitClipPicker } from "@/components/outfit-clip-picker";
 import { OutfitItemPicker, type PickerItem } from "@/components/outfit-item-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { CaptureClip } from "@/lib/camera/capture-controller";
 import {
   ImageProcessingError,
+  type ImageRotation,
   processImageForOutfitUpload,
   type ProcessedImage,
 } from "@/lib/image-processing";
+import type { PickedFrame } from "@/lib/outfits/clip-frames";
+import { planMediaUploads } from "@/lib/outfits/upload-plan";
 import { rotateStaged, stagePhoto, type StagedPhoto } from "@/lib/outfits/photo-rotation";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type OutfitQuickRecordFormProps = {
   items: PickerItem[];
@@ -32,6 +38,7 @@ type UploadPhase = "idle" | "processing" | "uploading" | "failed" | "done";
 
 const CONFIRM_FAILED_MESSAGE = "うまく進められませんでした。時間をおいて、もう一度お試しください";
 const UPLOAD_FAILED_MESSAGE = "写真を送れませんでした。もう一度送ってみてください";
+const VIDEO_FAILED_MESSAGE = "動画を送れませんでした";
 
 // 写真を1枚選ぶ → 送る → 服を選ぶ → 確定、の細い1本の流れ
 export function OutfitQuickRecordForm({
@@ -73,6 +80,22 @@ export function OutfitQuickRecordForm({
   const [isConfirming, setIsConfirming] = useState(false);
   // 増やすと撮影の部品が作り直される（カウントダウンも確認中の写真もやめる）
   const [cameraKey, setCameraKey] = useState(0);
+  // 撮り直しのとき、撮影の部品を開いてすぐカメラを起こす
+  const [autoStartCamera, setAutoStartCamera] = useState(false);
+
+  // 動画モード：録った動画は、確定・リセット・撮り直しまでフォームが持つ。
+  // 選んだコマの送信は「確定」のときだけ（コマ選びの途中で下書きを作らない）
+  const [clip, setClip] = useState<{ clip: CaptureClip; rotation: ImageRotation } | null>(null);
+  const [frames, setFrames] = useState<PickedFrame<ProcessedImage>[]>([]);
+  const [keepVideo, setKeepVideo] = useState(true);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [sendStatus, setSendStatus] = useState<string | null>(null);
+  const [frameUrls, setFrameUrls] = useState<Record<string, string>>({});
+  // 送信の再開用：コマごとの mediaId（コマの id）、動画の mediaId、送り終えたもの
+  const videoMediaIdRef = useRef<string | null>(null);
+  const doneMediaRef = useRef<Set<string>>(new Set());
+  const videoDoneRef = useRef(false);
+  const videoFailedRef = useRef(false);
 
   // Activity で隠れると effect の後始末が走り、また表示されると作り直される。
   // 作った URL をその場で解放するので、戻ってきたときも新しい URL で表示できる
@@ -96,12 +119,35 @@ export function OutfitQuickRecordForm({
     return () => URL.revokeObjectURL(url);
   }, [stagedBlob]);
 
+  // 決定したコマの表示（picker を閉じているあいだの横並び）
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    for (const f of frames) next[f.id] = URL.createObjectURL(f.image.blob);
+    setFrameUrls(next);
+    return () => {
+      for (const u of Object.values(next)) URL.revokeObjectURL(u);
+    };
+  }, [frames]);
+
   // 選んでいる服のうち、今の一覧にあるものだけ（消えた服は外れる）
   const validSelectedIds = selectedIds.filter((id) => items.some((item) => item.id === id));
   const entryItemIds = () =>
     preselectedItemId && items.some((item) => item.id === preselectedItemId)
       ? [preselectedItemId]
       : [];
+
+  // 動画・選んだコマ・送信の進み具合を全部捨てる
+  const discardClip = () => {
+    setClip(null);
+    setFrames([]);
+    setKeepVideo(true);
+    setPickerOpen(false);
+    setSendStatus(null);
+    videoMediaIdRef.current = null;
+    doneMediaRef.current = new Set();
+    videoDoneRef.current = false;
+    videoFailedRef.current = false;
+  };
 
   // 確定のあとは新しい入力に戻す。キャッシュされた画面（Activity）に戻ったときに、
   // 「確定しています」のままや前の写真が残らないようにする（previewUrl を消すと、古い blob も解放される）
@@ -120,6 +166,8 @@ export function OutfitQuickRecordForm({
     setNote("");
     setMessage(null);
     setIsConfirming(false);
+    discardClip();
+    setAutoStartCamera(false);
     setCameraKey((k) => k + 1);
   };
 
@@ -196,9 +244,44 @@ export function OutfitQuickRecordForm({
     await start(mediaId, image);
   };
 
+  // 動画を録り終えた。写真1枚の流れの下書きは使わないので捨てて、コマ選びを開く
+  const handleClip = useCallback((next: CaptureClip, rotation: ImageRotation) => {
+    clientRequestIdRef.current = crypto.randomUUID();
+    startedMediaIdRef.current = null;
+    mediaIdRef.current = null;
+    processedRef.current = null;
+    setOutfitId(null);
+    setPhase("idle");
+    setPreviewBlob(null);
+    setStaged(null);
+    setMessage(null);
+    setFrames([]);
+    setKeepVideo(true);
+    setSendStatus(null);
+    videoMediaIdRef.current = crypto.randomUUID();
+    doneMediaRef.current = new Set();
+    videoDoneRef.current = false;
+    videoFailedRef.current = false;
+    setAutoStartCamera(false);
+    setClip({ clip: next, rotation });
+    setPickerOpen(true);
+  }, []);
+
+  // 動画と選んだコマを全部捨てて、カメラに戻る
+  const handleRetakeClip = () => {
+    if (isConfirmingRef.current) return;
+    discardClip();
+    setOutfitId(null);
+    clientRequestIdRef.current = crypto.randomUUID();
+    setAutoStartCamera(true);
+    setCameraKey((k) => k + 1);
+  };
+
   const handleCameraPhoto = (image: ProcessedImage) => {
     if (isConfirmingRef.current || phase === "processing" || phase === "uploading") return;
     setMessage(null);
+    discardClip();
+    setAutoStartCamera(false);
     // カメラの確認はここで閉じ、送る前の確認（向きを回せる）に渡す
     setCameraKey((k) => k + 1);
     setStaged({ ...stagePhoto<Blob>(image.blob), image });
@@ -212,6 +295,7 @@ export function OutfitQuickRecordForm({
     try {
       const image = await processImageForOutfitUpload(staging.source, staging.rotation);
       setStaged({ ...staging, image });
+      discardClip(); // 写真1枚の流れに切り替える
     } catch (error) {
       setMessage(
         error instanceof ImageProcessingError
@@ -239,6 +323,7 @@ export function OutfitQuickRecordForm({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file || isConfirmingRef.current) return;
+    setAutoStartCamera(false);
     setCameraKey((k) => k + 1);
 
     // 処理に失敗したら、できあがっている下書きや確認中の写真はそのまま残す
@@ -266,16 +351,13 @@ export function OutfitQuickRecordForm({
     await upload(retried.uploadUrl, mediaId, image);
   };
 
-  const handleConfirm = async () => {
-    if (isConfirmingRef.current) return;
-    if (!outfitId || phase !== "done" || validSelectedIds.length === 0) return;
-    isConfirmingRef.current = true;
-    setIsConfirming(true);
-    setMessage(null);
+  // 確定の呼び出しと、そのあとの移動（写真1枚の流れも動画の流れも共通）。
+  // 呼ぶ前に isConfirming を立てておく。移動しない結果のときは、ここで解除する
+  const runConfirm = async (targetOutfitId: string, notice: string | null) => {
     let navigating = false;
     try {
       const result = await confirmOutfitAction({
-        outfitId,
+        outfitId: targetOutfitId,
         expectedRevision: 0,
         wornOn,
         itemIds: validSelectedIds,
@@ -286,9 +368,13 @@ export function OutfitQuickRecordForm({
         return;
       }
       navigating = true;
-      const target = `/protected/looks/${outfitId}`;
-      if (result.status === "stale") {
-        setMessage("ほかの画面で先に変更されました。最新の内容を表示します");
+      const target = `/protected/looks/${targetOutfitId}`;
+      if (result.status === "stale" || notice) {
+        setMessage(
+          result.status === "stale"
+            ? "ほかの画面で先に変更されました。最新の内容を表示します"
+            : notice,
+        );
         // 操作はロックしたまま少し見せてから、リセットして移動する
         setTimeout(() => {
           resetForm();
@@ -308,7 +394,138 @@ export function OutfitQuickRecordForm({
     }
   };
 
-  const canConfirm = !staged && phase === "done" && validSelectedIds.length > 0 && !isConfirming;
+  const handleConfirm = async () => {
+    if (isConfirmingRef.current) return;
+    if (!outfitId || phase !== "done" || validSelectedIds.length === 0) return;
+    isConfirmingRef.current = true;
+    setIsConfirming(true);
+    setMessage(null);
+    await runConfirm(outfitId, null);
+  };
+
+  // 1つ送る：アップロード URL をもらう → 送る → 完了。失敗したら、画面に出す文を返す（成功は null）。
+  // 同じ mediaId で何度呼んでもよい（サーバーが送り直しに回す）
+  const sendOne = async (input: {
+    kind: "photo" | "video";
+    mediaId: string;
+    blob: Blob;
+    filename: string;
+    size?: { width: number; height: number };
+    request: () => Promise<{ mediaId: string; uploadUrl: string | null } | { error: string }>;
+  }): Promise<string | null> => {
+    try {
+      const started = await input.request();
+      if ("error" in started) return started.error;
+      if (started.uploadUrl) {
+        const formData = new FormData();
+        formData.append("file", input.blob, input.filename);
+        const response = await fetch(started.uploadUrl, { method: "POST", body: formData });
+        if (!response.ok) return input.kind === "photo" ? UPLOAD_FAILED_MESSAGE : VIDEO_FAILED_MESSAGE;
+      }
+      const done = await completeOutfitMedia({
+        mediaId: input.mediaId,
+        ...(input.size ? input.size : {}),
+      });
+      if ("error" in done) return done.error;
+      return null;
+    } catch {
+      return input.kind === "photo" ? UPLOAD_FAILED_MESSAGE : VIDEO_FAILED_MESSAGE;
+    }
+  };
+
+  // 動画モードの確定：選んだ写真と動画をここで送ってから、確定する。
+  // 写真が失敗したら止める（もう一度押すと、送り終えたものを飛ばして続きから）。
+  // 動画が失敗しても、写真と記録は確定する
+  const handleConfirmWithClip = async () => {
+    if (isConfirmingRef.current) return;
+    if (!clip || pickerOpen || frames.length === 0 || validSelectedIds.length === 0) return;
+    isConfirmingRef.current = true;
+    setIsConfirming(true);
+    setMessage(null);
+
+    const plan = planMediaUploads({ photoCount: frames.length, keepVideo });
+    let draftId = outfitId;
+    for (const step of plan) {
+      if (step.kind === "photo") {
+        const frame = frames[step.photoIndex as number];
+        if (doneMediaRef.current.has(frame.id)) continue;
+        setSendStatus(`写真を送っています ${(step.photoIndex as number) + 1}/${frames.length}`);
+        const error = await sendOne({
+          kind: "photo",
+          mediaId: frame.id,
+          blob: frame.image.blob,
+          filename: "outfit.jpg",
+          size: { width: frame.image.width, height: frame.image.height },
+          request: async () => {
+            if (step.createsDraft) {
+              const started = await startOutfitPhotoUpload({
+                clientRequestId: clientRequestIdRef.current,
+                mediaId: frame.id,
+                wornOn,
+              });
+              if ("error" in started) return started;
+              draftId = started.outfitId;
+              setOutfitId(started.outfitId);
+              return { mediaId: started.mediaId, uploadUrl: started.uploadUrl };
+            }
+            return addOutfitMediaUpload({
+              outfitId: draftId as string,
+              mediaId: frame.id,
+              kind: "photo",
+              sortOrder: step.sortOrder,
+            });
+          },
+        });
+        if (error) {
+          setMessage(error);
+          setSendStatus(null);
+          isConfirmingRef.current = false;
+          setIsConfirming(false);
+          return;
+        }
+        doneMediaRef.current.add(frame.id);
+      } else if (!videoDoneRef.current) {
+        const videoMediaId = videoMediaIdRef.current as string;
+        setSendStatus("動画を送っています");
+        const error = await sendOne({
+          kind: "video",
+          mediaId: videoMediaId,
+          blob: clip.clip.blob,
+          filename: clip.clip.blob.type.includes("mp4") ? "outfit.mp4" : "outfit.webm",
+          request: () =>
+            addOutfitMediaUpload({
+              outfitId: draftId as string,
+              mediaId: videoMediaId,
+              kind: "video",
+              sortOrder: step.sortOrder,
+            }),
+        });
+        if (error) videoFailedRef.current = true;
+        else videoDoneRef.current = true;
+      }
+    }
+    setSendStatus(null);
+    if (!draftId) {
+      setMessage(UPLOAD_FAILED_MESSAGE);
+      isConfirmingRef.current = false;
+      setIsConfirming(false);
+      return;
+    }
+    await runConfirm(
+      draftId,
+      videoFailedRef.current && !videoDoneRef.current
+        ? "動画は送れませんでした。写真と記録は保存しました"
+        : null,
+    );
+  };
+
+  // 動画モード：コマを決めてあり、服を選んであれば確定できる（送るのは確定のとき）。
+  // 下書きができたあと（送信を始めたあと）は、コマの選び直しを止める（使われない写真が下書きに残らないように）
+  const videoMode = clip !== null;
+  const videoLocked = videoMode && outfitId !== null;
+  const canConfirm = videoMode
+    ? !pickerOpen && frames.length > 0 && validSelectedIds.length > 0 && !isConfirming
+    : !staged && phase === "done" && validSelectedIds.length > 0 && !isConfirming;
 
   return (
     <div className="flex flex-col gap-6">
@@ -316,7 +533,7 @@ export function OutfitQuickRecordForm({
         <h2 id="look-photo-title" className="text-base font-semibold">
           1. 写真を選ぶ
         </h2>
-        {(stagedUrl ?? previewUrl) && (
+        {!videoMode && (stagedUrl ?? previewUrl) && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={(stagedUrl ?? previewUrl) as string}
@@ -343,19 +560,80 @@ export function OutfitQuickRecordForm({
             </Button>
           </div>
         )}
-        <Button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isConfirming || phase === "processing" || phase === "uploading"}
-          className="w-fit"
-        >
-          写真を選ぶ
-        </Button>
-        <OutfitCameraCapture
-          key={cameraKey}
-          disabled={isConfirming || phase === "processing" || phase === "uploading"}
-          onPhoto={handleCameraPhoto}
-        />
+        {videoMode && clip && pickerOpen && (
+          <OutfitClipPicker
+            clip={clip.clip}
+            rotation={clip.rotation}
+            frames={frames}
+            onFramesChange={setFrames}
+            keepVideo={keepVideo}
+            onKeepVideoChange={setKeepVideo}
+            disabled={isConfirming}
+            onDecide={() => setPickerOpen(false)}
+            onRetake={handleRetakeClip}
+          />
+        )}
+        {videoMode && !pickerOpen && (
+          <div className="flex flex-col gap-3">
+            <ul className="flex gap-2 overflow-x-auto pb-1" aria-label="選んだ写真">
+              {frames.map((f, index) => (
+                <li key={f.id} className="relative shrink-0">
+                  {frameUrls[f.id] && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={frameUrls[f.id]}
+                      alt={`選んだ写真 ${index + 1}`}
+                      className="h-28 w-auto rounded-xl bg-photo object-contain"
+                    />
+                  )}
+                </li>
+              ))}
+              {keepVideo && (
+                <li className="flex h-28 w-20 shrink-0 items-center justify-center rounded-xl bg-secondary text-sm text-muted-foreground">
+                  動画
+                </li>
+              )}
+            </ul>
+            <p className="text-sm text-muted-foreground">
+              写真 {frames.length}枚{keepVideo ? "と動画" : ""}を、確定のときに送ります
+            </p>
+            {!videoLocked && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-fit"
+                onClick={() => setPickerOpen(true)}
+                disabled={isConfirming}
+              >
+                動画に戻って選び直す
+              </Button>
+            )}
+          </div>
+        )}
+        {sendStatus && (
+          <p className="text-sm text-muted-foreground" role="status">
+            {sendStatus}
+          </p>
+        )}
+        {!pickerOpen && (
+          <Button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isConfirming || phase === "processing" || phase === "uploading"}
+            className="w-fit"
+          >
+            写真を選ぶ
+          </Button>
+        )}
+        <div className={videoMode ? "hidden" : undefined}>
+          <OutfitCameraCapture
+            key={cameraKey}
+            disabled={isConfirming || phase === "processing" || phase === "uploading"}
+            onPhoto={handleCameraPhoto}
+            onClip={handleClip}
+            autoStart={autoStartCamera}
+          />
+        </div>
         <input
           ref={fileInputRef}
           type="file"
@@ -428,12 +706,15 @@ export function OutfitQuickRecordForm({
         </p>
       )}
 
-      <Button type="button" onClick={handleConfirm} disabled={!canConfirm} className="w-full">
+      <Button
+        type="button"
+        onClick={videoMode ? handleConfirmWithClip : handleConfirm}
+        disabled={!canConfirm} className="w-full">
         {isConfirming ? "確定しています" : "確定"}
       </Button>
       {!canConfirm && !isConfirming && (
         <p className="text-xs text-muted-foreground">
-          写真と服を選ぶと確定できます
+          {videoMode ? "コマを決めて、服を選ぶと確定できます" : "写真と服を選ぶと確定できます"}
         </p>
       )}
     </div>

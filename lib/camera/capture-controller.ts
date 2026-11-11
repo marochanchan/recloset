@@ -15,6 +15,7 @@ import {
   type CameraPreferences,
   type PreferenceStorage,
 } from "@/lib/camera/camera-preferences";
+import { ROTATION_AFTER_RECORDING } from "@/lib/camera/clip-rotation";
 import type { CaptureTrigger } from "@/lib/camera/capture-trigger";
 import {
   getNextRotation,
@@ -68,6 +69,8 @@ export type CaptureController = {
   cancelCountdown(): void; // カウントダウン中・録画中に止める
   useFrame(frame: Blob): Promise<void>; // picking で選んだコマを写真にする
   retake(): Promise<void>;
+  // picking の動画と向きを呼び出し側に渡して、カメラを止めて off に戻る（コマ選びは呼び出し側が持つ）。picking 以外は null
+  handOffClip(): { clip: CaptureClip; rotation: ImageRotation } | null;
   keep(): ProcessedImage | null; // 写真を返して off へ。2回目は null
   suspend(): void; // 画面が隠れた。確認中の写真だけ残す
   close(): void; // 全部やめる
@@ -228,7 +231,7 @@ export function createCaptureController(deps: {
     recordAbort = abort;
     showRecording(seconds);
     try {
-      const blob = await current.record(seconds, abort.signal);
+      const blob = await current.record(seconds, abort.signal, state.rotation);
       if (generation !== myGeneration || recordToken !== myToken) return;
       recordAbort = null;
       if (timer !== null) {
@@ -410,6 +413,14 @@ export function createCaptureController(deps: {
         return;
       }
       await openCamera(state.deviceId, true);
+    },
+    handOffClip() {
+      if (state.phase !== "picking" || !state.clip) return null;
+      // 動画は録るときに回してあるので、コマ選びでは回さない（写真の向きが二重にならないように）
+      const handed = { clip: state.clip, rotation: ROTATION_AFTER_RECORDING };
+      stopEverything();
+      setState({ ...INITIAL_STATE });
+      return handed;
     },
     keep() {
       if (state.phase !== "review" || !state.photo) return null;

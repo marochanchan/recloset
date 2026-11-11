@@ -44,12 +44,15 @@ export function buildStreamUrls(input: { customerCode: string; token: string }):
   manifestUrl: string;
   thumbnailUrl: string;
   previewGifUrl: string;
+  iframeUrl: string;
 } {
   const base = `https://customer-${input.customerCode}.cloudflarestream.com/${input.token}`;
   return {
     manifestUrl: `${base}/manifest/video.m3u8`,
     thumbnailUrl: `${base}/thumbnails/thumbnail.jpg?time=1s`,
     previewGifUrl: `${base}/thumbnails/thumbnail.gif?time=0s&duration=3s`,
+    // 埋め込みプレーヤー（署名付きトークンを URL の一部に入れる）
+    iframeUrl: `${base}/iframe`,
   };
 }
 

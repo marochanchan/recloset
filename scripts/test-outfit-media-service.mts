@@ -462,3 +462,58 @@ test("完了・送り直し：webhook の failed のあとに試行が置き換�
     (e) => e instanceof MediaUploadConflictError,
   );
 });
+
+// ---- 詳細画面での状態の照会（webhook が届かなかった動画の回復） ----
+const { refreshPendingMedia } = await import("../lib/outfits/media-service.ts");
+
+const VIDEO = "00000000-0000-4000-8000-0000000000c1";
+async function startVideo() {
+  const s = setup();
+  await startMediaUpload(s.deps, { ...s.startInput, mediaId: VIDEO, kind: "video" });
+  return s;
+}
+
+test("照会：processing の動画が Stream で ready なら ready にして、長さを入れる", async () => {
+  const s = await startVideo();
+  s.store.setState("fake-video-1", { state: "processing" });
+  await completeMediaUpload(s.deps, { userId: USER, mediaId: VIDEO });
+  assert.equal(s.rows.get(VIDEO)?.status, "processing");
+  s.store.setState("fake-video-1", { state: "ready", width: 720, height: 1280, durationSec: 5 });
+  const row = await refreshPendingMedia(s.deps, { userId: USER, mediaId: VIDEO });
+  assert.equal(row?.status, "ready");
+  assert.equal(row?.durationSec, 5);
+});
+
+test("照会：uploading で Stream にまだ届いていなければ何も変えない。failed なら failed", async () => {
+  const s = await startVideo();
+  assert.equal((await refreshPendingMedia(s.deps, { userId: USER, mediaId: VIDEO }))?.status, "uploading");
+  s.store.setState("fake-video-1", { state: "failed" });
+  assert.equal((await refreshPendingMedia(s.deps, { userId: USER, mediaId: VIDEO }))?.status, "failed");
+});
+
+test("照会：ready / failed の行は Stream に問い合わせない。他人・ない行は null", async () => {
+  const s = await startVideo();
+  s.store.setState("fake-video-1", { state: "ready" });
+  await completeMediaUpload(s.deps, { userId: USER, mediaId: VIDEO });
+  let asked = 0;
+  const original = s.store.getAssetState.bind(s.store);
+  s.store.getAssetState = async (p, a) => (asked++, original(p, a));
+  assert.equal((await refreshPendingMedia(s.deps, { userId: USER, mediaId: VIDEO }))?.status, "ready");
+  assert.equal(asked, 0);
+  assert.equal(await refreshPendingMedia(s.deps, { userId: "00000000-0000-4000-8000-0000000000ff", mediaId: VIDEO }), null);
+});
+
+test("照会：確かめているあいだに試行が置き換わったら、エラーにせず最新の行を返す", async () => {
+  const s = await startVideo();
+  s.store.setState("fake-video-1", { state: "processing" });
+  const original = s.store.getAssetState.bind(s.store);
+  s.store.getAssetState = async (p, a) => {
+    const r = await original(p, a);
+    const row = s.rows.get(VIDEO);
+    if (row) row.uploadAttempt += 1; // 別の処理が試行を置き換えた
+    return r;
+  };
+  const row = await refreshPendingMedia(s.deps, { userId: USER, mediaId: VIDEO });
+  assert.equal(row?.status, "uploading");
+  assert.equal(row?.uploadAttempt, 2);
+});

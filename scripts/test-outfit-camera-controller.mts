@@ -924,3 +924,40 @@ test("camera unplugged while picking keeps the clip; retake reopens", async (t) 
   assert.equal(h.controller.getState().phase, "live");
   assert.equal(h.source.openCalls.length, 2);
 });
+
+test("picking: handOffClip returns the clip and rotation, stops the camera, goes off", async (t) => {
+  const h = setup(t);
+  const camera = await h.startPicking();
+  const handed = h.controller.handOffClip();
+  assert.ok(handed);
+  assert.equal(handed.clip.durationSec, 5);
+  assert.equal(handed.rotation, 0);
+  assert.equal(h.controller.getState().phase, "off");
+  assert.equal(h.controller.getState().clip, null);
+  assert.equal(camera.stopped, true);
+  assert.equal(h.controller.handOffClip(), null);
+});
+
+test("handOffClip outside picking returns null and changes nothing", async (t) => {
+  const h = setup(t);
+  await h.startLive();
+  assert.equal(h.controller.handOffClip(), null);
+  assert.equal(h.controller.getState().phase, "live");
+});
+
+test("rotation: record gets the current rotation, and the handed-off clip is not rotated again", async (t) => {
+  const h = setup(t);
+  await h.startLive();
+  h.controller.rotate(); // 90
+  assert.equal(h.controller.getState().rotation, 90);
+  const camera = h.source.opened[h.source.opened.length - 1];
+  const release = camera.holdRecord();
+  h.controller.setMode("video5");
+  h.manual.fire();
+  await h.advanceSeconds(COUNTDOWN_SECONDS);
+  release();
+  await flush();
+  assert.deepEqual(camera.recordRotations, [90]);
+  const handed = h.controller.handOffClip();
+  assert.equal(handed?.rotation, 0); // 録るときに回してあるので、コマ選びでは 0
+});

@@ -1,6 +1,7 @@
 "use server";
 
 import { processMediaDeletionQueue, createSupabaseDeletionQueueDeps } from "@/lib/media/deletion-queue";
+import { addMediaToDraft, isValidCompleteSize, OutfitNotDraftError, parseAddMediaInput } from "@/lib/outfits/add-media";
 import {
   completeMediaUpload,
   MediaNotFoundError,
@@ -104,24 +105,74 @@ export async function startOutfitPhotoUpload(input: {
   }
 }
 
+// 確定前のコーデに、2枚目以降の写真と動画を足す（コマ選びのあと、確定のときに呼ぶ）。
+// 同じ mediaId で2回呼ばれても壊れない（既にあれば送り直しに回る）
+export async function addOutfitMediaUpload(input: {
+  outfitId: string;
+  mediaId: string;
+  kind: "photo" | "video";
+  sortOrder: number;
+}): Promise<{ mediaId: string; uploadUrl: string | null } | ErrorResult> {
+  const { supabase, userId } = await getUserId();
+  if (!userId) return { error: NOT_LOGGED_IN_ERROR };
+
+  const parsed = parseAddMediaInput(input);
+  if (!parsed.ok) return { error: INVALID_INPUT_ERROR };
+
+  let mediaDeps;
+  try {
+    mediaDeps = createOutfitMediaDeps();
+  } catch {
+    console.error("addOutfitMediaUpload: media deps unavailable");
+    return { error: GENERIC_ERROR };
+  }
+
+  try {
+    return await addMediaToDraft(mediaDeps.deps, {
+      ...parsed.value,
+      userId,
+      // 本人の下書きか。outfits は RLS で本人の行しか見えない（他人の ID は「ない」と同じ）。
+      // さらに register_outfit_media も持ち主を確かめる
+      isOwnDraft: async (outfitId) => {
+        const { data, error } = await supabase
+          .from("outfits")
+          .select("id")
+          .eq("id", outfitId)
+          .eq("user_id", userId)
+          .eq("status", "pending")
+          .maybeSingle();
+        if (error) throw error;
+        return data !== null;
+      },
+    });
+  } catch (error) {
+    if (error instanceof OutfitNotDraftError) {
+      return { error: "このコーデには、もう写真や動画を足せません。開き直してください" };
+    }
+    return mapUploadError(error, "addOutfitMediaUpload");
+  }
+}
+
+// width / height は写真のとき必須。動画は Stream が持つ寸法を使うので省いてよい（2つとも省く）。判定は isValidCompleteSize
 export async function completeOutfitMedia(input: {
   mediaId: string;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
 }): Promise<{ ok: true } | ErrorResult> {
   const { userId } = await getUserId();
   if (!userId) return { error: NOT_LOGGED_IN_ERROR };
 
-  if (
-    !UUID_PATTERN.test(String(input?.mediaId)) ||
-    !Number.isInteger(input.width) ||
-    !Number.isInteger(input.height) ||
-    input.width < 1 ||
-    input.height < 1 ||
-    input.width > 20000 ||
-    input.height > 20000
-  ) {
-    return { error: INVALID_INPUT_ERROR };
+  const noSize = input?.width === undefined && input?.height === undefined;
+  if (!UUID_PATTERN.test(String(input?.mediaId))) return { error: INVALID_INPUT_ERROR };
+
+  // 寸法の省略は動画だけ。本人のメディアの種類を見て決める（他人の ID は「見つからない」）
+  try {
+    const { deps } = createOutfitMediaDeps();
+    const row = await deps.db.getMedia(userId, input.mediaId);
+    if (!row) return { error: MEDIA_NOT_FOUND_ERROR };
+    if (!isValidCompleteSize(row.kind, input.width, input.height)) return { error: INVALID_INPUT_ERROR };
+  } catch (error) {
+    return mapUploadError(error, "completeOutfitMedia");
   }
 
   try {
@@ -129,8 +180,7 @@ export async function completeOutfitMedia(input: {
     await completeMediaUpload(deps, {
       userId,
       mediaId: input.mediaId,
-      width: input.width,
-      height: input.height,
+      ...(noSize ? {} : { width: input.width, height: input.height }),
     });
     return { ok: true };
   } catch (error) {

@@ -1,6 +1,8 @@
 // 実物のカメラ（getUserMedia）。流れの判断はここに書かない（controller の仕事）。
 
 import { createReadyGate } from "@/lib/camera/camera-ready-gate";
+import { recordingNeedsRotation, rotatedSize } from "@/lib/camera/clip-rotation";
+import type { ImageRotation } from "@/lib/image-processing";
 import {
   CameraError,
   toCameraError,
@@ -20,6 +22,47 @@ function pickRecordingMimeType(): string | null {
     }
   }
   return null;
+}
+
+// 映像を回して canvas に描き続け、その captureStream を返す。録画の中身を正しい向きにするため。
+// canvas.captureStream が使えなければ null
+function startRotatedStream(
+  source: HTMLVideoElement,
+  rotation: ImageRotation,
+  fps: number,
+): { stream: MediaStream; stop: () => void } | null {
+  const vw = source.videoWidth;
+  const vh = source.videoHeight;
+  if (vw <= 0 || vh <= 0) return null;
+  const canvas = document.createElement("canvas");
+  if (typeof canvas.captureStream !== "function") return null;
+  const size = rotatedSize({ width: vw, height: vh }, rotation);
+  canvas.width = size.width;
+  canvas.height = size.height;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  let stopped = false;
+  let frameRequest = 0;
+  const draw = () => {
+    if (stopped) return;
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.translate(size.width / 2, size.height / 2);
+    context.rotate((rotation * Math.PI) / 180); // 時計回り（写真の回転と同じ）
+    context.drawImage(source, -vw / 2, -vh / 2, vw, vh);
+    frameRequest = requestAnimationFrame(draw);
+  };
+  draw();
+  const stream = canvas.captureStream(fps);
+  return {
+    stream,
+    stop() {
+      stopped = true;
+      cancelAnimationFrame(frameRequest);
+      for (const t of stream.getTracks()) t.stop();
+      canvas.width = 0;
+      canvas.height = 0;
+    },
+  };
 }
 
 function openedCamera(stream: MediaStream, track: MediaStreamTrack): OpenedCamera {
@@ -91,21 +134,30 @@ function openedCamera(stream: MediaStream, track: MediaStreamTrack): OpenedCamer
       }
     },
     canRecord: () => pickRecordingMimeType() !== null,
-    record(seconds, signal) {
+    record(seconds, signal, rotation = 0) {
       const picked = pickRecordingMimeType();
       if (stopped || !picked || track.readyState !== "live" || activeRecorder) {
         return Promise.reject(new CameraError("failed"));
       }
       if (signal?.aborted) return Promise.reject(new CameraError("failed"));
       const mimeType: string = picked;
+      // 回して撮るときは、回した映像を録る。回せない環境では録らない（横倒しの動画を残さない）
+      let rotated: { stream: MediaStream; stop: () => void } | null = null;
+      if (recordingNeedsRotation(rotation)) {
+        const fps = Math.round(track.getSettings().frameRate ?? 30) || 30;
+        rotated = video ? startRotatedStream(video, rotation, fps) : null;
+        if (!rotated) return Promise.reject(new CameraError("failed"));
+      }
+      const recordStream = rotated ? rotated.stream : stream;
       return new Promise<Blob>((resolve, reject) => {
         const chunks: Blob[] = [];
         let finished = false;
         let aborted = false;
         let recorder: MediaRecorder;
         try {
-          recorder = new MediaRecorder(stream, { mimeType });
+          recorder = new MediaRecorder(recordStream, { mimeType });
         } catch {
+          rotated?.stop();
           reject(new CameraError("failed"));
           return;
         }
@@ -125,6 +177,7 @@ function openedCamera(stream: MediaStream, track: MediaStreamTrack): OpenedCamer
           if (finished) return;
           finished = true;
           clearTimeout(timeout);
+          rotated?.stop();
           signal?.removeEventListener("abort", handleAbort);
           if (activeRecorder === recorder) activeRecorder = null;
           if (error || aborted || chunks.length === 0) {
