@@ -11,7 +11,7 @@ const compat = new FlatCompat({
 
 const eslintConfig = [
   // ビルドの出力や作業用の置き場は対象外にする
-  { ignores: [".next/**", ".superpowers/**", "next-env.d.ts"] },
+  { ignores: [".next/**", ".superpowers/**", "next-env.d.ts", "public/mediapipe/**"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
 
