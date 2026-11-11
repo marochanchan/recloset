@@ -61,12 +61,14 @@ function setup(
     stored?: unknown;
     supported?: boolean;
     devices?: CameraDevice[];
+    recordable?: boolean;
   } = {},
 ) {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const source = createFakeCameraSource({
     devices: options.devices ?? DEVICES,
     supported: options.supported,
+    recordable: options.recordable,
   });
   const manual = createManualTrigger();
   let unsubscribeCount = 0;
@@ -144,6 +146,23 @@ function setup(
       manual.fire();
       assert.equal(controller.getState().phase, "countdown");
       return lastCamera();
+    },
+    async startRecording(mode: "video5" | "video8" = "video5") {
+      await controller.start();
+      const camera = lastCamera();
+      const release = camera.holdRecord();
+      controller.setMode(mode);
+      manual.fire();
+      await advanceSeconds(COUNTDOWN_SECONDS);
+      assert.equal(controller.getState().phase, "recording");
+      return { camera, release };
+    },
+    async startPicking() {
+      const { camera, release } = await this.startRecording();
+      release();
+      await flush();
+      assert.equal(controller.getState().phase, "picking");
+      return camera;
     },
     async startReview() {
       const camera = await this.startCountdown();
@@ -731,4 +750,177 @@ test("remembered camera and default both gone: not_found", async (t) => {
   assert.deepEqual(h.source.openCalls, ["cam-a", null]);
   assert.equal(h.controller.getState().phase, "unavailable");
   assert.equal(h.controller.getState().errorReason, "not_found");
+});
+
+// ---- 動画モード ----
+const RECORD_FAILED_MESSAGE = "録画できませんでした。もう一度お試しください";
+
+test("video mode: countdown, recording counts down, then picking with the clip", async (t) => {
+  const h = setup(t);
+  const camera = await h.startLive();
+  const releaseRecord = camera.holdRecord();
+  h.controller.setMode("video8");
+  assert.equal(h.controller.getState().mode, "video8");
+  h.manual.fire();
+  await h.advanceSeconds(COUNTDOWN_SECONDS);
+  assert.equal(h.controller.getState().phase, "recording");
+  assert.deepEqual(camera.recordCalls, [8]);
+  assert.equal(camera.captureCount, 0);
+  assert.equal(h.controller.getState().secondsLeft, 8);
+  await h.advanceSeconds(3);
+  assert.equal(h.controller.getState().secondsLeft, 5);
+  releaseRecord();
+  await flush();
+  const state = h.controller.getState();
+  assert.equal(state.phase, "picking");
+  assert.equal(state.secondsLeft, null);
+  assert.equal(state.clip?.durationSec, 8);
+  assert.equal(state.clip?.blob.type, "video/mp4");
+});
+
+test("picking: useFrame processes the frame and keep returns the photo", async (t) => {
+  const h = setup(t);
+  await h.startPicking();
+  assert.equal(h.controller.getState().phase, "picking");
+  const frame = new Blob(["f"], { type: "image/jpeg" });
+  await h.controller.useFrame(frame);
+  const state = h.controller.getState();
+  assert.equal(state.phase, "review");
+  assert.equal(state.clip, null);
+  assert.equal(h.processCalls.length, 1);
+  assert.equal(h.processCalls[0].frame, frame);
+  const photo = h.controller.keep();
+  assert.ok(photo);
+  assert.equal(h.controller.getState().phase, "off");
+});
+
+test("picking: useFrame failure returns to picking with a message", async (t) => {
+  const h = setup(t);
+  await h.startPicking();
+  h.failProcess();
+  await h.controller.useFrame(new Blob(["f"]));
+  const state = h.controller.getState();
+  assert.equal(state.phase, "picking");
+  assert.equal(state.message, FAILED_MESSAGE);
+  assert.ok(state.clip);
+});
+
+test("picking: retake goes back to live without reopening the camera", async (t) => {
+  const h = setup(t);
+  await h.startPicking();
+  await h.controller.retake();
+  const state = h.controller.getState();
+  assert.equal(state.phase, "live");
+  assert.equal(state.clip, null);
+  assert.equal(h.source.openCalls.length, 1);
+});
+
+test("review after a clip: retake goes back to live", async (t) => {
+  const h = setup(t);
+  await h.startPicking();
+  await h.controller.useFrame(new Blob(["f"]));
+  await h.controller.retake();
+  assert.equal(h.controller.getState().phase, "live");
+  assert.equal(h.source.openCalls.length, 1);
+});
+
+test("recording failure: back to live with a message", async (t) => {
+  const h = setup(t);
+  const camera = await h.startLive();
+  camera.failNextRecord();
+  h.controller.setMode("video5");
+  h.manual.fire();
+  await h.advanceSeconds(COUNTDOWN_SECONDS);
+  const state = h.controller.getState();
+  assert.equal(state.phase, "live");
+  assert.equal(state.message, RECORD_FAILED_MESSAGE);
+  assert.equal(state.clip, null);
+});
+
+test("camera unplugged while recording: unavailable (disconnected)", async (t) => {
+  const h = setup(t);
+  const camera = await h.startLive();
+  const releaseRecord = camera.holdRecord();
+  h.controller.setMode("video5");
+  h.manual.fire();
+  await h.advanceSeconds(COUNTDOWN_SECONDS);
+  assert.equal(h.controller.getState().phase, "recording");
+  camera.endNow();
+  assert.equal(h.controller.getState().phase, "unavailable");
+  assert.equal(h.controller.getState().errorReason, "disconnected");
+  releaseRecord();
+  await flush();
+  assert.equal(h.controller.getState().phase, "unavailable");
+});
+
+for (const action of ["suspend", "close"] as const) {
+  test(`${action} while recording drops the result`, async (t) => {
+    const h = setup(t);
+    const { camera, release } = await h.startRecording();
+    h.controller[action]();
+    assert.equal(h.controller.getState().phase, "off");
+    assert.equal(camera.stopped, true);
+    release();
+    await flush();
+    assert.equal(h.controller.getState().phase, "off");
+    assert.equal(h.controller.getState().clip, null);
+  });
+}
+
+test("cancelling during recording: back to live, clip discarded", async (t) => {
+  const h = setup(t);
+  const camera = await h.startLive();
+  const releaseRecord = camera.holdRecord();
+  h.controller.setMode("video5");
+  h.manual.fire();
+  await h.advanceSeconds(COUNTDOWN_SECONDS);
+  h.controller.cancelCountdown();
+  assert.equal(h.controller.getState().phase, "live");
+  assert.equal(h.controller.getState().secondsLeft, null);
+  releaseRecord();
+  await flush();
+  assert.equal(h.controller.getState().phase, "live");
+  assert.equal(h.controller.getState().clip, null);
+  assert.equal(camera.stopped, false);
+  // タイマーも止まっている（時間が進んでも状態は変わらない）
+  await h.advanceSeconds(5);
+  assert.equal(h.controller.getState().phase, "live");
+});
+
+test("a camera that cannot record: video mode is refused", async (t) => {
+  const h = setup(t, { recordable: false });
+  await h.startLive();
+  assert.equal(h.controller.getState().canRecord, false);
+  h.controller.setMode("video5");
+  assert.equal(h.controller.getState().mode, "photo");
+  h.manual.fire();
+  await h.advanceSeconds(COUNTDOWN_SECONDS);
+  assert.equal(h.controller.getState().phase, "review"); // 写真のまま
+});
+
+test("mode defaults to photo and can only change while live", async (t) => {
+  const h = setup(t);
+  h.controller.setMode("video5"); // off のときは無視
+  assert.equal(h.controller.getState().mode, "photo");
+  await h.startLive();
+  assert.equal(h.controller.getState().canRecord, true);
+  h.controller.setMode("video5");
+  assert.equal(h.controller.getState().mode, "video5");
+  h.controller.setMode("photo");
+  assert.equal(h.controller.getState().mode, "photo");
+  h.manual.fire();
+  assert.equal(h.controller.getState().phase, "countdown");
+  h.controller.setMode("video8"); // カウントダウン中は無視
+  assert.equal(h.controller.getState().mode, "photo");
+});
+
+test("camera unplugged while picking keeps the clip; retake reopens", async (t) => {
+  const h = setup(t);
+  const camera = await h.startPicking();
+  camera.endNow();
+  assert.equal(h.controller.getState().phase, "picking");
+  assert.ok(h.controller.getState().clip);
+  await h.controller.retake();
+  assert.equal(h.controller.getState().phase, "live");
+  assert.equal(h.source.openCalls.length, 2);
 });

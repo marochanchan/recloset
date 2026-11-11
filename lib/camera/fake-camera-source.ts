@@ -9,6 +9,9 @@ import {
 export type FakeOpenedCamera = OpenedCamera & {
   stopped: boolean;
   captureCount: number;
+  recordCalls: number[]; // record に渡された秒数
+  failNextRecord(): void;
+  holdRecord(): (error?: unknown) => void; // 次の record を止める。使い方は holdCapture と同じ
   video: HTMLVideoElement | null; // 最後に attach された要素
   endNow(): void;
   failNextCapture(): void;
@@ -34,15 +37,19 @@ type Deferred<T> = ReturnType<typeof deferred<T>>;
 function createFakeCamera(
   deviceId: string,
   readyHold: Deferred<void> | null,
+  recordable: boolean,
 ): FakeOpenedCamera {
   const endedListeners = new Set<() => void>();
   let heldReady: Promise<void> | null = readyHold?.promise ?? null;
   let captureHold: Promise<Blob> | null = null;
   let captureFails = false;
+  let recordHold: Promise<Blob> | null = null;
+  let recordFails = false;
   const camera: FakeOpenedCamera = {
     deviceId,
     stopped: false,
     captureCount: 0,
+    recordCalls: [],
     video: null,
     attach(video) {
       camera.video = video;
@@ -62,6 +69,31 @@ function createFakeCamera(
         return Promise.reject(new CameraError("failed"));
       }
       return Promise.resolve(new Blob(["frame"]));
+    },
+    canRecord: () => recordable,
+    record(seconds, signal) {
+      camera.recordCalls.push(seconds);
+      const aborted = new Promise<never>((_, reject) => {
+        signal?.addEventListener("abort", () => reject(new CameraError("failed")));
+      });
+      if (recordHold) {
+        const held = recordHold;
+        recordHold = null;
+        return Promise.race([held, aborted]);
+      }
+      if (recordFails) {
+        recordFails = false;
+        return Promise.reject(new CameraError("failed"));
+      }
+      return Promise.resolve(new Blob(["clip"], { type: "video/mp4" }));
+    },
+    failNextRecord() {
+      recordFails = true;
+    },
+    holdRecord() {
+      const { promise, settle } = deferred(new Blob(["clip"], { type: "video/mp4" }));
+      recordHold = promise;
+      return settle;
     },
     onEnded(listener) {
       endedListeners.add(listener);
@@ -93,10 +125,11 @@ function createFakeCamera(
 }
 
 export function createFakeCameraSource(
-  options: { devices?: CameraDevice[]; supported?: boolean } = {},
+  options: { devices?: CameraDevice[]; supported?: boolean; recordable?: boolean } = {},
 ) {
   let devices = options.devices ?? DEFAULT_DEVICES;
   const supported = options.supported ?? true;
+  const recordable = options.recordable ?? true;
   const deviceListeners = new Set<() => void>();
   const openFailures: unknown[] = [];
   const openHolds: Deferred<null>[] = [];
@@ -118,6 +151,7 @@ export function createFakeCameraSource(
     const camera = createFakeCamera(
       requested ?? defaultDeviceId(),
       readyHolds.shift() ?? null,
+      recordable,
     );
     source.opened.push(camera);
     return camera;
