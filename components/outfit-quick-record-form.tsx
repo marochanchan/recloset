@@ -21,6 +21,16 @@ import {
   type ProcessedImage,
 } from "@/lib/image-processing";
 import type { PickedFrame } from "@/lib/outfits/clip-frames";
+import {
+  applyBackgroundToImage,
+  BACKGROUND_FAILED_MESSAGE,
+} from "@/lib/outfits/frame-background-browser";
+import {
+  reconcileProcessed,
+  resolveSendImage,
+  type BackgroundMode,
+  type ProcessedMap,
+} from "@/lib/outfits/frame-background";
 import { planMediaUploads } from "@/lib/outfits/upload-plan";
 import { rotateStaged, stagePhoto, type StagedPhoto } from "@/lib/outfits/photo-rotation";
 import { useRouter } from "next/navigation";
@@ -39,6 +49,12 @@ type UploadPhase = "idle" | "processing" | "uploading" | "failed" | "done";
 const CONFIRM_FAILED_MESSAGE = "うまく進められませんでした。時間をおいて、もう一度お試しください";
 const UPLOAD_FAILED_MESSAGE = "写真を送れませんでした。もう一度送ってみてください";
 const VIDEO_FAILED_MESSAGE = "動画を送れませんでした";
+
+const BACKGROUND_OPTIONS: { mode: BackgroundMode; label: string }[] = [
+  { mode: "none", label: "そのまま" },
+  { mode: "blur", label: "ぼかす" },
+  { mode: "white", label: "白" },
+];
 
 // 写真を1枚選ぶ → 送る → 服を選ぶ → 確定、の細い1本の流れ
 export function OutfitQuickRecordForm({
@@ -91,6 +107,10 @@ export function OutfitQuickRecordForm({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [sendStatus, setSendStatus] = useState<string | null>(null);
   const [frameUrls, setFrameUrls] = useState<Record<string, string>>({});
+  // 選んだコマの背景（全部のコマに同じ設定）。処理済みの写真は設定ごとに作り、確定のときはそれを送る
+  const [bgMode, setBgMode] = useState<BackgroundMode>("none");
+  const [bgProcessed, setBgProcessed] = useState<ProcessedMap<ProcessedImage>>({});
+  const bgProcessedRef = useRef<ProcessedMap<ProcessedImage>>({});
   // 送信の再開用：コマごとの mediaId（コマの id）、動画の mediaId、送り終えたもの
   const videoMediaIdRef = useRef<string | null>(null);
   const doneMediaRef = useRef<Set<string>>(new Set());
@@ -119,15 +139,53 @@ export function OutfitQuickRecordForm({
     return () => URL.revokeObjectURL(url);
   }, [stagedBlob]);
 
-  // 決定したコマの表示（picker を閉じているあいだの横並び）
+  // 背景を整える：設定やコマが変わったら、処理済みを整理して、足りない分を1枚ずつ作る。
+  // 1枚ごとに画面へ返すので、6枚でも固まらない。設定やコマがまた変わったら、前の続きはやめる
+  useEffect(() => {
+    if (pickerOpen) return;
+    const frameIds = frames.map((f) => f.id);
+    const { keep, pending } = reconcileProcessed(bgProcessedRef.current, frameIds, bgMode);
+    bgProcessedRef.current = keep;
+    setBgProcessed(keep);
+    if (bgMode === "none" || pending.length === 0) return;
+
+    let cancelled = false;
+    const mode = bgMode;
+    void (async () => {
+      for (const id of pending) {
+        const frame = frames.find((f) => f.id === id);
+        if (!frame) continue;
+        try {
+          const image = await applyBackgroundToImage(frame.image, mode);
+          if (cancelled) return;
+          bgProcessedRef.current = { ...bgProcessedRef.current, [id]: { mode, image } };
+          setBgProcessed(bgProcessedRef.current);
+        } catch (error) {
+          if (cancelled) return;
+          // 失敗したら一言出して「そのまま」に戻す（記録は止めない）
+          setMessage(error instanceof ImageProcessingError ? error.message : BACKGROUND_FAILED_MESSAGE);
+          setBgMode("none");
+          return;
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [frames, bgMode, pickerOpen]);
+
+  // 決定したコマの表示（picker を閉じているあいだの横並び）。背景を整えてあれば、その写真を見せる
   useEffect(() => {
     const next: Record<string, string> = {};
-    for (const f of frames) next[f.id] = URL.createObjectURL(f.image.blob);
+    for (const f of frames) {
+      const shown = resolveSendImage(f.id, f.image, bgProcessed, bgMode) ?? f.image;
+      next[f.id] = URL.createObjectURL(shown.blob);
+    }
     setFrameUrls(next);
     return () => {
       for (const u of Object.values(next)) URL.revokeObjectURL(u);
     };
-  }, [frames]);
+  }, [frames, bgProcessed, bgMode]);
 
   // 選んでいる服のうち、今の一覧にあるものだけ（消えた服は外れる）
   const validSelectedIds = selectedIds.filter((id) => items.some((item) => item.id === id));
@@ -143,6 +201,9 @@ export function OutfitQuickRecordForm({
     setKeepVideo(true);
     setPickerOpen(false);
     setSendStatus(null);
+    setBgMode("none");
+    bgProcessedRef.current = {};
+    setBgProcessed({});
     videoMediaIdRef.current = null;
     doneMediaRef.current = new Set();
     videoDoneRef.current = false;
@@ -258,6 +319,9 @@ export function OutfitQuickRecordForm({
     setFrames([]);
     setKeepVideo(true);
     setSendStatus(null);
+    setBgMode("none");
+    bgProcessedRef.current = {};
+    setBgProcessed({});
     videoMediaIdRef.current = crypto.randomUUID();
     doneMediaRef.current = new Set();
     videoDoneRef.current = false;
@@ -433,12 +497,19 @@ export function OutfitQuickRecordForm({
     }
   };
 
+  // 背景を整え中（今の設定で処理済みでないコマがある）。終わるまで確定しない
+  const bgBusy =
+    bgMode !== "none" &&
+    reconcileProcessed(bgProcessed, frames.map((f) => f.id), bgMode).pending.length > 0;
+
   // 動画モードの確定：選んだ写真と動画をここで送ってから、確定する。
   // 写真が失敗したら止める（もう一度押すと、送り終えたものを飛ばして続きから）。
   // 動画が失敗しても、写真と記録は確定する
   const handleConfirmWithClip = async () => {
     if (isConfirmingRef.current) return;
     if (!clip || pickerOpen || frames.length === 0 || validSelectedIds.length === 0) return;
+    // 背景を整え終わるまで送らない（元の写真は送らない）
+    if (bgBusy) return;
     isConfirmingRef.current = true;
     setIsConfirming(true);
     setMessage(null);
@@ -449,13 +520,21 @@ export function OutfitQuickRecordForm({
       if (step.kind === "photo") {
         const frame = frames[step.photoIndex as number];
         if (doneMediaRef.current.has(frame.id)) continue;
+        const sendImage = resolveSendImage(frame.id, frame.image, bgProcessed, bgMode);
+        if (!sendImage) {
+          setMessage(BACKGROUND_FAILED_MESSAGE);
+          setSendStatus(null);
+          isConfirmingRef.current = false;
+          setIsConfirming(false);
+          return;
+        }
         setSendStatus(`写真を送っています ${(step.photoIndex as number) + 1}/${frames.length}`);
         const error = await sendOne({
           kind: "photo",
           mediaId: frame.id,
-          blob: frame.image.blob,
+          blob: sendImage.blob,
           filename: "outfit.jpg",
-          size: { width: frame.image.width, height: frame.image.height },
+          size: { width: sendImage.width, height: sendImage.height },
           request: async () => {
             if (step.createsDraft) {
               const started = await startOutfitPhotoUpload({
@@ -524,7 +603,7 @@ export function OutfitQuickRecordForm({
   const videoMode = clip !== null;
   const videoLocked = videoMode && outfitId !== null;
   const canConfirm = videoMode
-    ? !pickerOpen && frames.length > 0 && validSelectedIds.length > 0 && !isConfirming
+    ? !pickerOpen && frames.length > 0 && validSelectedIds.length > 0 && !isConfirming && !bgBusy
     : !staged && phase === "done" && validSelectedIds.length > 0 && !isConfirming;
 
   return (
@@ -594,6 +673,31 @@ export function OutfitQuickRecordForm({
                 </li>
               )}
             </ul>
+            <div className="flex flex-col gap-2">
+              <span id="look-bg-label" className="text-sm font-medium">
+                背景
+              </span>
+              <div role="group" aria-labelledby="look-bg-label" className="flex flex-wrap gap-2">
+                {BACKGROUND_OPTIONS.map((option) => (
+                  <Button
+                    key={option.mode}
+                    type="button"
+                    size="sm"
+                    variant={bgMode === option.mode ? "default" : "outline"}
+                    aria-pressed={bgMode === option.mode}
+                    onClick={() => setBgMode(option.mode)}
+                    disabled={isConfirming || videoLocked}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
+              {bgBusy && (
+                <p className="text-sm text-muted-foreground" role="status">
+                  背景を整えています…
+                </p>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">
               写真 {frames.length}枚{keepVideo ? "と動画" : ""}を、確定のときに送ります
             </p>
