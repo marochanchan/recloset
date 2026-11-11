@@ -16,6 +16,7 @@ import {
   removePickedFrame,
   type PickedFrame,
 } from "@/lib/outfits/clip-frames";
+import { createGeneration } from "@/lib/outfits/async-generation";
 import { useEffect, useRef, useState } from "react";
 
 type OutfitClipPickerProps = {
@@ -72,13 +73,15 @@ export function OutfitClipPicker({
   // 追加の処理（切り出し・縮小）は時間がかかる。終わったときの最新の列と、まだ画面にいるかを見る
   const framesRef = useRef(frames);
   framesRef.current = frames;
-  const mountedRef = useRef(true);
+  // 隠れる（Activity）・撮り直す・消えるたびに世代を進め、古い追加の結果は捨てる。
+  // 再び表示されたときは busy を戻す（途中だった追加は世代が古いので無視される）
+  const [generation] = useState(createGeneration);
   useEffect(() => {
-    mountedRef.current = true;
+    setBusy(false);
     return () => {
-      mountedRef.current = false;
+      generation.bump();
     };
-  }, []);
+  }, [generation]);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
 
   // 選んだコマのサムネイル。列が変わるたびに作り直し、前のものは解放する
@@ -150,6 +153,7 @@ export function OutfitClipPicker({
   async function addCurrentFrame() {
     const video = videoRef.current;
     if (!video || busy) return;
+    const myGeneration = generation.current();
     setBusy(true);
     setMessage(null);
     try {
@@ -162,20 +166,21 @@ export function OutfitClipPicker({
       const timeSec = video.currentTime;
       const image = await processImageForOutfitUpload(await frameFromVideo(video), rotation);
       // 処理を待つあいだに画面を離れたら、結果は捨てる。列は終わった時点の最新のものに足す
-      if (!mountedRef.current) return;
+      if (!generation.isCurrent(myGeneration)) return;
       const { list, result } = addPickedFrame(framesRef.current, { id: crypto.randomUUID(), timeSec, image });
       if (result === "added") onFramesChange(list);
       else if (result === "duplicate") setMessage("ほぼ同じ場面はもう選んであります");
       else setMessage(`選べるのは${MAX_PICKED_FRAMES}枚までです`);
     } catch {
-      setMessage("コマを切り出せませんでした。もう一度お試しください");
+      if (generation.isCurrent(myGeneration)) setMessage("コマを切り出せませんでした。もう一度お試しください");
     } finally {
-      if (mountedRef.current) setBusy(false);
+      if (generation.isCurrent(myGeneration)) setBusy(false);
     }
   }
 
   function handleRetake() {
     // 選んだコマも動画も捨てて撮り直す
+    generation.bump();
     onRetake();
   }
 

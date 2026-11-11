@@ -1,4 +1,5 @@
 import { createOutfitMediaDeps, tryCreateMediaStore } from "@/lib/outfits/media-deps";
+import { displayVideoFromRow } from "@/lib/outfits/video-display";
 import { refreshPendingMedia } from "@/lib/outfits/media-service";
 import { DeleteLookButton } from "@/components/delete-look-button";
 import { DoodleHanger } from "@/components/doodle-icons";
@@ -90,12 +91,7 @@ async function LookDetail({ params }: { params: Promise<{ id: string }> }) {
       const { deps } = createOutfitMediaDeps();
       const refreshed = await refreshPendingMedia(deps, { userId, mediaId: pendingVideo.id });
       if (refreshed && refreshed.status !== "uploading") {
-        video = {
-          ...pendingVideo,
-          status: refreshed.status,
-          width: refreshed.width,
-          height: refreshed.height,
-        };
+        video = { ...pendingVideo, ...displayVideoFromRow(refreshed) };
       }
     } catch {
       console.error("look detail: refresh video state failed");

@@ -69,24 +69,11 @@ export async function addMediaToDraft(
   });
 
   // 最初の確認と登録のあいだに、別の画面で確定されたかもしれない（RPC は下書きかどうかを見ない）。
-  // 登録のあとにもう一度確かめ、確定済みなら今作った実体を消して断る。
-  // 完全な直し方は、確定と同じロックの下で RPC が pending を確かめること（migration で、あとで行う）
+  // 登録のあとにもう一度確かめ、確定済みならエラーを返す（アップロード URL は返さない）。
+  // 実体の削除も行の状態の変更もしない：同じ mediaId の新しい試行が成功していると、それを壊すため。
+  // 使われない uploading の行は詳細画面では出さず、期限切れの後始末に任せる。
+  // 完全な直し方は、確定と同じロックの下で RPC が pending を確かめること（あとの migration で行う）
   if (result.uploadUrl !== null && !(await input.isOwnDraft(input.outfitId))) {
-    try {
-      const row = await deps.db.getMedia(input.userId, input.mediaId);
-      if (row) {
-        await deps.store.deleteAsset(row.provider, row.providerAssetId);
-        // 行は残るが、届かない実体のまま「失敗」にして画面には出さない（uploading からは failed にできる）
-        await deps.db.setState({
-          userId: input.userId,
-          mediaId: input.mediaId,
-          expectedUploadAttempt: row.uploadAttempt,
-          status: "failed",
-        });
-      }
-    } catch {
-      // 後始末の失敗で、断るという結果は変えない
-    }
     throw new OutfitNotDraftError();
   }
   return result;

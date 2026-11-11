@@ -181,9 +181,12 @@ test("addMediaToDraft: 写真と動画の upload URL を返し、同じ mediaId 
   assert.equal(rows.size, 1);
 });
 
-test("addMediaToDraft: 登録のあいだに確定されたら、作った実体を消して OutfitNotDraftError（行は failed）", async () => {
+test("addMediaToDraft: 登録のあいだに確定されたら、エラーで URL は返さず、実体の削除も行の変更もしない", async () => {
   const { db, rows } = fakeDb();
   const store = createFakeMediaStore();
+  let deletes = 0;
+  const originalDelete = store.deleteAsset.bind(store);
+  store.deleteAsset = async (p, a) => (deletes++, originalDelete(p, a));
   const deps = { db, store, now: () => new Date("2026-11-11T00:00:00Z") };
   let calls = 0;
   const isOwnDraft = async () => ++calls === 1; // 1回目は下書き、2回目（登録のあと）は確定済み
@@ -192,8 +195,9 @@ test("addMediaToDraft: 登録のあいだに確定されたら、作った実体
     OutfitNotDraftError,
   );
   assert.equal(calls, 2);
-  assert.equal(store.assets.size, 0);
-  assert.equal(rows.get(MEDIA_ID)?.status, "failed");
+  assert.equal(deletes, 0);
+  assert.equal(store.assets.size, 1);
+  assert.equal(rows.get(MEDIA_ID)?.status, "uploading");
 });
 
 test("isValidCompleteSize: 寸法の省略は動画だけ。写真は必須、片方だけ・範囲外・小数は不可", () => {
@@ -219,4 +223,27 @@ test("clip-rotation: 90/270 で幅と高さが入れ替わる。0 は録画で�
   assert.equal(recordingNeedsRotation(0), false);
   assert.equal(recordingNeedsRotation(90), true);
   assert.equal(ROTATION_AFTER_RECORDING, 0);
+});
+
+const { createGeneration } = await import("../lib/outfits/async-generation.ts");
+const { displayVideoFromRow } = await import("../lib/outfits/video-display.ts");
+
+test("createGeneration: bump のあと、古い世代は使えず、新しい世代だけ使える", () => {
+  const gen = createGeneration();
+  const first = gen.current();
+  assert.equal(gen.isCurrent(first), true);
+  gen.bump(); // 隠れた・撮り直した
+  assert.equal(gen.isCurrent(first), false);
+  assert.equal(gen.isCurrent(gen.current()), true);
+});
+
+test("displayVideoFromRow: 置き換わった試行の asset ID・状態・寸法をそろえて行から作る", () => {
+  const refreshed = {
+    id: "m", outfitId: "o", userId: "u", kind: "video" as const, provider: "cf_stream" as const,
+    providerAssetId: "new-asset", uploadAttempt: 2, uploadExpiresAt: null, status: "ready" as const,
+    width: 720, height: 1280, durationSec: 5,
+  };
+  assert.deepEqual(displayVideoFromRow(refreshed), {
+    status: "ready", provider_asset_id: "new-asset", width: 720, height: 1280,
+  });
 });
