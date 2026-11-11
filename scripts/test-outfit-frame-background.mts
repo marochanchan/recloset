@@ -11,6 +11,7 @@ const {
   personAlphaFromBackgroundConfidence,
   reconcileProcessed,
   resolveSendImage,
+  readThenClose,
 } = await import("../lib/outfits/frame-background.ts");
 
 test("背景の設定は none / blur / white の3つだけ", () => {
@@ -92,4 +93,35 @@ test("送る写真：ぼかす／白は処理済みだけ。まだなら null（
   assert.equal(resolveSendImage("a", "ORIG", processed, "blur"), "PROC");
   assert.equal(resolveSendImage("a", "ORIG", processed, "white"), null);
   assert.equal(resolveSendImage("b", "ORIG", processed, "blur"), null);
+});
+
+test("readThenClose：読み取りが成功しても結果を解放し、値を返す", () => {
+  let closed = 0;
+  const value = readThenClose({ close: () => closed++ }, () => 42);
+  assert.equal(value, 42);
+  assert.equal(closed, 1);
+});
+
+test("readThenClose：読み取りが失敗しても結果を解放し、元のエラーを投げる", () => {
+  let closed = 0;
+  assert.throws(
+    () =>
+      readThenClose({ close: () => closed++ }, () => {
+        throw new Error("read_failed");
+      }),
+    /read_failed/,
+  );
+  assert.equal(closed, 1);
+});
+
+test("readThenClose：解放が失敗しても、読み取りの値を返す", () => {
+  const value = readThenClose(
+    {
+      close: () => {
+        throw new Error("close_failed");
+      },
+    },
+    () => "ok",
+  );
+  assert.equal(value, "ok");
 });

@@ -96,3 +96,19 @@ export function resolveSendImage<T>(
   const entry = processed[frameId];
   return entry && entry.mode === mode ? entry.image : null;
 }
+
+/**
+ * 分割の結果から値を読み取り、読み取りの成否によらず結果（全部のマスク）を解放する。
+ * 解放の失敗は握りつぶす（読み取りの結果や元のエラーを隠さないため）。
+ */
+export function readThenClose<R extends { close(): void }, T>(result: R, read: (result: R) => T): T {
+  try {
+    return read(result);
+  } finally {
+    try {
+      result.close();
+    } catch {
+      // 後始末の失敗は無視する
+    }
+  }
+}

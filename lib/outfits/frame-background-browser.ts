@@ -12,6 +12,7 @@ import type { ImageSegmenter } from "@mediapipe/tasks-vision";
 import {
   WHITE_BACKGROUND_COLOR,
   personAlphaFromBackgroundConfidence,
+  readThenClose,
   type BackgroundMode,
 } from "@/lib/outfits/frame-background";
 import {
@@ -24,6 +25,8 @@ const WASM_BASE_PATH = "/mediapipe/wasm";
 const MODEL_PATH = "/mediapipe/models/selfie_multiclass_256x256.tflite";
 // 背景のクラス（0）の信頼度を使う。人らしさ = 1 - 背景
 const BACKGROUND_MASK_INDEX = 0;
+// 人と背景を分けるときの入力の長辺（px）。元の大きさのまま分けるとマスクが巨大になる
+const SEGMENT_LONG_EDGE = 512;
 // 縁の羽（マスクを広げたあとにぼかす幅。写真の長辺に対する割合、最低 2px）
 const FEATHER_RATIO = 0.003;
 // 「ぼかす」の強さ：長辺をこの値まで縮めてから広げる（小さいほど強くぼける）
@@ -132,18 +135,26 @@ export async function applyBackgroundToImage(
     const height = bitmap.height;
     await yieldToBrowser();
 
-    // 1. 人と背景を分ける（マスクは低い解像度で出る）
-    const result = segmenter.segment(bitmap);
-    const bgMask = result.confidenceMasks?.[BACKGROUND_MASK_INDEX];
-    if (!bgMask) throw new Error("no_mask");
-    const maskWidth = bgMask.width;
-    const maskHeight = bgMask.height;
-    const alpha = personAlphaFromBackgroundConfidence(bgMask.getAsFloat32Array());
-    try {
-      result.confidenceMasks?.forEach((m) => m.close());
-    } catch {
-      // 後始末の失敗は無視する
-    }
+    // 1. 人と背景を分ける。マスクは入力と同じ大きさで出る（全クラス分の Float32 で大きなメモリになる）ので、
+    //    長辺 SEGMENT_LONG_EDGE px に縮めた写真で分け、あとで写真の大きさに広げる
+    const segScale = Math.min(1, SEGMENT_LONG_EDGE / Math.max(width, height));
+    const segInput = track(Math.max(1, Math.round(width * segScale)), Math.max(1, Math.round(height * segScale)));
+    const segCtx = segInput.getContext("2d");
+    if (!segCtx) throw new Error("no_context");
+    segCtx.imageSmoothingEnabled = true;
+    segCtx.imageSmoothingQuality = "high";
+    segCtx.drawImage(bitmap, 0, 0, segInput.width, segInput.height);
+    await yieldToBrowser();
+
+    const { alpha, maskWidth, maskHeight } = readThenClose(segmenter.segment(segInput), (result) => {
+      const bgMask = result.confidenceMasks?.[BACKGROUND_MASK_INDEX];
+      if (!bgMask) throw new Error("no_mask");
+      return {
+        alpha: personAlphaFromBackgroundConfidence(bgMask.getAsFloat32Array()),
+        maskWidth: bgMask.width,
+        maskHeight: bgMask.height,
+      };
+    });
     await yieldToBrowser();
 
     // 2. アルファをマスクの絵にして、写真の大きさに広げる（縁は少しぼかす）
