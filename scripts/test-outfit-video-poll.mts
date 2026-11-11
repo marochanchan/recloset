@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { VIDEO_POLL_INTERVAL_MS, VIDEO_POLL_MAX_ATTEMPTS, nextVideoPoll } = await import(
+const { VIDEO_POLL_INTERVAL_MS, VIDEO_POLL_MAX_ATTEMPTS, createVideoPollCycle, nextVideoPoll } = await import(
   "../lib/outfits/video-poll.ts"
 );
 
@@ -43,4 +43,25 @@ test("0回から回すと、ちょうど36回読み直して止まる", () => {
     if (step.exhausted) break;
   }
   assert.equal(refreshes, 36);
+});
+
+test("サイクル：36回で止まり、その後は読み直さない", () => {
+  const cycle = createVideoPollCycle();
+  let refreshes = 0;
+  let last = { refresh: false, exhausted: false };
+  for (let i = 0; i < 36; i++) {
+    last = cycle.tick();
+    if (last.refresh) refreshes++;
+  }
+  assert.equal(refreshes, 36);
+  assert.equal(last.exhausted, true);
+  assert.deepEqual(cycle.tick(), { refresh: false, exhausted: true });
+});
+
+test("サイクル：隠れて再表示（新しいサイクル）は0回から数え直す", () => {
+  const first = createVideoPollCycle();
+  for (let i = 0; i < 36; i++) first.tick();
+  assert.equal(first.tick().refresh, false);
+  const second = createVideoPollCycle();
+  assert.deepEqual(second.tick(), { refresh: true, exhausted: false });
 });

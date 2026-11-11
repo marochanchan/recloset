@@ -13,3 +13,15 @@ export function nextVideoPoll(attempts: number): { refresh: boolean; attempts: n
   const next = attempts + 1;
   return { refresh: true, attempts: next, exhausted: next >= VIDEO_POLL_MAX_ATTEMPTS };
 }
+
+// 1回分の読み直しのサイクル。隠れて再表示されたら、新しく作って0回から数え直す
+export function createVideoPollCycle(): { tick: () => { refresh: boolean; exhausted: boolean } } {
+  let attempts = 0;
+  return {
+    tick() {
+      const step = nextVideoPoll(attempts);
+      attempts = step.attempts;
+      return { refresh: step.refresh, exhausted: step.exhausted };
+    },
+  };
+}
