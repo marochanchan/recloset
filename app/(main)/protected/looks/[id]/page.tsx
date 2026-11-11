@@ -3,6 +3,7 @@ import { displayVideoFromRow } from "@/lib/outfits/video-display";
 import { refreshPendingMedia } from "@/lib/outfits/media-service";
 import { DeleteLookButton } from "@/components/delete-look-button";
 import { DoodleHanger } from "@/components/doodle-icons";
+import { LookVideoRefresher } from "@/components/look-video-refresher";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { getPrivateSignedImageUrls } from "@/lib/supabase/signed-image-urls";
@@ -158,6 +159,8 @@ async function LookDetail({ params }: { params: Promise<{ id: string }> }) {
               {video.status === "failed" || !store ? "動画を再生できませんでした" : "動画を準備しています"}
             </p>
           )}
+          {/* 変換中のあいだだけ、画面を自動で読み直す（ready / failed になればこの部品は消える） */}
+          {!videoIframeUrl && store && video.status === "processing" && <LookVideoRefresher />}
         </section>
       )}
 
