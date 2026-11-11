@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { canPickFrame } from "@/lib/camera/can-pick-frame";
 import { previewLayout } from "@/lib/camera/camera-preview-layout";
 import type { CaptureClip } from "@/lib/camera/capture-controller";
 import { frameFromVideo } from "@/lib/camera/video-frame";
@@ -47,6 +48,19 @@ export function OutfitClipPicker({
   const [duration, setDuration] = useState(clip.durationSec);
   const [time, setTime] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [pickable, setPickable] = useState(false);
+  const seekedOnce = useRef(false);
+
+  // 絵が出ていて、シーク中でないときだけ「このコマで記録」を押せる
+  function refreshPickable(video: HTMLVideoElement) {
+    setPickable(
+      canPickFrame({
+        readyState: video.readyState,
+        seeking: video.seeking,
+        hasSeekedOnce: seekedOnce.current,
+      }),
+    );
+  }
 
   // picking を離れる（アンマウント・動画の差し替え）ときに URL を解放する
   useEffect(() => {
@@ -64,6 +78,7 @@ export function OutfitClipPicker({
     video.pause();
     video.currentTime = clamped;
     setTime(clamped);
+    refreshPickable(video);
   }
 
   function handleLoadedMetadata(video: HTMLVideoElement) {
@@ -141,7 +156,14 @@ export function OutfitClipPicker({
             onLoadedData={(event) => {
               // 最初の位置に一度だけ移す
               if (time === 0) handleCanPlayFirst(event.currentTarget);
+              refreshPickable(event.currentTarget);
             }}
+            onSeeking={(event) => refreshPickable(event.currentTarget)}
+            onSeeked={(event) => {
+              seekedOnce.current = true;
+              refreshPickable(event.currentTarget);
+            }}
+            onCanPlay={(event) => refreshPickable(event.currentTarget)}
             onTimeUpdate={(event) => {
               if (!event.currentTarget.paused) setTime(event.currentTarget.currentTime);
             }}
@@ -190,7 +212,7 @@ export function OutfitClipPicker({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={() => void pickCurrentFrame()} disabled={disabled || busy}>
+        <Button type="button" onClick={() => void pickCurrentFrame()} disabled={disabled || busy || !pickable}>
           このコマで記録
         </Button>
         <Button type="button" variant="outline" onClick={onRetake}>
