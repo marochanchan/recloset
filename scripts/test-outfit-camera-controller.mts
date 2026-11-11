@@ -944,3 +944,20 @@ test("handOffClip outside picking returns null and changes nothing", async (t) =
   assert.equal(h.controller.handOffClip(), null);
   assert.equal(h.controller.getState().phase, "live");
 });
+
+test("rotation: record gets the current rotation, and the handed-off clip is not rotated again", async (t) => {
+  const h = setup(t);
+  await h.startLive();
+  h.controller.rotate(); // 90
+  assert.equal(h.controller.getState().rotation, 90);
+  const camera = h.source.opened[h.source.opened.length - 1];
+  const release = camera.holdRecord();
+  h.controller.setMode("video5");
+  h.manual.fire();
+  await h.advanceSeconds(COUNTDOWN_SECONDS);
+  release();
+  await flush();
+  assert.deepEqual(camera.recordRotations, [90]);
+  const handed = h.controller.handOffClip();
+  assert.equal(handed?.rotation, 0); // 録るときに回してあるので、コマ選びでは 0
+});

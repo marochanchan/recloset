@@ -217,3 +217,32 @@ export async function retryMediaUpload(
   }
   return { mediaId: input.mediaId, uploadUrl: upload.uploadUrl, row: replaced };
 }
+
+// 詳細画面を開いたときの状態の照会。webhook や完了の知らせが届かなかった動画を、Stream の実際の状態に合わせる。
+// 照会するのは uploading / processing の行だけ。まだ届いていなければ（uploading のまま）何も変えない。
+// 試行番号・終端状態の保護は completeMediaUpload と同じ（setStateOrTerminal）。行が見つからなければ null
+export async function refreshPendingMedia(
+  deps: MediaServiceDeps,
+  input: { userId: string; mediaId: string },
+): Promise<OutfitMediaRow | null> {
+  const row = await deps.db.getMedia(input.userId, input.mediaId);
+  if (!row) return null;
+  if (row.status !== "uploading" && row.status !== "processing") return row;
+
+  const state = await deps.store.getAssetState(row.provider, row.providerAssetId);
+  const status = targetStatus(row.kind, state.state) ?? (state.state === "failed" ? "failed" : null);
+  if (!status) return row;
+  try {
+    return await setStateOrTerminal(deps, {
+      userId: input.userId,
+      mediaId: input.mediaId,
+      expectedUploadAttempt: row.uploadAttempt,
+      status,
+      ...dimensions(state),
+    });
+  } catch (error) {
+    // 別の処理が試行を置き換えた。最新の行を返す
+    if (error instanceof MediaUploadConflictError) return deps.db.getMedia(input.userId, input.mediaId);
+    throw error;
+  }
+}

@@ -10,6 +10,7 @@ export type FakeOpenedCamera = OpenedCamera & {
   stopped: boolean;
   captureCount: number;
   recordCalls: number[]; // record に渡された秒数
+  recordRotations: (number | undefined)[]; // record に渡された回転
   failNextRecord(): void;
   holdRecord(): (error?: unknown) => void; // 次の record を止める。使い方は holdCapture と同じ
   video: HTMLVideoElement | null; // 最後に attach された要素
@@ -50,6 +51,7 @@ function createFakeCamera(
     stopped: false,
     captureCount: 0,
     recordCalls: [],
+    recordRotations: [],
     video: null,
     attach(video) {
       camera.video = video;
@@ -71,8 +73,9 @@ function createFakeCamera(
       return Promise.resolve(new Blob(["frame"]));
     },
     canRecord: () => recordable,
-    record(seconds, signal) {
+    record(seconds, signal, rotation) {
       camera.recordCalls.push(seconds);
+      camera.recordRotations.push(rotation);
       const aborted = new Promise<never>((_, reject) => {
         signal?.addEventListener("abort", () => reject(new CameraError("failed")));
       });

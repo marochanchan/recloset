@@ -15,6 +15,7 @@ import {
   type CameraPreferences,
   type PreferenceStorage,
 } from "@/lib/camera/camera-preferences";
+import { ROTATION_AFTER_RECORDING } from "@/lib/camera/clip-rotation";
 import type { CaptureTrigger } from "@/lib/camera/capture-trigger";
 import {
   getNextRotation,
@@ -230,7 +231,7 @@ export function createCaptureController(deps: {
     recordAbort = abort;
     showRecording(seconds);
     try {
-      const blob = await current.record(seconds, abort.signal);
+      const blob = await current.record(seconds, abort.signal, state.rotation);
       if (generation !== myGeneration || recordToken !== myToken) return;
       recordAbort = null;
       if (timer !== null) {
@@ -415,7 +416,8 @@ export function createCaptureController(deps: {
     },
     handOffClip() {
       if (state.phase !== "picking" || !state.clip) return null;
-      const handed = { clip: state.clip, rotation: state.rotation };
+      // 動画は録るときに回してあるので、コマ選びでは回さない（写真の向きが二重にならないように）
+      const handed = { clip: state.clip, rotation: ROTATION_AFTER_RECORDING };
       stopEverything();
       setState({ ...INITIAL_STATE });
       return handed;

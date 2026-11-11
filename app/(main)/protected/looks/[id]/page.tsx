@@ -1,4 +1,5 @@
-import { tryCreateMediaStore } from "@/lib/outfits/media-deps";
+import { createOutfitMediaDeps, tryCreateMediaStore } from "@/lib/outfits/media-deps";
+import { refreshPendingMedia } from "@/lib/outfits/media-service";
 import { DeleteLookButton } from "@/components/delete-look-button";
 import { DoodleHanger } from "@/components/doodle-icons";
 import { Button } from "@/components/ui/button";
@@ -64,7 +65,7 @@ async function LookDetail({ params }: { params: Promise<{ id: string }> }) {
   // 写真は ready のものだけ、動画は届いたもの（変換中・失敗も含む）。Cloudflare の設定が足りなければ、メディアなしで表示を続ける
   const { data: media, error: mediaError } = await supabase
     .from("outfit_media")
-    .select("kind, status, provider_asset_id, width, height")
+    .select("id, kind, status, provider_asset_id, width, height")
     .eq("outfit_id", id)
     .in("kind", ["photo", "video"])
     .order("sort_order")
@@ -77,7 +78,29 @@ async function LookDetail({ params }: { params: Promise<{ id: string }> }) {
   const now = new Date();
   const photos = (media ?? []).filter((m) => m.kind === "photo" && m.status === "ready");
   // uploading のままのもの（送信が終わらなかった動画）は出さない
-  const video = (media ?? []).find((m) => m.kind === "video" && m.status !== "uploading");
+  let video = (media ?? []).find((m) => m.kind === "video" && m.status !== "uploading");
+
+  // webhook や完了の知らせが届かなかった動画を、Stream の実際の状態に合わせる。
+  // この着画の最初の未完了の動画1本だけ、表示1回につき1回。失敗しても画面は止めない
+  const pendingVideo = (media ?? []).find(
+    (m) => m.kind === "video" && (m.status === "processing" || m.status === "uploading"),
+  );
+  if (pendingVideo && typeof userId === "string") {
+    try {
+      const { deps } = createOutfitMediaDeps();
+      const refreshed = await refreshPendingMedia(deps, { userId, mediaId: pendingVideo.id });
+      if (refreshed && refreshed.status !== "uploading") {
+        video = {
+          ...pendingVideo,
+          status: refreshed.status,
+          width: refreshed.width,
+          height: refreshed.height,
+        };
+      }
+    } catch {
+      console.error("look detail: refresh video state failed");
+    }
+  }
   const photoUrls = store
     ? photos.map((m) => ({
         url: store.signedImageUrl(m.provider_asset_id, "display", now),

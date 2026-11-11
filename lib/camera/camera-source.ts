@@ -1,5 +1,7 @@
 // カメラの型とエラーの扱い。ブラウザの実装（getUserMedia）は別ファイルで差し替える。
 
+import type { ImageRotation } from "@/lib/image-processing";
+
 export type CameraDevice = { deviceId: string; label: string };
 
 export type CameraErrorReason =
@@ -59,7 +61,8 @@ export interface OpenedCamera {
   capture(): Promise<Blob>; // 反転も回転もしていない生のフレーム
   canRecord(): boolean; // 動画を録れるか（MediaRecorder がない環境では false）
   // seconds 秒の動画を録る。signal が中断されたら録画を止めて reject する
-  record(seconds: number, signal?: AbortSignal): Promise<Blob>;
+  // rotation が 0 でなければ、回した映像そのものを録る（動画の中身が正しい向きになる）
+  record(seconds: number, signal?: AbortSignal, rotation?: ImageRotation): Promise<Blob>;
   onEnded(listener: () => void): () => void;
   stop(): void;
 }

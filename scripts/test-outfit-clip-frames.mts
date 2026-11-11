@@ -81,7 +81,7 @@ test("planMediaUploads: 写真が6枚を超える・負・小数は例外", () =
 });
 
 // ---- addOutfitMediaUpload の入力チェックと、本人の下書きだけに足す確認 ----
-const { OutfitNotDraftError, addMediaToDraft, parseAddMediaInput } = await import(
+const { OutfitNotDraftError, addMediaToDraft, isValidCompleteSize, parseAddMediaInput } = await import(
   "../lib/outfits/add-media.ts"
 );
 const { createFakeMediaStore } = await import("../lib/media/fake-media-store.ts");
@@ -133,7 +133,8 @@ function fakeDb() {
     async setState(i) {
       const row = rows.get(i.mediaId);
       if (!row) throw new Error("no row");
-      return { ...row, status: i.status };
+      row.status = i.status;
+      return { ...row };
     },
     async replaceAsset() {
       throw new Error("unused");
@@ -168,7 +169,7 @@ test("addMediaToDraft: 写真と動画の upload URL を返し、同じ mediaId 
   assert.ok(video.uploadUrl);
   assert.equal(rows.get(MEDIA_ID)?.kind, "video");
   assert.equal(rows.get(MEDIA_ID)?.sortOrder, 2);
-  assert.deepEqual(seen, [OUTFIT_ID]);
+  assert.deepEqual(seen, [OUTFIT_ID, OUTFIT_ID]); // 登録の前と後
 
   // 2回目：届いていれば uploadUrl は null（retry に回る）
   const assetId = rows.get(MEDIA_ID)?.providerAssetId as string;
@@ -178,4 +179,44 @@ test("addMediaToDraft: 写真と動画の upload URL を返し、同じ mediaId 
   });
   assert.equal(again.uploadUrl, null);
   assert.equal(rows.size, 1);
+});
+
+test("addMediaToDraft: 登録のあいだに確定されたら、作った実体を消して OutfitNotDraftError（行は failed）", async () => {
+  const { db, rows } = fakeDb();
+  const store = createFakeMediaStore();
+  const deps = { db, store, now: () => new Date("2026-11-11T00:00:00Z") };
+  let calls = 0;
+  const isOwnDraft = async () => ++calls === 1; // 1回目は下書き、2回目（登録のあと）は確定済み
+  await assert.rejects(
+    addMediaToDraft(deps, { userId: USER_ID, ...good, kind: "photo", isOwnDraft }),
+    OutfitNotDraftError,
+  );
+  assert.equal(calls, 2);
+  assert.equal(store.assets.size, 0);
+  assert.equal(rows.get(MEDIA_ID)?.status, "failed");
+});
+
+test("isValidCompleteSize: 寸法の省略は動画だけ。写真は必須、片方だけ・範囲外・小数は不可", () => {
+  assert.equal(isValidCompleteSize("video", undefined, undefined), true);
+  assert.equal(isValidCompleteSize("photo", undefined, undefined), false);
+  assert.equal(isValidCompleteSize("photo", 800, 1200), true);
+  assert.equal(isValidCompleteSize("video", 800, 1200), true);
+  assert.equal(isValidCompleteSize("video", 800, undefined), false);
+  assert.equal(isValidCompleteSize("photo", 0, 10), false);
+  assert.equal(isValidCompleteSize("photo", 20001, 10), false);
+  assert.equal(isValidCompleteSize("photo", 1.5, 10), false);
+});
+
+const { recordingNeedsRotation, rotatedSize, ROTATION_AFTER_RECORDING } = await import(
+  "../lib/camera/clip-rotation.ts"
+);
+
+test("clip-rotation: 90/270 で幅と高さが入れ替わる。0 は録画で回さない。録ったあとの向きは常に 0", () => {
+  assert.deepEqual(rotatedSize({ width: 1920, height: 1080 }, 90), { width: 1080, height: 1920 });
+  assert.deepEqual(rotatedSize({ width: 1920, height: 1080 }, 270), { width: 1080, height: 1920 });
+  assert.deepEqual(rotatedSize({ width: 1920, height: 1080 }, 180), { width: 1920, height: 1080 });
+  assert.deepEqual(rotatedSize({ width: 1920, height: 1080 }, 0), { width: 1920, height: 1080 });
+  assert.equal(recordingNeedsRotation(0), false);
+  assert.equal(recordingNeedsRotation(90), true);
+  assert.equal(ROTATION_AFTER_RECORDING, 0);
 });

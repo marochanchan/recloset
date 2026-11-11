@@ -69,6 +69,16 @@ export function OutfitClipPicker({
   const [pickable, setPickable] = useState(false);
   const seekedOnce = useRef(false);
   const [message, setMessage] = useState<string | null>(null);
+  // 追加の処理（切り出し・縮小）は時間がかかる。終わったときの最新の列と、まだ画面にいるかを見る
+  const framesRef = useRef(frames);
+  framesRef.current = frames;
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
 
   // 選んだコマのサムネイル。列が変わるたびに作り直し、前のものは解放する
@@ -151,14 +161,16 @@ export function OutfitClipPicker({
       }
       const timeSec = video.currentTime;
       const image = await processImageForOutfitUpload(await frameFromVideo(video), rotation);
-      const { list, result } = addPickedFrame(frames, { id: crypto.randomUUID(), timeSec, image });
+      // 処理を待つあいだに画面を離れたら、結果は捨てる。列は終わった時点の最新のものに足す
+      if (!mountedRef.current) return;
+      const { list, result } = addPickedFrame(framesRef.current, { id: crypto.randomUUID(), timeSec, image });
       if (result === "added") onFramesChange(list);
       else if (result === "duplicate") setMessage("ほぼ同じ場面はもう選んであります");
       else setMessage(`選べるのは${MAX_PICKED_FRAMES}枚までです`);
     } catch {
       setMessage("コマを切り出せませんでした。もう一度お試しください");
     } finally {
-      setBusy(false);
+      if (mountedRef.current) setBusy(false);
     }
   }
 
@@ -283,7 +295,7 @@ export function OutfitClipPicker({
                 <button
                   type="button"
                   aria-label={`${index + 1}枚目を外す`}
-                  disabled={disabled}
+                  disabled={disabled || busy}
                   onClick={() => onFramesChange(removePickedFrame(frames, f.id))}
                   className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-xs text-background"
                 >
@@ -322,7 +334,7 @@ export function OutfitClipPicker({
         <Button type="button" onClick={onDecide} disabled={disabled || busy || frames.length === 0}>
           {frames.length}枚で決定
         </Button>
-        <Button type="button" variant="outline" onClick={handleRetake} disabled={disabled}>
+        <Button type="button" variant="outline" onClick={handleRetake} disabled={disabled || busy}>
           撮り直す
         </Button>
         <Button type="button" variant="outline" onClick={saveVideo}>

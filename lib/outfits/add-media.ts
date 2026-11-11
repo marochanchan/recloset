@@ -59,7 +59,7 @@ export async function addMediaToDraft(
   if (!(await input.isOwnDraft(input.outfitId))) throw new OutfitNotDraftError();
   // 同じ mediaId が既にあれば startMediaUpload が送り直しに回す（冪等）。
   // register_outfit_media も outfit の持ち主を確かめる（二重の確認）
-  return startMediaUpload(deps, {
+  const result = await startMediaUpload(deps, {
     userId: input.userId,
     mediaId: input.mediaId,
     outfitId: input.outfitId,
@@ -67,4 +67,34 @@ export async function addMediaToDraft(
     takenAt: null,
     sortOrder: input.sortOrder,
   });
+
+  // 最初の確認と登録のあいだに、別の画面で確定されたかもしれない（RPC は下書きかどうかを見ない）。
+  // 登録のあとにもう一度確かめ、確定済みなら今作った実体を消して断る。
+  // 完全な直し方は、確定と同じロックの下で RPC が pending を確かめること（migration で、あとで行う）
+  if (result.uploadUrl !== null && !(await input.isOwnDraft(input.outfitId))) {
+    try {
+      const row = await deps.db.getMedia(input.userId, input.mediaId);
+      if (row) {
+        await deps.store.deleteAsset(row.provider, row.providerAssetId);
+        // 行は残るが、届かない実体のまま「失敗」にして画面には出さない（uploading からは failed にできる）
+        await deps.db.setState({
+          userId: input.userId,
+          mediaId: input.mediaId,
+          expectedUploadAttempt: row.uploadAttempt,
+          status: "failed",
+        });
+      }
+    } catch {
+      // 後始末の失敗で、断るという結果は変えない
+    }
+    throw new OutfitNotDraftError();
+  }
+  return result;
+}
+
+// 完了の知らせの寸法の確認。写真は必須（1〜20000 の整数）、動画は 2つとも省くか 2つとも正しく指定
+export function isValidCompleteSize(kind: "photo" | "video" | "frame", width: unknown, height: unknown): boolean {
+  if (width === undefined && height === undefined) return kind === "video";
+  const ok = (v: unknown) => typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 20000;
+  return ok(width) && ok(height);
 }

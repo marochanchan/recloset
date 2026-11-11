@@ -1,7 +1,7 @@
 "use server";
 
 import { processMediaDeletionQueue, createSupabaseDeletionQueueDeps } from "@/lib/media/deletion-queue";
-import { addMediaToDraft, OutfitNotDraftError, parseAddMediaInput } from "@/lib/outfits/add-media";
+import { addMediaToDraft, isValidCompleteSize, OutfitNotDraftError, parseAddMediaInput } from "@/lib/outfits/add-media";
 import {
   completeMediaUpload,
   MediaNotFoundError,
@@ -153,7 +153,7 @@ export async function addOutfitMediaUpload(input: {
   }
 }
 
-// width / height は写真のとき必須。動画は Stream が持つ寸法を使うので省いてよい（2つとも省く）
+// width / height は写真のとき必須。動画は Stream が持つ寸法を使うので省いてよい（2つとも省く）。判定は isValidCompleteSize
 export async function completeOutfitMedia(input: {
   mediaId: string;
   width?: number;
@@ -163,17 +163,16 @@ export async function completeOutfitMedia(input: {
   if (!userId) return { error: NOT_LOGGED_IN_ERROR };
 
   const noSize = input?.width === undefined && input?.height === undefined;
-  if (
-    !UUID_PATTERN.test(String(input?.mediaId)) ||
-    (!noSize &&
-      (!Number.isInteger(input.width) ||
-        !Number.isInteger(input.height) ||
-        (input.width as number) < 1 ||
-        (input.height as number) < 1 ||
-        (input.width as number) > 20000 ||
-        (input.height as number) > 20000))
-  ) {
-    return { error: INVALID_INPUT_ERROR };
+  if (!UUID_PATTERN.test(String(input?.mediaId))) return { error: INVALID_INPUT_ERROR };
+
+  // 寸法の省略は動画だけ。本人のメディアの種類を見て決める（他人の ID は「見つからない」）
+  try {
+    const { deps } = createOutfitMediaDeps();
+    const row = await deps.db.getMedia(userId, input.mediaId);
+    if (!row) return { error: MEDIA_NOT_FOUND_ERROR };
+    if (!isValidCompleteSize(row.kind, input.width, input.height)) return { error: INVALID_INPUT_ERROR };
+  } catch (error) {
+    return mapUploadError(error, "completeOutfitMedia");
   }
 
   try {
