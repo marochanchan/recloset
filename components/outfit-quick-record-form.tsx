@@ -861,7 +861,7 @@ export function OutfitQuickRecordForm({
             disabled={isConfirming || phase === "processing" || phase === "uploading"}
             className="w-fit"
           >
-            写真を選ぶ
+            写真を1枚選ぶ
           </Button>
         )}
         {!pickerOpen && (
@@ -872,7 +872,7 @@ export function OutfitQuickRecordForm({
               onClick={() => photosInputRef.current?.click()}
               disabled={isConfirming || libraryBusy || phase === "processing" || phase === "uploading" || videoLocked}
             >
-              写真から選ぶ（6枚まで）
+              写真をまとめて選ぶ（6枚まで）
             </Button>
             <Button
               type="button"
@@ -904,7 +904,7 @@ export function OutfitQuickRecordForm({
           accept="image/*"
           onChange={handleFileChange}
           disabled={isConfirming || phase === "processing" || phase === "uploading"}
-          aria-label="着画の写真を選ぶ"
+          aria-label="着画の写真を1枚選ぶ"
           className="hidden"
         />
         <input
@@ -913,7 +913,7 @@ export function OutfitQuickRecordForm({
           accept="image/*"
           multiple
           onChange={handlePhotosChange}
-          aria-label="着画の写真を複数選ぶ"
+          aria-label="着画の写真をまとめて選ぶ"
           className="hidden"
         />
         <input
