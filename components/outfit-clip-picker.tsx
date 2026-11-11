@@ -291,8 +291,14 @@ export function OutfitClipPicker({
               <li key={f.id} className="relative">
                 <button
                   type="button"
-                  aria-label={`${index + 1}枚目（${f.timeSec.toFixed(1)}秒）の場面に移る`}
-                  onClick={() => seek(f.timeSec)}
+                  aria-label={
+                    f.timeSec === null
+                      ? `${index + 1}枚目（写真）`
+                      : `${index + 1}枚目（${f.timeSec.toFixed(1)}秒）の場面に移る`
+                  }
+                  onClick={() => {
+                    if (f.timeSec !== null) seek(f.timeSec); // 端末の写真には場面（時刻）が無い
+                  }}
                   className="block h-16 w-16 overflow-hidden rounded-lg bg-photo outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {thumbs[f.id] && (

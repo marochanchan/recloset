@@ -220,10 +220,18 @@ export function OutfitQuickRecordForm({
       ? [preselectedItemId]
       : [];
 
-  // 動画・選んだコマ・送信の進み具合を全部捨てる
-  const discardClip = () => {
+  // 入口を切り替える共通の処理：進めている取り込み（端末の動画の確認・写真の処理）の世代を進めて捨て、
+  // 「読み込んでいます」も解除する。新しい取り込みを始めるとき・動画や写真の流れに入るとき・リセットで必ず通す。
+  // 返した世代は、取り込みが終わったときに「まだ自分が最新か」を確かめるのに使う
+  const switchEntry = () => {
     selectionEpochRef.current += 1;
     setLibraryBusy(false);
+    return selectionEpochRef.current;
+  };
+
+  // 動画・選んだコマ・送信の進み具合を全部捨てる
+  const discardClip = () => {
+    switchEntry();
     setPhotoSet(false);
     setClip(null);
     setFrames([]);
@@ -336,7 +344,7 @@ export function OutfitQuickRecordForm({
 
   // 動画を録り終えた。写真1枚の流れの下書きは使わないので捨てて、コマ選びを開く
   const handleClip = useCallback((next: CaptureClip, rotation: ImageRotation, fromLibrary = false, name?: string) => {
-    selectionEpochRef.current += 1;
+    switchEntry();
     setPhotoSet(false);
     clientRequestIdRef.current = crypto.randomUUID();
     startedMediaIdRef.current = null;
@@ -369,7 +377,7 @@ export function OutfitQuickRecordForm({
     event.target.value = "";
     if (!file || isConfirmingRef.current) return;
     setMessage(null);
-    const epoch = ++selectionEpochRef.current;
+    const epoch = switchEntry();
     // 大きさは読み込む前に見る（大きすぎる動画を開かない）
     const tooLarge = judgeLibraryVideo({ sizeBytes: file.size, durationSec: 1 });
     if (!tooLarge.ok) return setMessage(LIBRARY_VIDEO_MESSAGES[tooLarge.reason]);
@@ -401,7 +409,7 @@ export function OutfitQuickRecordForm({
     const base = fresh ? [] : frames;
     const { take, ignored } = planPhotoSelection(base.length, files.length);
     if (take === 0) return setMessage(photoSelectionNotice({ ignored, failed: 0 }));
-    const epoch = ++selectionEpochRef.current;
+    const epoch = switchEntry();
     setLibraryBusy(true);
     const done: { id: string; image: ProcessedImage }[] = [];
     let failed = 0;
@@ -438,7 +446,8 @@ export function OutfitQuickRecordForm({
       setPhotoSet(true);
       setPickerOpen(false);
     }
-    setFrames(mergePickedPhotos(base, done).list);
+    // 取り込み中はコマの変更を止めているが、念のため完了時点の最新の列に足し、上限もその列で見る
+    setFrames((latest) => mergePickedPhotos(fresh ? [] : latest, done).list);
     setMessage(notice);
   };
 
@@ -576,7 +585,7 @@ export function OutfitQuickRecordForm({
   };
 
   const handleConfirm = async () => {
-    if (isConfirmingRef.current) return;
+    if (isConfirmingRef.current || libraryBusy) return;
     if (!outfitId || phase !== "done" || validSelectedIds.length === 0) return;
     isConfirmingRef.current = true;
     setIsConfirming(true);
@@ -623,7 +632,7 @@ export function OutfitQuickRecordForm({
   // 写真が失敗したら止める（もう一度押すと、送り終えたものを飛ばして続きから）。
   // 動画が失敗しても、写真と記録は確定する
   const handleConfirmWithClip = async () => {
-    if (isConfirmingRef.current) return;
+    if (isConfirmingRef.current || libraryBusy) return;
     if (!multiMode || pickerOpen || frames.length === 0 || validSelectedIds.length === 0) return;
     // 背景を整え終わるまで送らない（元の写真は送らない）
     if (bgBusy) return;
@@ -726,8 +735,8 @@ export function OutfitQuickRecordForm({
   const multiMode = clip !== null || photoSet;
   const videoLocked = multiMode && outfitId !== null;
   const canConfirm = multiMode
-    ? !pickerOpen && frames.length > 0 && validSelectedIds.length > 0 && !isConfirming && !bgBusy
-    : !staged && phase === "done" && validSelectedIds.length > 0 && !isConfirming;
+    ? !pickerOpen && frames.length > 0 && validSelectedIds.length > 0 && !isConfirming && !bgBusy && !libraryBusy
+    : !staged && phase === "done" && validSelectedIds.length > 0 && !isConfirming && !libraryBusy;
 
   return (
     <div className="flex flex-col gap-6">
@@ -749,14 +758,14 @@ export function OutfitQuickRecordForm({
               type="button"
               variant="outline"
               onClick={handleRotate}
-              disabled={isConfirming || phase === "processing" || phase === "uploading"}
+              disabled={isConfirming || libraryBusy || phase === "processing" || phase === "uploading"}
             >
               向きを回す
             </Button>
             <Button
               type="button"
               onClick={handleUseStaged}
-              disabled={isConfirming || phase === "processing" || phase === "uploading"}
+              disabled={isConfirming || libraryBusy || phase === "processing" || phase === "uploading"}
             >
               この写真を使う
             </Button>
@@ -770,7 +779,7 @@ export function OutfitQuickRecordForm({
             onFramesChange={setFrames}
             keepVideo={keepVideo}
             onKeepVideoChange={setKeepVideo}
-            disabled={isConfirming}
+            disabled={isConfirming || libraryBusy}
             onDecide={() => setPickerOpen(false)}
             onRetake={handleRetakeClip}
             fromLibrary={clip.fromLibrary}
@@ -821,7 +830,7 @@ export function OutfitQuickRecordForm({
                     variant={bgMode === option.mode ? "default" : "outline"}
                     aria-pressed={bgMode === option.mode}
                     onClick={() => setBgMode(option.mode)}
-                    disabled={isConfirming || videoLocked}
+                    disabled={isConfirming || libraryBusy || videoLocked}
                   >
                     {option.label}
                   </Button>
@@ -842,7 +851,7 @@ export function OutfitQuickRecordForm({
                 variant="outline"
                 className="w-fit"
                 onClick={() => setPickerOpen(true)}
-                disabled={isConfirming}
+                disabled={isConfirming || libraryBusy}
               >
                 動画に戻って選び直す
               </Button>
@@ -858,7 +867,7 @@ export function OutfitQuickRecordForm({
           <Button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isConfirming || phase === "processing" || phase === "uploading"}
+            disabled={isConfirming || libraryBusy || phase === "processing" || phase === "uploading"}
             className="w-fit"
           >
             写真を1枚選ぶ
@@ -892,7 +901,7 @@ export function OutfitQuickRecordForm({
         <div className={videoMode ? "hidden" : undefined}>
           <OutfitCameraCapture
             key={cameraKey}
-            disabled={isConfirming || phase === "processing" || phase === "uploading"}
+            disabled={isConfirming || libraryBusy || phase === "processing" || phase === "uploading"}
             onPhoto={handleCameraPhoto}
             onClip={handleClip}
             autoStart={autoStartCamera}
@@ -903,7 +912,7 @@ export function OutfitQuickRecordForm({
           type="file"
           accept="image/*"
           onChange={handleFileChange}
-          disabled={isConfirming || phase === "processing" || phase === "uploading"}
+          disabled={isConfirming || libraryBusy || phase === "processing" || phase === "uploading"}
           aria-label="着画の写真を1枚選ぶ"
           className="hidden"
         />

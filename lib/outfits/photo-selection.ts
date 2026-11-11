@@ -17,7 +17,7 @@ export function planPhotoSelection(
 }
 
 // 処理できた写真を、今の列の後ろに足す（並びは選んだ順。上限を超える分は足さない）。
-// 写真に撮影の時刻は無いので、timeSec は 0 にする（動画のコマの重複判定には使わない）
+// 写真に撮影の時刻は無いので、timeSec は null にする（動画のコマの重複判定・シークの対象にしない）
 export function mergePickedPhotos<T>(
   list: PickedFrame<T>[],
   photos: { id: string; image: T }[],
@@ -25,7 +25,7 @@ export function mergePickedPhotos<T>(
   const room = photoRoom(list.length);
   const taken = photos.slice(0, room);
   return {
-    list: [...list, ...taken.map((p) => ({ id: p.id, timeSec: 0, image: p.image }))],
+    list: [...list, ...taken.map((p) => ({ id: p.id, timeSec: null, image: p.image }))],
     added: taken.length,
   };
 }

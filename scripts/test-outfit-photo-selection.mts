@@ -16,11 +16,12 @@ registerHooks({
   },
 });
 
+const { addPickedFrame } = await import("../lib/outfits/clip-frames.ts");
 const { photoRoom, planPhotoSelection, mergePickedPhotos, photoSelectionNotice } = await import(
   "../lib/outfits/photo-selection.ts"
 );
 
-const frame = (id: string, timeSec = 0) => ({ id, timeSec, image: id });
+const frame = (id: string, timeSec: number | null = 0) => ({ id, timeSec, image: id });
 
 test("photoRoom: 6枚までの残り", () => {
   assert.equal(photoRoom(0), 6);
@@ -37,14 +38,14 @@ test("planPhotoSelection: 入るだけ取って、残りは無視する", () => 
   assert.deepEqual(planPhotoSelection(2, 0), { take: 0, ignored: 0 });
 });
 
-test("mergePickedPhotos: 動画のコマの後ろに選んだ順で足す（timeSec は 0）", () => {
+test("mergePickedPhotos: 動画のコマの後ろに選んだ順で足す（timeSec は null）", () => {
   const { list, added } = mergePickedPhotos([frame("v1", 2.5)], [
     { id: "p1", image: "p1" },
     { id: "p2", image: "p2" },
   ]);
   assert.equal(added, 2);
   assert.deepEqual(list.map((f) => f.id), ["v1", "p1", "p2"]);
-  assert.equal(list[1].timeSec, 0);
+  assert.equal(list[1].timeSec, null);
 });
 
 test("mergePickedPhotos: 上限（6枚）を超える分は足さない", () => {
@@ -66,4 +67,21 @@ test("photoSelectionNotice: あふれと失敗の一言（なければ null）",
     photoSelectionNotice({ ignored: 1, failed: 2 }),
     "選べるのは6枚までです。1枚は追加しませんでした。2枚は開けませんでした",
   );
+});
+
+test("端末の写真（時刻なし）と動画の0秒のコマは、重複扱いにならない（どちらの順でも）", () => {
+  const photos = mergePickedPhotos([], [{ id: "p1", image: "p1" }]).list;
+  const r1 = addPickedFrame(photos, { id: "v0", timeSec: 0, image: "v0" });
+  assert.equal(r1.result, "added");
+  const r2 = addPickedFrame(r1.list, { id: "v0b", timeSec: 0.02, image: "v0b" });
+  assert.equal(r2.result, "duplicate"); // 動画のコマどうしは今までどおり
+  const r3 = addPickedFrame([frame("v0", 0)], { id: "p", timeSec: null, image: "p" });
+  assert.equal(r3.result, "added");
+});
+
+test("mergePickedPhotos: 取り込み中に外した・足したコマは、最新の列に対して足される", () => {
+  // 取り込み開始時は [A]。待っているあいだに A を外して B を足した → 最新は [B]。ここへ P を足す
+  const latest = [frame("B", 3)];
+  const { list } = mergePickedPhotos(latest, [{ id: "P", image: "P" }]);
+  assert.deepEqual(list.map((f) => f.id), ["B", "P"]);
 });
