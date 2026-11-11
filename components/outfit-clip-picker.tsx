@@ -30,6 +30,8 @@ type OutfitClipPickerProps = {
   disabled: boolean;
   onDecide: () => void;
   onRetake: () => void;
+  /** 端末から選んだ動画か。反転せずに見せ、「この端末に保存」は出さない（もう端末にあるため） */
+  fromLibrary?: boolean;
 };
 
 const STEP_SECONDS = 0.1;
@@ -59,6 +61,7 @@ export function OutfitClipPicker({
   disabled,
   onDecide,
   onRetake,
+  fromLibrary = false,
 }: OutfitClipPickerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [url, setUrl] = useState<string | null>(null);
@@ -112,7 +115,7 @@ export function OutfitClipPicker({
     return () => URL.revokeObjectURL(objectUrl);
   }, [clip.blob]);
 
-  const layout = previewLayout(frame, rotation);
+  const layout = previewLayout(frame, rotation, !fromLibrary);
 
   function seek(next: number) {
     const video = videoRef.current;
@@ -340,14 +343,16 @@ export function OutfitClipPicker({
           {frames.length}枚で決定
         </Button>
         <Button type="button" variant="outline" onClick={handleRetake} disabled={disabled || busy}>
-          撮り直す
+          {fromLibrary ? "選び直す" : "撮り直す"}
         </Button>
-        <Button type="button" variant="outline" onClick={saveVideo}>
-          この端末に保存
-        </Button>
+        {!fromLibrary && (
+          <Button type="button" variant="outline" onClick={saveVideo}>
+            この端末に保存
+          </Button>
+        )}
       </div>
       {frames.length > 0 && (
-        <p className="text-xs text-muted-foreground">「撮り直す」を押すと、選んだコマも消えます</p>
+        <p className="text-xs text-muted-foreground">「{fromLibrary ? "選び直す" : "撮り直す"}」を押すと、選んだコマも消えます</p>
       )}
     </div>
   );

@@ -32,6 +32,18 @@ import {
   type ProcessedMap,
 } from "@/lib/outfits/frame-background";
 import { planMediaUploads } from "@/lib/outfits/upload-plan";
+import {
+  judgeLibraryVideo,
+  LIBRARY_VIDEO_MESSAGES,
+  libraryVideoUploadName,
+} from "@/lib/outfits/library-video";
+import { probeVideoFile } from "@/lib/outfits/library-video-browser";
+import {
+  mergePickedPhotos,
+  photoSelectionNotice,
+  planPhotoSelection,
+} from "@/lib/outfits/photo-selection";
+import { removePickedFrame } from "@/lib/outfits/clip-frames";
 import { rotateStaged, stagePhoto, type StagedPhoto } from "@/lib/outfits/photo-rotation";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -72,6 +84,10 @@ export function OutfitQuickRecordForm({
   const mediaIdRef = useRef<string | null>(null);
   const processedRef = useRef<ProcessedImage | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photosInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  // 選び直し・確定・リセットのたびに進める。処理を待つあいだに状況が変わったら、古い結果は捨てる
+  const selectionEpochRef = useRef(0);
 
   // 送る前の確認中の写真。向きを回せるのはここにいる間だけ。
   // 下書きの作成とアップロードは「この写真を使う」を押したときに1回だけ行う
@@ -101,7 +117,17 @@ export function OutfitQuickRecordForm({
 
   // 動画モード：録った動画は、確定・リセット・撮り直しまでフォームが持つ。
   // 選んだコマの送信は「確定」のときだけ（コマ選びの途中で下書きを作らない）
-  const [clip, setClip] = useState<{ clip: CaptureClip; rotation: ImageRotation } | null>(null);
+  // fromLibrary：端末から選んだ動画（「この端末に保存」を出さず、反転しないで見せる）
+  const [clip, setClip] = useState<{
+    clip: CaptureClip;
+    rotation: ImageRotation;
+    fromLibrary: boolean;
+    name?: string;
+  } | null>(null);
+  // 端末の写真を複数選んだ流れ（動画なし）。選んだ列を動画のコマと同じ列で持つ
+  const [photoSet, setPhotoSet] = useState(false);
+  // 端末の動画の確認中・写真の処理中
+  const [libraryBusy, setLibraryBusy] = useState(false);
   const [frames, setFrames] = useState<PickedFrame<ProcessedImage>[]>([]);
   const [keepVideo, setKeepVideo] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -196,6 +222,9 @@ export function OutfitQuickRecordForm({
 
   // 動画・選んだコマ・送信の進み具合を全部捨てる
   const discardClip = () => {
+    selectionEpochRef.current += 1;
+    setLibraryBusy(false);
+    setPhotoSet(false);
     setClip(null);
     setFrames([]);
     setKeepVideo(true);
@@ -306,7 +335,9 @@ export function OutfitQuickRecordForm({
   };
 
   // 動画を録り終えた。写真1枚の流れの下書きは使わないので捨てて、コマ選びを開く
-  const handleClip = useCallback((next: CaptureClip, rotation: ImageRotation) => {
+  const handleClip = useCallback((next: CaptureClip, rotation: ImageRotation, fromLibrary = false, name?: string) => {
+    selectionEpochRef.current += 1;
+    setPhotoSet(false);
     clientRequestIdRef.current = crypto.randomUUID();
     startedMediaIdRef.current = null;
     mediaIdRef.current = null;
@@ -327,15 +358,101 @@ export function OutfitQuickRecordForm({
     videoDoneRef.current = false;
     videoFailedRef.current = false;
     setAutoStartCamera(false);
-    setClip({ clip: next, rotation });
+    setClip({ clip: next, rotation, fromLibrary, name });
     setPickerOpen(true);
   }, []);
+
+  // 端末の動画を選んだ。使えるか確かめて、よければカメラで録り終えたときと同じ入口（handleClip）に合流する。
+  // 向きは回転の値 0 で渡す：ブラウザが <video> の表示も canvas への描画も回転後の向きで返すため（二重に回さない）
+  const handleVideoFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || isConfirmingRef.current) return;
+    setMessage(null);
+    const epoch = ++selectionEpochRef.current;
+    // 大きさは読み込む前に見る（大きすぎる動画を開かない）
+    const tooLarge = judgeLibraryVideo({ sizeBytes: file.size, durationSec: 1 });
+    if (!tooLarge.ok) return setMessage(LIBRARY_VIDEO_MESSAGES[tooLarge.reason]);
+    setLibraryBusy(true);
+    let verdict;
+    try {
+      const { durationSec } = await probeVideoFile(file);
+      verdict = { durationSec, ...judgeLibraryVideo({ sizeBytes: file.size, durationSec }) };
+    } catch {
+      verdict = { durationSec: 0, ok: false as const, reason: "unreadable" as const };
+    }
+    if (epoch !== selectionEpochRef.current) return;
+    setLibraryBusy(false);
+    // 選べなかったときは、今の状態をそのまま残して一言だけ出す（選び直せる）
+    if (!verdict.ok) return setMessage(LIBRARY_VIDEO_MESSAGES[verdict.reason]);
+    setAutoStartCamera(false);
+    setCameraKey((k) => k + 1);
+    handleClip({ blob: file, durationSec: verdict.durationSec }, 0, true, file.name);
+  };
+
+  // 端末の写真を複数選んだ。今の列（動画のコマ）があれば後ろに足し、なければ写真だけの列を始める。
+  // 処理は写真1枚の流れと同じ（向き・長辺2560・JPEG 0.9）。6枚を超える分は無視する
+  const handlePhotosChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (files.length === 0 || isConfirmingRef.current) return;
+    setMessage(null);
+    const fresh = clip === null && !photoSet;
+    const base = fresh ? [] : frames;
+    const { take, ignored } = planPhotoSelection(base.length, files.length);
+    if (take === 0) return setMessage(photoSelectionNotice({ ignored, failed: 0 }));
+    const epoch = ++selectionEpochRef.current;
+    setLibraryBusy(true);
+    const done: { id: string; image: ProcessedImage }[] = [];
+    let failed = 0;
+    let lastError: string | null = null;
+    for (const file of files.slice(0, take)) {
+      try {
+        done.push({ id: crypto.randomUUID(), image: await processImageForOutfitUpload(file, 0) });
+      } catch (error) {
+        failed += 1;
+        lastError = error instanceof ImageProcessingError ? error.message : null;
+      }
+      if (epoch !== selectionEpochRef.current) return;
+    }
+    setLibraryBusy(false);
+    const notice = photoSelectionNotice({ ignored, failed });
+    if (done.length === 0) return setMessage(failed === 1 && lastError ? lastError : notice);
+    if (fresh) {
+      // 写真1枚の流れの下書きは使わないので捨てる（動画のときと同じ）
+      clientRequestIdRef.current = crypto.randomUUID();
+      startedMediaIdRef.current = null;
+      mediaIdRef.current = null;
+      processedRef.current = null;
+      setOutfitId(null);
+      setPhase("idle");
+      setPreviewBlob(null);
+      setStaged(null);
+      setSendStatus(null);
+      setBgMode("none");
+      bgProcessedRef.current = {};
+      setBgProcessed({});
+      doneMediaRef.current = new Set();
+      setAutoStartCamera(false);
+      setCameraKey((k) => k + 1);
+      setPhotoSet(true);
+      setPickerOpen(false);
+    }
+    setFrames(mergePickedPhotos(base, done).list);
+    setMessage(notice);
+  };
 
   // 動画と選んだコマを全部捨てて、カメラに戻る
   const handleRetakeClip = () => {
     if (isConfirmingRef.current) return;
+    const fromLibrary = clip?.fromLibrary ?? false;
     discardClip();
     setOutfitId(null);
+    // 端末から選んだ動画は、カメラではなく動画の選び直しに戻る
+    if (fromLibrary) {
+      videoInputRef.current?.click();
+      return;
+    }
     clientRequestIdRef.current = crypto.randomUUID();
     setAutoStartCamera(true);
     setCameraKey((k) => k + 1);
@@ -507,14 +624,14 @@ export function OutfitQuickRecordForm({
   // 動画が失敗しても、写真と記録は確定する
   const handleConfirmWithClip = async () => {
     if (isConfirmingRef.current) return;
-    if (!clip || pickerOpen || frames.length === 0 || validSelectedIds.length === 0) return;
+    if (!multiMode || pickerOpen || frames.length === 0 || validSelectedIds.length === 0) return;
     // 背景を整え終わるまで送らない（元の写真は送らない）
     if (bgBusy) return;
     isConfirmingRef.current = true;
     setIsConfirming(true);
     setMessage(null);
 
-    const plan = planMediaUploads({ photoCount: frames.length, keepVideo });
+    const plan = planMediaUploads({ photoCount: frames.length, keepVideo: clip !== null && keepVideo });
     let draftId = outfitId;
     for (const step of plan) {
       if (step.kind === "photo") {
@@ -563,14 +680,18 @@ export function OutfitQuickRecordForm({
           return;
         }
         doneMediaRef.current.add(frame.id);
-      } else if (!videoDoneRef.current) {
+      } else if (clip && !videoDoneRef.current) {
         const videoMediaId = videoMediaIdRef.current as string;
         setSendStatus("動画を送っています");
         const error = await sendOne({
           kind: "video",
           mediaId: videoMediaId,
           blob: clip.clip.blob,
-          filename: clip.clip.blob.type.includes("mp4") ? "outfit.mp4" : "outfit.webm",
+          filename: clip.fromLibrary
+            ? libraryVideoUploadName({ type: clip.clip.blob.type, name: clip.name })
+            : clip.clip.blob.type.includes("mp4")
+              ? "outfit.mp4"
+              : "outfit.webm",
           request: () =>
             addOutfitMediaUpload({
               outfitId: draftId as string,
@@ -600,9 +721,11 @@ export function OutfitQuickRecordForm({
 
   // 動画モード：コマを決めてあり、服を選んであれば確定できる（送るのは確定のとき）。
   // 下書きができたあと（送信を始めたあと）は、コマの選び直しを止める（使われない写真が下書きに残らないように）
+  // multiMode：動画のコマ、または端末の複数の写真を、選んだ列として持つ流れ（確定のとき送る）
   const videoMode = clip !== null;
-  const videoLocked = videoMode && outfitId !== null;
-  const canConfirm = videoMode
+  const multiMode = clip !== null || photoSet;
+  const videoLocked = multiMode && outfitId !== null;
+  const canConfirm = multiMode
     ? !pickerOpen && frames.length > 0 && validSelectedIds.length > 0 && !isConfirming && !bgBusy
     : !staged && phase === "done" && validSelectedIds.length > 0 && !isConfirming;
 
@@ -612,7 +735,7 @@ export function OutfitQuickRecordForm({
         <h2 id="look-photo-title" className="text-base font-semibold">
           1. 写真を選ぶ
         </h2>
-        {!videoMode && (stagedUrl ?? previewUrl) && (
+        {!multiMode && (stagedUrl ?? previewUrl) && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={(stagedUrl ?? previewUrl) as string}
@@ -650,9 +773,10 @@ export function OutfitQuickRecordForm({
             disabled={isConfirming}
             onDecide={() => setPickerOpen(false)}
             onRetake={handleRetakeClip}
+            fromLibrary={clip.fromLibrary}
           />
         )}
-        {videoMode && !pickerOpen && (
+        {multiMode && !pickerOpen && (
           <div className="flex flex-col gap-3">
             <ul className="flex gap-2 overflow-x-auto pb-1" aria-label="選んだ写真">
               {frames.map((f, index) => (
@@ -665,9 +789,20 @@ export function OutfitQuickRecordForm({
                       className="h-28 w-auto rounded-xl bg-photo object-contain"
                     />
                   )}
+                  {photoSet && !videoLocked && (
+                    <button
+                      type="button"
+                      aria-label={`${index + 1}枚目を外す`}
+                      disabled={isConfirming || libraryBusy}
+                      onClick={() => setFrames(removePickedFrame(frames, f.id))}
+                      className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-xs text-background"
+                    >
+                      ×
+                    </button>
+                  )}
                 </li>
               ))}
-              {keepVideo && (
+              {videoMode && keepVideo && (
                 <li className="flex h-28 w-20 shrink-0 items-center justify-center rounded-xl bg-secondary text-sm text-muted-foreground">
                   動画
                 </li>
@@ -699,9 +834,9 @@ export function OutfitQuickRecordForm({
               )}
             </div>
             <p className="text-sm text-muted-foreground">
-              写真 {frames.length}枚{keepVideo ? "と動画" : ""}を、確定のときに送ります
+              写真 {frames.length}枚{videoMode && keepVideo ? "と動画" : ""}を、確定のときに送ります
             </p>
-            {!videoLocked && (
+            {videoMode && !videoLocked && (
               <Button
                 type="button"
                 variant="outline"
@@ -729,6 +864,31 @@ export function OutfitQuickRecordForm({
             写真を選ぶ
           </Button>
         )}
+        {!pickerOpen && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => photosInputRef.current?.click()}
+              disabled={isConfirming || libraryBusy || phase === "processing" || phase === "uploading" || videoLocked}
+            >
+              写真から選ぶ（6枚まで）
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => videoInputRef.current?.click()}
+              disabled={isConfirming || libraryBusy || phase === "processing" || phase === "uploading" || videoLocked}
+            >
+              動画から選ぶ
+            </Button>
+          </div>
+        )}
+        {libraryBusy && (
+          <p className="text-sm text-muted-foreground" role="status">
+            読み込んでいます…
+          </p>
+        )}
         <div className={videoMode ? "hidden" : undefined}>
           <OutfitCameraCapture
             key={cameraKey}
@@ -745,6 +905,23 @@ export function OutfitQuickRecordForm({
           onChange={handleFileChange}
           disabled={isConfirming || phase === "processing" || phase === "uploading"}
           aria-label="着画の写真を選ぶ"
+          className="hidden"
+        />
+        <input
+          ref={photosInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handlePhotosChange}
+          aria-label="着画の写真を複数選ぶ"
+          className="hidden"
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/*"
+          onChange={handleVideoFileChange}
+          aria-label="着画の動画を選ぶ"
           className="hidden"
         />
         <p className="text-sm text-muted-foreground" role="status">
@@ -812,13 +989,17 @@ export function OutfitQuickRecordForm({
 
       <Button
         type="button"
-        onClick={videoMode ? handleConfirmWithClip : handleConfirm}
+        onClick={multiMode ? handleConfirmWithClip : handleConfirm}
         disabled={!canConfirm} className="w-full">
         {isConfirming ? "確定しています" : "確定"}
       </Button>
       {!canConfirm && !isConfirming && (
         <p className="text-xs text-muted-foreground">
-          {videoMode ? "コマを決めて、服を選ぶと確定できます" : "写真と服を選ぶと確定できます"}
+          {videoMode
+            ? "コマを決めて、服を選ぶと確定できます"
+            : multiMode
+              ? "写真が1枚以上あり、服を選ぶと確定できます"
+              : "写真と服を選ぶと確定できます"}
         </p>
       )}
     </div>

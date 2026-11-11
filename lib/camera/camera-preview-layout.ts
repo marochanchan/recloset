@@ -12,6 +12,8 @@ export type PreviewLayout = {
 export function previewLayout(
   frame: { width: number; height: number },
   rotation: ImageRotation,
+  // カメラのプレビューは鏡のように反転する。端末から選んだ動画は、撮ったとおりに（反転しないで）見せる
+  mirror = true,
 ): PreviewLayout {
   const sideways = rotation === 90 || rotation === 270;
   // 横向きのときは、回した映像が外枠に収まるよう幅と高さを入れ替えて割合を出す
@@ -24,6 +26,6 @@ export function previewLayout(
     aspect,
     widthPercent,
     heightPercent,
-    transform: `translate(-50%, -50%) scaleX(-1)${turn}`,
+    transform: `translate(-50%, -50%)${mirror ? " scaleX(-1)" : ""}${turn}`,
   };
 }
