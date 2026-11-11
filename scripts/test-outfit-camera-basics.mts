@@ -199,3 +199,9 @@ test("ready gate never leaves an unhandled rejection", async () => {
     process.off("unhandledRejection", onUnhandled);
   }
 });
+
+test("previewLayout: mirror=false は左右反転しない（端末から選んだ動画）", () => {
+  const layout = previewLayout({ width: 720, height: 1280 }, 0, false);
+  assert.equal(layout.transform, "translate(-50%, -50%)");
+  assert.equal(previewLayout({ width: 720, height: 1280 }, 90, false).transform, "translate(-50%, -50%) rotate(90deg)");
+});

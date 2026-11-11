@@ -4,7 +4,8 @@ export const MAX_PICKED_FRAMES = 6;
 // 同じ時刻とみなす幅（秒）。スライダーの刻み（0.05秒）と同じ
 export const SAME_TIME_SECONDS = 0.05;
 
-export type PickedFrame<T> = { id: string; timeSec: number; image: T };
+// timeSec：動画から選んだコマの時刻（秒）。端末の写真には時刻が無いので null（重複判定・シークの対象外）
+export type PickedFrame<T> = { id: string; timeSec: number | null; image: T };
 
 export function addPickedFrame<T>(
   list: PickedFrame<T>[],
@@ -12,9 +13,14 @@ export function addPickedFrame<T>(
 ): { list: PickedFrame<T>[]; result: "added" | "duplicate" | "full" } {
   if (list.length >= MAX_PICKED_FRAMES) return { list, result: "full" };
   // 浮動小数点の誤差で境界がぶれないよう、ミリ秒に丸めて比べる
-  const near = list.some(
-    (f) => Math.round(Math.abs(f.timeSec - frame.timeSec) * 1000) <= SAME_TIME_SECONDS * 1000,
-  );
+  const near =
+    frame.timeSec !== null &&
+    list.some(
+      (f) =>
+        f.timeSec !== null &&
+        frame.timeSec !== null &&
+        Math.round(Math.abs(f.timeSec - frame.timeSec) * 1000) <= SAME_TIME_SECONDS * 1000,
+    );
   if (near) return { list, result: "duplicate" };
   return { list: [...list, frame], result: "added" };
 }

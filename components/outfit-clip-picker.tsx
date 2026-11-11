@@ -30,6 +30,8 @@ type OutfitClipPickerProps = {
   disabled: boolean;
   onDecide: () => void;
   onRetake: () => void;
+  /** 端末から選んだ動画か。反転せずに見せ、「この端末に保存」は出さない（もう端末にあるため） */
+  fromLibrary?: boolean;
 };
 
 const STEP_SECONDS = 0.1;
@@ -59,6 +61,7 @@ export function OutfitClipPicker({
   disabled,
   onDecide,
   onRetake,
+  fromLibrary = false,
 }: OutfitClipPickerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [url, setUrl] = useState<string | null>(null);
@@ -112,7 +115,7 @@ export function OutfitClipPicker({
     return () => URL.revokeObjectURL(objectUrl);
   }, [clip.blob]);
 
-  const layout = previewLayout(frame, rotation);
+  const layout = previewLayout(frame, rotation, !fromLibrary);
 
   function seek(next: number) {
     const video = videoRef.current;
@@ -288,8 +291,14 @@ export function OutfitClipPicker({
               <li key={f.id} className="relative">
                 <button
                   type="button"
-                  aria-label={`${index + 1}枚目（${f.timeSec.toFixed(1)}秒）の場面に移る`}
-                  onClick={() => seek(f.timeSec)}
+                  aria-label={
+                    f.timeSec === null
+                      ? `${index + 1}枚目（写真）`
+                      : `${index + 1}枚目（${f.timeSec.toFixed(1)}秒）の場面に移る`
+                  }
+                  onClick={() => {
+                    if (f.timeSec !== null) seek(f.timeSec); // 端末の写真には場面（時刻）が無い
+                  }}
                   className="block h-16 w-16 overflow-hidden rounded-lg bg-photo outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {thumbs[f.id] && (
@@ -340,14 +349,16 @@ export function OutfitClipPicker({
           {frames.length}枚で決定
         </Button>
         <Button type="button" variant="outline" onClick={handleRetake} disabled={disabled || busy}>
-          撮り直す
+          {fromLibrary ? "選び直す" : "撮り直す"}
         </Button>
-        <Button type="button" variant="outline" onClick={saveVideo}>
-          この端末に保存
-        </Button>
+        {!fromLibrary && (
+          <Button type="button" variant="outline" onClick={saveVideo}>
+            この端末に保存
+          </Button>
+        )}
       </div>
       {frames.length > 0 && (
-        <p className="text-xs text-muted-foreground">「撮り直す」を押すと、選んだコマも消えます</p>
+        <p className="text-xs text-muted-foreground">「{fromLibrary ? "選び直す" : "撮り直す"}」を押すと、選んだコマも消えます</p>
       )}
     </div>
   );
