@@ -68,6 +68,8 @@ export type CaptureController = {
   cancelCountdown(): void; // カウントダウン中・録画中に止める
   useFrame(frame: Blob): Promise<void>; // picking で選んだコマを写真にする
   retake(): Promise<void>;
+  // picking の動画と向きを呼び出し側に渡して、カメラを止めて off に戻る（コマ選びは呼び出し側が持つ）。picking 以外は null
+  handOffClip(): { clip: CaptureClip; rotation: ImageRotation } | null;
   keep(): ProcessedImage | null; // 写真を返して off へ。2回目は null
   suspend(): void; // 画面が隠れた。確認中の写真だけ残す
   close(): void; // 全部やめる
@@ -410,6 +412,13 @@ export function createCaptureController(deps: {
         return;
       }
       await openCamera(state.deviceId, true);
+    },
+    handOffClip() {
+      if (state.phase !== "picking" || !state.clip) return null;
+      const handed = { clip: state.clip, rotation: state.rotation };
+      stopEverything();
+      setState({ ...INITIAL_STATE });
+      return handed;
     },
     keep() {
       if (state.phase !== "review" || !state.photo) return null;

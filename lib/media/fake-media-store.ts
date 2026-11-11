@@ -50,6 +50,7 @@ export function createFakeMediaStore(): MediaStore & {
         manifestUrl: `${base}/manifest/video.m3u8`,
         thumbnailUrl: `${base}/thumbnails/thumbnail.jpg`,
         previewGifUrl: `${base}/thumbnails/thumbnail.gif`,
+        iframeUrl: `${base}/iframe`,
       };
     },
 

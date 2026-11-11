@@ -1,0 +1,181 @@
+// 選んだコマの列と、確定のときの送る計画の自動テスト。
+//   node --test scripts/test-outfit-clip-frames.mts
+
+import assert from "node:assert/strict";
+import { registerHooks } from "node:module";
+import { test } from "node:test";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier.startsWith("@/")) {
+      return nextResolve(pathToFileURL(`${repoRoot}${specifier.slice(2)}.ts`).href, context);
+    }
+    return nextResolve(specifier, context);
+  },
+});
+
+const { MAX_PICKED_FRAMES, addPickedFrame, removePickedFrame } = await import(
+  "../lib/outfits/clip-frames.ts"
+);
+const { planMediaUploads } = await import("../lib/outfits/upload-plan.ts");
+
+const frame = (id: string, timeSec: number) => ({ id, timeSec, image: id });
+
+test("addPickedFrame: 追加順に並び、同じ時刻（0.05秒以内）は足さない", () => {
+  let list: ReturnType<typeof frame>[] = [];
+  let r = addPickedFrame(list, frame("a", 2));
+  assert.equal(r.result, "added");
+  list = r.list;
+  r = addPickedFrame(list, frame("b", 1));
+  list = r.list;
+  assert.deepEqual(list.map((f) => f.id), ["a", "b"]);
+  r = addPickedFrame(list, frame("c", 2.05));
+  assert.equal(r.result, "duplicate");
+  assert.equal(r.list.length, 2);
+  r = addPickedFrame(list, frame("d", 2.06));
+  assert.equal(r.result, "added");
+  assert.equal(r.list.length, 3);
+});
+
+test("addPickedFrame: 最大6枚で、7枚目は断る。元の配列は変えない", () => {
+  let list: ReturnType<typeof frame>[] = [];
+  for (let i = 0; i < MAX_PICKED_FRAMES; i++) list = addPickedFrame(list, frame(`f${i}`, i)).list;
+  assert.equal(MAX_PICKED_FRAMES, 6);
+  assert.equal(list.length, 6);
+  const before = list;
+  const r = addPickedFrame(list, frame("x", 99));
+  assert.equal(r.result, "full");
+  assert.equal(r.list, before);
+});
+
+test("removePickedFrame: id で外し、残りの順序は保つ。知らない id は何もしない", () => {
+  const list = [frame("a", 1), frame("b", 2), frame("c", 3)];
+  assert.deepEqual(removePickedFrame(list, "b").map((f) => f.id), ["a", "c"]);
+  assert.equal(removePickedFrame(list, "zzz").length, 3);
+  assert.equal(list.length, 3);
+});
+
+test("planMediaUploads: 写真0枚なら何も作らない（動画だけでも）", () => {
+  assert.deepEqual(planMediaUploads({ photoCount: 0, keepVideo: true }), []);
+  assert.deepEqual(planMediaUploads({ photoCount: 0, keepVideo: false }), []);
+});
+
+test("planMediaUploads: 最初の写真が下書きを作り、残りの写真、動画の順。sortOrder は 0.. の連番", () => {
+  assert.deepEqual(planMediaUploads({ photoCount: 3, keepVideo: true }), [
+    { kind: "photo", photoIndex: 0, sortOrder: 0, createsDraft: true },
+    { kind: "photo", photoIndex: 1, sortOrder: 1, createsDraft: false },
+    { kind: "photo", photoIndex: 2, sortOrder: 2, createsDraft: false },
+    { kind: "video", photoIndex: null, sortOrder: 3, createsDraft: false },
+  ]);
+  assert.deepEqual(planMediaUploads({ photoCount: 1, keepVideo: false }), [
+    { kind: "photo", photoIndex: 0, sortOrder: 0, createsDraft: true },
+  ]);
+});
+
+test("planMediaUploads: 写真が6枚を超える・負・小数は例外", () => {
+  assert.throws(() => planMediaUploads({ photoCount: 7, keepVideo: false }));
+  assert.throws(() => planMediaUploads({ photoCount: -1, keepVideo: false }));
+  assert.throws(() => planMediaUploads({ photoCount: 1.5, keepVideo: false }));
+});
+
+// ---- addOutfitMediaUpload の入力チェックと、本人の下書きだけに足す確認 ----
+const { OutfitNotDraftError, addMediaToDraft, parseAddMediaInput } = await import(
+  "../lib/outfits/add-media.ts"
+);
+const { createFakeMediaStore } = await import("../lib/media/fake-media-store.ts");
+
+const OUTFIT_ID = "00000000-0000-4000-8000-0000000000a1";
+const MEDIA_ID = "00000000-0000-4000-8000-0000000000b1";
+const USER_ID = "00000000-0000-4000-8000-000000000001";
+import type { OutfitMediaDb, OutfitMediaRow } from "../lib/outfits/media-db.ts";
+
+const good = { outfitId: OUTFIT_ID, mediaId: MEDIA_ID, kind: "photo", sortOrder: 1 };
+
+test("parseAddMediaInput: 正しい入力を通す", () => {
+  assert.deepEqual(parseAddMediaInput(good), { ok: true, value: good });
+  assert.deepEqual(parseAddMediaInput({ ...good, kind: "video", sortOrder: 6 }).ok, true);
+});
+
+test("parseAddMediaInput: UUID・kind・sortOrder の範囲（1〜6、整数）を確かめる", () => {
+  for (const bad of [
+    null,
+    "x",
+    { ...good, outfitId: "nope" },
+    { ...good, mediaId: 5 },
+    { ...good, kind: "frame" },
+    { ...good, kind: undefined },
+    { ...good, sortOrder: 0 }, // 0 番は下書きを作る写真（startOutfitPhotoUpload）だけ
+    { ...good, sortOrder: 7 },
+    { ...good, sortOrder: 1.5 },
+    { ...good, sortOrder: "1" },
+  ]) {
+    assert.equal(parseAddMediaInput(bad).ok, false, JSON.stringify(bad));
+  }
+});
+
+function fakeDb() {
+  const rows = new Map<string, OutfitMediaRow & { sortOrder: number }>();
+  const db: OutfitMediaDb = {
+    async getMedia(_userId, id) {
+      return rows.get(id) ?? null;
+    },
+    async registerMedia(i) {
+      const row = {
+        id: i.mediaId, outfitId: i.outfitId, userId: i.userId, kind: i.kind, provider: i.provider,
+        providerAssetId: i.assetId, uploadAttempt: 1, uploadExpiresAt: null, status: "uploading" as const,
+        width: null, height: null, durationSec: null, sortOrder: i.sortOrder,
+      };
+      rows.set(i.mediaId, row);
+      return row;
+    },
+    async setState(i) {
+      const row = rows.get(i.mediaId);
+      if (!row) throw new Error("no row");
+      return { ...row, status: i.status };
+    },
+    async replaceAsset() {
+      throw new Error("unused");
+    },
+  };
+  return { rows, db };
+}
+
+test("addMediaToDraft: 本人の下書きにだけ足す。違えば Cloudflare にも DB にも触らない", async () => {
+  const { db, rows } = fakeDb();
+  const store = createFakeMediaStore();
+  const deps = { db, store, now: () => new Date("2026-11-11T00:00:00Z") };
+  await assert.rejects(
+    addMediaToDraft(deps, { userId: USER_ID, ...good, kind: "photo", isOwnDraft: async () => false }),
+    OutfitNotDraftError,
+  );
+  assert.equal(rows.size, 0);
+  assert.equal(store.assets.size, 0);
+});
+
+test("addMediaToDraft: 写真と動画の upload URL を返し、同じ mediaId の2回目は壊れず新しい行を作らない", async () => {
+  const { db, rows } = fakeDb();
+  const store = createFakeMediaStore();
+  const deps = { db, store, now: () => new Date("2026-11-11T00:00:00Z") };
+  const seen: string[] = [];
+  const isOwnDraft = async (id: string) => (seen.push(id), true);
+
+  const video = await addMediaToDraft(deps, {
+    userId: USER_ID, outfitId: OUTFIT_ID, mediaId: MEDIA_ID, kind: "video", sortOrder: 2, isOwnDraft,
+  });
+  assert.equal(video.mediaId, MEDIA_ID);
+  assert.ok(video.uploadUrl);
+  assert.equal(rows.get(MEDIA_ID)?.kind, "video");
+  assert.equal(rows.get(MEDIA_ID)?.sortOrder, 2);
+  assert.deepEqual(seen, [OUTFIT_ID]);
+
+  // 2回目：届いていれば uploadUrl は null（retry に回る）
+  const assetId = rows.get(MEDIA_ID)?.providerAssetId as string;
+  store.setState(assetId, { state: "ready" });
+  const again = await addMediaToDraft(deps, {
+    userId: USER_ID, outfitId: OUTFIT_ID, mediaId: MEDIA_ID, kind: "video", sortOrder: 2, isOwnDraft,
+  });
+  assert.equal(again.uploadUrl, null);
+  assert.equal(rows.size, 1);
+});

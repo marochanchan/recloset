@@ -54,6 +54,7 @@ test("Stream の URL は customer コードとトークンから作る", () => {
   assert.equal(u.manifestUrl, "https://customer-abc.cloudflarestream.com/TKN/manifest/video.m3u8");
   assert.equal(u.thumbnailUrl, "https://customer-abc.cloudflarestream.com/TKN/thumbnails/thumbnail.jpg?time=1s");
   assert.equal(u.previewGifUrl, "https://customer-abc.cloudflarestream.com/TKN/thumbnails/thumbnail.gif?time=0s&duration=3s");
+  assert.equal(u.iframeUrl, "https://customer-abc.cloudflarestream.com/TKN/iframe");
 });
 
 // webhook: 秘密 "whsec"、本文 '{"uid":"v1"}'、time=1700000000、now=1700000100

@@ -61,42 +61,85 @@ async function LookDetail({ params }: { params: Promise<{ id: string }> }) {
     "look detail items",
   );
 
-  // 写真は ready のものだけ。Cloudflare の設定が足りなければ、写真なしで表示を続ける
+  // 写真は ready のものだけ、動画は届いたもの（変換中・失敗も含む）。Cloudflare の設定が足りなければ、メディアなしで表示を続ける
   const { data: media, error: mediaError } = await supabase
     .from("outfit_media")
-    .select("provider_asset_id, width, height")
+    .select("kind, status, provider_asset_id, width, height")
     .eq("outfit_id", id)
-    .eq("kind", "photo")
-    .eq("status", "ready")
+    .in("kind", ["photo", "video"])
     .order("sort_order")
-    .order("created_at")
-    .limit(1);
+    .order("created_at");
   if (mediaError) {
     console.error("look detail: fetch media error", mediaError.code);
   }
 
   const store = tryCreateMediaStore();
-  const photoAssetId = media?.[0]?.provider_asset_id;
-  const photoUrl =
-    store && photoAssetId ? store.signedImageUrl(photoAssetId, "display", new Date()) : null;
+  const now = new Date();
+  const photos = (media ?? []).filter((m) => m.kind === "photo" && m.status === "ready");
+  // uploading のままのもの（送信が終わらなかった動画）は出さない
+  const video = (media ?? []).find((m) => m.kind === "video" && m.status !== "uploading");
+  const photoUrls = store
+    ? photos.map((m) => ({
+        url: store.signedImageUrl(m.provider_asset_id, "display", now),
+        width: m.width,
+        height: m.height,
+      }))
+    : [];
+  const videoIframeUrl =
+    store && video?.status === "ready" ? store.signedStreamUrls(video.provider_asset_id, now).iframeUrl : null;
 
   return (
     <div className="flex flex-col gap-6">
-      {photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={photoUrl}
-          alt="着画"
-          width={media?.[0]?.width ?? undefined}
-          height={media?.[0]?.height ?? undefined}
-          className="h-auto max-h-[32rem] w-full rounded-2xl bg-photo object-contain"
-        />
+      {photoUrls.length > 0 ? (
+        // 写真を横に並べる。タップすると大きい画像が開く
+        <ul className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1" aria-label="着画の写真">
+          {photoUrls.map((photo, index) => (
+            <li key={photo.url} className={photoUrls.length > 1 ? "w-[85%] shrink-0 snap-center" : "w-full"}>
+              <a href={photo.url} target="_blank" rel="noreferrer" aria-label={`写真 ${index + 1} を大きく見る`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photo.url}
+                  alt={`着画 ${index + 1}`}
+                  width={photo.width ?? undefined}
+                  height={photo.height ?? undefined}
+                  className="h-auto max-h-[32rem] w-full rounded-2xl bg-photo object-contain"
+                />
+              </a>
+            </li>
+          ))}
+        </ul>
       ) : (
         <p className="rounded-2xl bg-secondary/60 px-4 py-6 text-center text-sm text-muted-foreground">
-          {photoAssetId
+          {(media ?? []).some((m) => m.kind === "photo")
             ? "写真は今は表示できません。しばらくしてから開き直してください"
             : "写真はまだありません"}
         </p>
+      )}
+
+      {video && (
+        <section aria-labelledby="look-video-title" className="flex flex-col gap-2">
+          <h2 id="look-video-title" className="text-base font-semibold">
+            動画
+          </h2>
+          {videoIframeUrl ? (
+            <div
+              className="w-full overflow-hidden rounded-2xl bg-photo"
+              style={{ aspectRatio: video.width && video.height ? `${video.width} / ${video.height}` : "16 / 9" }}
+            >
+              <iframe
+                src={videoIframeUrl}
+                title="着画の動画"
+                allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
+                allowFullScreen
+                className="h-full w-full border-0"
+              />
+            </div>
+          ) : (
+            <p className="rounded-2xl bg-secondary/60 px-4 py-6 text-center text-sm text-muted-foreground">
+              {video.status === "failed" || !store ? "動画を再生できませんでした" : "動画を準備しています"}
+            </p>
+          )}
+        </section>
       )}
 
       <div className="flex flex-col gap-1">

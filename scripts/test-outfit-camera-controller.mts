@@ -924,3 +924,23 @@ test("camera unplugged while picking keeps the clip; retake reopens", async (t) 
   assert.equal(h.controller.getState().phase, "live");
   assert.equal(h.source.openCalls.length, 2);
 });
+
+test("picking: handOffClip returns the clip and rotation, stops the camera, goes off", async (t) => {
+  const h = setup(t);
+  const camera = await h.startPicking();
+  const handed = h.controller.handOffClip();
+  assert.ok(handed);
+  assert.equal(handed.clip.durationSec, 5);
+  assert.equal(handed.rotation, 0);
+  assert.equal(h.controller.getState().phase, "off");
+  assert.equal(h.controller.getState().clip, null);
+  assert.equal(camera.stopped, true);
+  assert.equal(h.controller.handOffClip(), null);
+});
+
+test("handOffClip outside picking returns null and changes nothing", async (t) => {
+  const h = setup(t);
+  await h.startLive();
+  assert.equal(h.controller.handOffClip(), null);
+  assert.equal(h.controller.getState().phase, "live");
+});

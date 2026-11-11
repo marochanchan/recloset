@@ -1,21 +1,28 @@
 "use client";
 
-import { OutfitClipPicker } from "@/components/outfit-clip-picker";
 import { Button } from "@/components/ui/button";
 import { createBrowserCameraSource } from "@/lib/camera/browser-camera-source";
 import { previewLayout } from "@/lib/camera/camera-preview-layout";
 import type { PreferenceStorage } from "@/lib/camera/camera-preferences";
 import { cameraErrorMessage } from "@/lib/camera/camera-source";
-import { createCaptureController, type CaptureMode } from "@/lib/camera/capture-controller";
+import { createCaptureController, type CaptureClip, type CaptureMode } from "@/lib/camera/capture-controller";
 import { createManualTrigger } from "@/lib/camera/capture-trigger";
 import { createCountdownBeep } from "@/lib/camera/countdown-beep";
-import { processImageForOutfitUpload, type ProcessedImage } from "@/lib/image-processing";
+import {
+  processImageForOutfitUpload,
+  type ImageRotation,
+  type ProcessedImage,
+} from "@/lib/image-processing";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
 
 type OutfitCameraCaptureProps = {
   disabled: boolean;
   onPhoto: (image: ProcessedImage) => void;
+  /** 動画を録り終えたとき。コマ選びは呼び出し側が持つ（カメラはここで止まる） */
+  onClip: (clip: CaptureClip, rotation: ImageRotation) => void;
+  /** 開いたらすぐカメラを起こす（撮り直しのとき） */
+  autoStart?: boolean;
 };
 
 const MODE_OPTIONS: { mode: CaptureMode; label: string }[] = [
@@ -36,7 +43,12 @@ function getStorage(): PreferenceStorage | null {
 }
 
 // 流れの判断は controller の仕事。ここは状態を描いて、ボタンを controller につなぐだけ
-export function OutfitCameraCapture({ disabled, onPhoto }: OutfitCameraCaptureProps) {
+export function OutfitCameraCapture({
+  disabled,
+  onPhoto,
+  onClip,
+  autoStart = false,
+}: OutfitCameraCaptureProps) {
   // 1回だけ作る（レンダーごとに作り直すと、下の後始末が走ってカメラが止まる）
   const [{ controller, trigger, beep }] = useState(() => {
     const trigger = createManualTrigger();
@@ -64,6 +76,19 @@ export function OutfitCameraCapture({ disabled, onPhoto }: OutfitCameraCapturePr
     [controller, beep],
   );
 
+  // 動画を録り終えたら、動画をフォームに渡す（コマ選びと動画の保持はフォームの仕事）
+  useEffect(() => {
+    if (state.phase !== "picking" || !state.clip) return;
+    const handed = controller.handOffClip();
+    if (handed) onClip(handed.clip, handed.rotation);
+  }, [state.phase, state.clip, controller, onClip]);
+
+  useEffect(() => {
+    if (autoStart) void controller.start();
+    // 開いた直後に1回だけ（autoStart の変化では起こさない）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 確認の写真の表示 URL。フォームの previewBlob と同じ作り
   const photoBlob = state.photo?.blob ?? null;
   useEffect(() => {
@@ -89,7 +114,6 @@ export function OutfitCameraCapture({ disabled, onPhoto }: OutfitCameraCapturePr
     phase === "live" ||
     phase === "countdown" ||
     phase === "recording" ||
-    // 動画のコマを処理しているあいだは、選び中の画面を出し続ける
     (phase === "processing" && !state.clip);
 
   return (
@@ -229,24 +253,6 @@ export function OutfitCameraCapture({ disabled, onPhoto }: OutfitCameraCapturePr
         <p className="text-sm text-muted-foreground" role="status">
           写真を整えています
         </p>
-      )}
-
-      {(phase === "picking" || (phase === "processing" && state.clip)) && state.clip && (
-        <div className="flex flex-col gap-3">
-          <OutfitClipPicker
-            clip={state.clip}
-            rotation={state.rotation}
-            message={state.message}
-            disabled={disabled || phase === "processing"}
-            onUseFrame={(frameBlob) => void controller.useFrame(frameBlob)}
-            onRetake={() => void controller.retake()}
-          />
-          {phase === "processing" && (
-            <p className="text-sm text-muted-foreground" role="status">
-              写真を整えています
-            </p>
-          )}
-        </div>
       )}
 
       {phase === "review" && state.photo && (

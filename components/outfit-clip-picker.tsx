@@ -5,15 +5,29 @@ import { canPickFrame } from "@/lib/camera/can-pick-frame";
 import { previewLayout } from "@/lib/camera/camera-preview-layout";
 import type { CaptureClip } from "@/lib/camera/capture-controller";
 import { frameFromVideo } from "@/lib/camera/video-frame";
-import type { ImageRotation } from "@/lib/image-processing";
+import {
+  processImageForOutfitUpload,
+  type ImageRotation,
+  type ProcessedImage,
+} from "@/lib/image-processing";
+import {
+  addPickedFrame,
+  MAX_PICKED_FRAMES,
+  removePickedFrame,
+  type PickedFrame,
+} from "@/lib/outfits/clip-frames";
 import { useEffect, useRef, useState } from "react";
 
 type OutfitClipPickerProps = {
   clip: CaptureClip;
   rotation: ImageRotation;
-  message: string | null;
+  /** 選んだコマの列（持ち主はフォーム。決定のあとに戻ってきても残る） */
+  frames: PickedFrame<ProcessedImage>[];
+  onFramesChange: (frames: PickedFrame<ProcessedImage>[]) => void;
+  keepVideo: boolean;
+  onKeepVideoChange: (keep: boolean) => void;
   disabled: boolean;
-  onUseFrame: (frame: Blob) => void;
+  onDecide: () => void;
   onRetake: () => void;
 };
 
@@ -37,9 +51,12 @@ function downloadName(blob: Blob): string {
 export function OutfitClipPicker({
   clip,
   rotation,
-  message,
+  frames,
+  onFramesChange,
+  keepVideo,
+  onKeepVideoChange,
   disabled,
-  onUseFrame,
+  onDecide,
   onRetake,
 }: OutfitClipPickerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -48,8 +65,21 @@ export function OutfitClipPicker({
   const [duration, setDuration] = useState(clip.durationSec);
   const [time, setTime] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [playing, setPlaying] = useState(true);
   const [pickable, setPickable] = useState(false);
   const seekedOnce = useRef(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+
+  // 選んだコマのサムネイル。列が変わるたびに作り直し、前のものは解放する
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    for (const f of frames) next[f.id] = URL.createObjectURL(f.image.blob);
+    setThumbs(next);
+    return () => {
+      for (const u of Object.values(next)) URL.revokeObjectURL(u);
+    };
+  }, [frames]);
 
   // 絵が出ていて、シーク中でないときだけ「このコマで記録」を押せる
   function refreshPickable(video: HTMLVideoElement) {
@@ -106,10 +136,12 @@ export function OutfitClipPicker({
     video.currentTime = video.duration * START_RATIO;
   }
 
-  async function pickCurrentFrame() {
+  // 今のコマを選んだ列に足す。切り出し・縮小は写真と同じ処理（向きもここで反映する）
+  async function addCurrentFrame() {
     const video = videoRef.current;
     if (!video || busy) return;
     setBusy(true);
+    setMessage(null);
     try {
       video.pause();
       if (video.seeking) {
@@ -117,12 +149,29 @@ export function OutfitClipPicker({
           video.addEventListener("seeked", () => resolve(), { once: true }),
         );
       }
-      onUseFrame(await frameFromVideo(video));
+      const timeSec = video.currentTime;
+      const image = await processImageForOutfitUpload(await frameFromVideo(video), rotation);
+      const { list, result } = addPickedFrame(frames, { id: crypto.randomUUID(), timeSec, image });
+      if (result === "added") onFramesChange(list);
+      else if (result === "duplicate") setMessage("ほぼ同じ場面はもう選んであります");
+      else setMessage(`選べるのは${MAX_PICKED_FRAMES}枚までです`);
     } catch {
-      // 切り出せなかったときは、もう一度押せるようにする
+      setMessage("コマを切り出せませんでした。もう一度お試しください");
     } finally {
       setBusy(false);
     }
+  }
+
+  function handleRetake() {
+    // 選んだコマも動画も捨てて撮り直す
+    onRetake();
+  }
+
+  function togglePlay() {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) void video.play().catch(() => undefined);
+    else video.pause();
   }
 
   function saveVideo() {
@@ -158,6 +207,8 @@ export function OutfitClipPicker({
               if (time === 0) handleCanPlayFirst(event.currentTarget);
               refreshPickable(event.currentTarget);
             }}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
             onSeeking={(event) => refreshPickable(event.currentTarget)}
             onSeeked={(event) => {
               seekedOnce.current = true;
@@ -181,7 +232,9 @@ export function OutfitClipPicker({
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="text-sm text-muted-foreground">いちばんよいコマを選んでください</p>
+        <p className="text-sm text-muted-foreground">
+          よいコマを選んで追加してください（動画は何度でも見直せます）
+        </p>
         <input
           type="range"
           aria-label="コマを選ぶ"
@@ -193,6 +246,9 @@ export function OutfitClipPicker({
           className="w-full accent-primary"
         />
         <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={togglePlay}>
+            {playing ? "一時停止" : "再生"}
+          </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => seek(time - STEP_SECONDS)}>
             ◀ 0.1秒
           </Button>
@@ -205,6 +261,54 @@ export function OutfitClipPicker({
         </div>
       </div>
 
+      <div className="flex flex-col gap-2">
+        <p className="text-sm font-medium">
+          選んだコマ {frames.length}/{MAX_PICKED_FRAMES}
+        </p>
+        {frames.length > 0 ? (
+          <ul className="flex flex-wrap gap-2">
+            {frames.map((f, index) => (
+              <li key={f.id} className="relative">
+                <button
+                  type="button"
+                  aria-label={`${index + 1}枚目（${f.timeSec.toFixed(1)}秒）の場面に移る`}
+                  onClick={() => seek(f.timeSec)}
+                  className="block h-16 w-16 overflow-hidden rounded-lg bg-photo outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {thumbs[f.id] && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumbs[f.id]} alt="" className="h-full w-full object-cover" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  aria-label={`${index + 1}枚目を外す`}
+                  disabled={disabled}
+                  onClick={() => onFramesChange(removePickedFrame(frames, f.id))}
+                  className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-xs text-background"
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            動画を動かして、よいコマで「このコマを追加」を押してください
+          </p>
+        )}
+      </div>
+
+      <label className="flex min-h-10 items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={keepVideo}
+          onChange={(event) => onKeepVideoChange(event.target.checked)}
+          className="h-4 w-4 accent-primary"
+        />
+        動画も残す
+      </label>
+
       {message && (
         <p className="text-sm text-muted-foreground" role="status">
           {message}
@@ -212,16 +316,22 @@ export function OutfitClipPicker({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={() => void pickCurrentFrame()} disabled={disabled || busy || !pickable}>
-          このコマで記録
+        <Button type="button" variant="outline" onClick={() => void addCurrentFrame()} disabled={disabled || busy || !pickable || frames.length >= MAX_PICKED_FRAMES}>
+          このコマを追加
         </Button>
-        <Button type="button" variant="outline" onClick={onRetake}>
+        <Button type="button" onClick={onDecide} disabled={disabled || busy || frames.length === 0}>
+          {frames.length}枚で決定
+        </Button>
+        <Button type="button" variant="outline" onClick={handleRetake} disabled={disabled}>
           撮り直す
         </Button>
         <Button type="button" variant="outline" onClick={saveVideo}>
           この端末に保存
         </Button>
       </div>
+      {frames.length > 0 && (
+        <p className="text-xs text-muted-foreground">「撮り直す」を押すと、選んだコマも消えます</p>
+      )}
     </div>
   );
 }
