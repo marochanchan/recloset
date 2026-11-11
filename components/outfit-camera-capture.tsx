@@ -1,11 +1,12 @@
 "use client";
 
+import { OutfitClipPicker } from "@/components/outfit-clip-picker";
 import { Button } from "@/components/ui/button";
 import { createBrowserCameraSource } from "@/lib/camera/browser-camera-source";
 import { previewLayout } from "@/lib/camera/camera-preview-layout";
 import type { PreferenceStorage } from "@/lib/camera/camera-preferences";
 import { cameraErrorMessage } from "@/lib/camera/camera-source";
-import { createCaptureController } from "@/lib/camera/capture-controller";
+import { createCaptureController, type CaptureMode } from "@/lib/camera/capture-controller";
 import { createManualTrigger } from "@/lib/camera/capture-trigger";
 import { createCountdownBeep } from "@/lib/camera/countdown-beep";
 import { processImageForOutfitUpload, type ProcessedImage } from "@/lib/image-processing";
@@ -16,6 +17,12 @@ type OutfitCameraCaptureProps = {
   disabled: boolean;
   onPhoto: (image: ProcessedImage) => void;
 };
+
+const MODE_OPTIONS: { mode: CaptureMode; label: string }[] = [
+  { mode: "photo", label: "写真" },
+  { mode: "video5", label: "動画 5秒" },
+  { mode: "video8", label: "動画 8秒" },
+];
 
 const DEFAULT_FRAME = { width: 1280, height: 720 };
 
@@ -78,7 +85,12 @@ export function OutfitCameraCapture({ disabled, onPhoto }: OutfitCameraCapturePr
   const { phase } = state;
   const layout = previewLayout(frame, state.rotation);
   const showVideo =
-    phase === "opening" || phase === "live" || phase === "countdown" || phase === "processing";
+    phase === "opening" ||
+    phase === "live" ||
+    phase === "countdown" ||
+    phase === "recording" ||
+    // 動画のコマを処理しているあいだは、選び中の画面を出し続ける
+    (phase === "processing" && !state.clip);
 
   return (
     <div className="flex flex-col gap-3">
@@ -109,6 +121,14 @@ export function OutfitCameraCapture({ disabled, onPhoto }: OutfitCameraCapturePr
             transform: layout.transform,
           }}
         />
+        {phase === "recording" && state.secondsLeft !== null && (
+          <div
+            aria-live="polite"
+            className="absolute inset-x-0 top-3 flex justify-center text-lg font-semibold text-white drop-shadow-lg"
+          >
+            録画中 {state.secondsLeft}
+          </div>
+        )}
         {phase === "countdown" && state.secondsLeft !== null && (
           <div
             aria-live="assertive"
@@ -158,6 +178,22 @@ export function OutfitCameraCapture({ disabled, onPhoto }: OutfitCameraCapturePr
               ))}
             </select>
           )}
+          {state.canRecord && (
+            <div role="group" aria-label="撮り方" className="flex flex-wrap gap-2">
+              {MODE_OPTIONS.map(({ mode, label }) => (
+                <Button
+                  key={mode}
+                  type="button"
+                  size="sm"
+                  variant={state.mode === mode ? "default" : "outline"}
+                  aria-pressed={state.mode === mode}
+                  onClick={() => controller.setMode(mode)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={controller.rotate}>
               向きを回す
@@ -169,7 +205,7 @@ export function OutfitCameraCapture({ disabled, onPhoto }: OutfitCameraCapturePr
                 trigger.fire();
               }}
             >
-              5秒後に撮る
+              {state.mode === "photo" ? "5秒後に撮る" : "5秒後に録画する"}
             </Button>
             <Button type="button" variant="outline" onClick={controller.close}>
               閉じる
@@ -183,16 +219,34 @@ export function OutfitCameraCapture({ disabled, onPhoto }: OutfitCameraCapturePr
         </div>
       )}
 
-      {phase === "countdown" && (
+      {(phase === "countdown" || phase === "recording") && (
         <Button type="button" variant="outline" className="w-fit" onClick={controller.cancelCountdown}>
           やめる
         </Button>
       )}
 
-      {phase === "processing" && (
+      {phase === "processing" && !state.clip && (
         <p className="text-sm text-muted-foreground" role="status">
           写真を整えています
         </p>
+      )}
+
+      {(phase === "picking" || (phase === "processing" && state.clip)) && state.clip && (
+        <div className="flex flex-col gap-3">
+          <OutfitClipPicker
+            clip={state.clip}
+            rotation={state.rotation}
+            message={state.message}
+            disabled={disabled || phase === "processing"}
+            onUseFrame={(frameBlob) => void controller.useFrame(frameBlob)}
+            onRetake={() => void controller.retake()}
+          />
+          {phase === "processing" && (
+            <p className="text-sm text-muted-foreground" role="status">
+              写真を整えています
+            </p>
+          )}
+        </div>
       )}
 
       {phase === "review" && state.photo && (

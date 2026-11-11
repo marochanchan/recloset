@@ -9,12 +9,26 @@ import {
   type OpenedCamera,
 } from "@/lib/camera/camera-source";
 
+// 使える形式を探す。mp4 が録れればそれ（Safari など）、だめなら webm
+function pickRecordingMimeType(): string | null {
+  if (typeof MediaRecorder === "undefined") return null;
+  for (const type of ["video/mp4", "video/webm"]) {
+    try {
+      if (MediaRecorder.isTypeSupported(type)) return type;
+    } catch {
+      // 判定できない形式は使わない
+    }
+  }
+  return null;
+}
+
 function openedCamera(stream: MediaStream, track: MediaStreamTrack): OpenedCamera {
   // 10秒は許可を待つ時間を含まない。映像が届いた今から数える
   const gate = createReadyGate();
   let video: HTMLVideoElement | null = null;
   let stopped = false;
   const endedListeners = new Set<() => void>();
+  let activeRecorder: MediaRecorder | null = null;
 
   const handleLoaded = () => gate.resolve();
   const handleTrackEnded = () => {
@@ -76,6 +90,67 @@ function openedCamera(stream: MediaStream, track: MediaStreamTrack): OpenedCamer
         canvas.height = 0;
       }
     },
+    canRecord: () => pickRecordingMimeType() !== null,
+    record(seconds, signal) {
+      const picked = pickRecordingMimeType();
+      if (stopped || !picked || track.readyState !== "live" || activeRecorder) {
+        return Promise.reject(new CameraError("failed"));
+      }
+      if (signal?.aborted) return Promise.reject(new CameraError("failed"));
+      const mimeType: string = picked;
+      return new Promise<Blob>((resolve, reject) => {
+        const chunks: Blob[] = [];
+        let finished = false;
+        let aborted = false;
+        let recorder: MediaRecorder;
+        try {
+          recorder = new MediaRecorder(stream, { mimeType });
+        } catch {
+          reject(new CameraError("failed"));
+          return;
+        }
+        activeRecorder = recorder;
+        const timeout = setTimeout(stopRecorder, seconds * 1000);
+        function stopRecorder() {
+          clearTimeout(timeout);
+          if (recorder.state !== "inactive") {
+            try {
+              recorder.stop();
+            } catch {
+              // すでに止まっている
+            }
+          }
+        }
+        function finish(error: CameraError | null) {
+          if (finished) return;
+          finished = true;
+          clearTimeout(timeout);
+          signal?.removeEventListener("abort", handleAbort);
+          if (activeRecorder === recorder) activeRecorder = null;
+          if (error || aborted || chunks.length === 0) {
+            reject(error ?? new CameraError("failed"));
+            return;
+          }
+          resolve(new Blob(chunks, { type: recorder.mimeType || mimeType }));
+        }
+        function handleAbort() {
+          aborted = true;
+          stopRecorder();
+          finish(new CameraError("failed"));
+        }
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) chunks.push(event.data);
+        };
+        recorder.onerror = () => finish(new CameraError("failed"));
+        recorder.onstop = () => finish(null);
+        signal?.addEventListener("abort", handleAbort);
+        try {
+          recorder.start(1000);
+        } catch {
+          finish(new CameraError("failed"));
+        }
+      });
+    },
     onEnded(listener) {
       endedListeners.add(listener);
       return () => {
@@ -86,6 +161,13 @@ function openedCamera(stream: MediaStream, track: MediaStreamTrack): OpenedCamer
       stopped = true;
       track.removeEventListener("ended", handleTrackEnded);
       endedListeners.clear();
+      if (activeRecorder && activeRecorder.state !== "inactive") {
+        try {
+          activeRecorder.stop();
+        } catch {
+          // すでに止まっている
+        }
+      }
       gate.reject(new CameraError("failed")); // 未決着の ready を決着させる
       detach();
       for (const t of stream.getTracks()) t.stop();

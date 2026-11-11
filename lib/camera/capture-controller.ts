@@ -25,19 +25,30 @@ import {
 export const COUNTDOWN_SECONDS = 5;
 
 const CAPTURE_FAILED_MESSAGE = "撮れませんでした。もう一度お試しください";
+const RECORD_FAILED_MESSAGE = "録画できませんでした。もう一度お試しください";
+
+// 撮り方。写真か、5秒・8秒の動画
+export type CaptureMode = "photo" | "video5" | "video8";
+const VIDEO_SECONDS: Record<CaptureMode, number> = { photo: 0, video5: 5, video8: 8 };
+export type CaptureClip = { blob: Blob; durationSec: number };
 
 export type CapturePhase =
   | "off"
   | "opening"
   | "live"
   | "countdown"
+  | "recording"
+  | "picking"
   | "processing"
   | "review"
   | "unavailable";
 
 export type CaptureState = {
   phase: CapturePhase;
-  secondsLeft: number | null; // countdown のときだけ
+  secondsLeft: number | null; // countdown・recording のときだけ
+  mode: CaptureMode;
+  canRecord: boolean; // このカメラで動画を録れるか（live のあいだ有効）
+  clip: CaptureClip | null; // picking（と、そこから処理中）のときだけ
   devices: CameraDevice[];
   deviceId: string | null;
   rotation: ImageRotation;
@@ -53,7 +64,9 @@ export type CaptureController = {
   start(): Promise<void>;
   selectDevice(deviceId: string): Promise<void>;
   rotate(): void; // live のときだけ効く
-  cancelCountdown(): void;
+  setMode(mode: CaptureMode): void; // live のときだけ効く。録れないカメラでは動画を選べない
+  cancelCountdown(): void; // カウントダウン中・録画中に止める
+  useFrame(frame: Blob): Promise<void>; // picking で選んだコマを写真にする
   retake(): Promise<void>;
   keep(): ProcessedImage | null; // 写真を返して off へ。2回目は null
   suspend(): void; // 画面が隠れた。確認中の写真だけ残す
@@ -63,6 +76,9 @@ export type CaptureController = {
 const INITIAL_STATE: CaptureState = {
   phase: "off",
   secondsLeft: null,
+  mode: "photo",
+  canRecord: false,
+  clip: null,
   devices: [],
   deviceId: null,
   rotation: 0,
@@ -91,6 +107,9 @@ export function createCaptureController(deps: {
   let camera: OpenedCamera | null = null;
   let video: HTMLVideoElement | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  // 録画ごとに増やす。取りやめた録画の結果を捨てる（camera の世代とは別）
+  let recordToken = 0;
+  let recordAbort: AbortController | null = null;
   let unsubscribeEnded: (() => void) | null = null;
   let unsubscribeDevices: (() => void) | null = null;
   let unsubscribeTrigger: (() => void) | null = null;
@@ -112,6 +131,9 @@ export function createCaptureController(deps: {
   // カメラを止める処理はここだけ。タイマー、登録の解除、stop()、世代の更新をまとめて行う
   function stopEverything() {
     generation++;
+    recordToken++;
+    recordAbort?.abort();
+    recordAbort = null;
     if (timer !== null) {
       clearTimeout(timer);
       timer = null;
@@ -130,18 +152,20 @@ export function createCaptureController(deps: {
       phase: "unavailable",
       secondsLeft: null,
       photo: null,
+      clip: null,
       errorReason: reason,
     });
   }
 
   function handleEnded() {
-    if (state.phase === "review") {
-      // 確認中の写真は残す。開き直すのは retake のとき
+    if (state.phase === "review" || state.phase === "picking") {
+      // 確認中の写真・選び中の動画は残す。開き直すのは retake のとき
       stopEverything();
     } else if (
       state.phase === "opening" ||
       state.phase === "live" ||
       state.phase === "countdown" ||
+      state.phase === "recording" ||
       state.phase === "processing"
     ) {
       fail("disconnected");
@@ -160,7 +184,8 @@ export function createCaptureController(deps: {
     safeTick(secondsLeft);
     if (secondsLeft === 0) {
       timer = null;
-      void capture();
+      if (state.mode === "photo") void capture();
+      else void record(VIDEO_SECONDS[state.mode]);
       return;
     }
     setState({ phase: "countdown", secondsLeft });
@@ -184,6 +209,44 @@ export function createCaptureController(deps: {
     }
   }
 
+  // 録画の残り秒の表示。録れたかどうかは record() の結果で決まる
+  function showRecording(secondsLeft: number) {
+    setState({ phase: "recording", secondsLeft });
+    if (secondsLeft > 1) {
+      timer = setTimeout(() => showRecording(secondsLeft - 1), 1000);
+    } else {
+      timer = null;
+    }
+  }
+
+  async function record(seconds: number) {
+    const current = camera;
+    if (!current) return;
+    const myGeneration = generation;
+    const myToken = ++recordToken;
+    const abort = new AbortController();
+    recordAbort = abort;
+    showRecording(seconds);
+    try {
+      const blob = await current.record(seconds, abort.signal);
+      if (generation !== myGeneration || recordToken !== myToken) return;
+      recordAbort = null;
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      setState({ phase: "picking", secondsLeft: null, clip: { blob, durationSec: seconds } });
+    } catch {
+      if (generation !== myGeneration || recordToken !== myToken) return;
+      recordAbort = null;
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      setState({ phase: "live", secondsLeft: null, clip: null, message: RECORD_FAILED_MESSAGE });
+    }
+  }
+
   function handleTrigger() {
     if (state.phase !== "live") return;
     showCountdown(COUNTDOWN_SECONDS);
@@ -199,6 +262,7 @@ export function createCaptureController(deps: {
       phase: "opening",
       secondsLeft: null,
       photo: null,
+      clip: null,
       errorReason: null,
     });
     if (!source.isSupported()) {
@@ -248,8 +312,11 @@ export function createCaptureController(deps: {
 
       unsubscribeTrigger = trigger.subscribe(handleTrigger);
       preferences = { ...preferences, lastDeviceId: opened.deviceId };
+      const canRecord = opened.canRecord();
       setState({
         phase: "live",
+        canRecord,
+        mode: canRecord ? state.mode : "photo",
         devices,
         deviceId: opened.deviceId,
         rotation: preferences.rotations[opened.deviceId] ?? 0,
@@ -303,19 +370,43 @@ export function createCaptureController(deps: {
       saveCameraPreferences(storage, preferences);
       setState({ rotation });
     },
+    setMode(mode) {
+      if (state.phase !== "live") return;
+      if (mode !== "photo" && !state.canRecord) return;
+      setState({ mode });
+    },
     cancelCountdown() {
-      if (state.phase !== "countdown") return;
+      if (state.phase !== "countdown" && state.phase !== "recording") return;
       if (timer !== null) {
         clearTimeout(timer);
         timer = null;
       }
-      setState({ phase: "live", secondsLeft: null });
+      // 録画中なら止めて、結果は捨てる
+      recordToken++;
+      recordAbort?.abort();
+      recordAbort = null;
+      setState({ phase: "live", secondsLeft: null, clip: null });
+    },
+    async useFrame(frame) {
+      if (state.phase !== "picking" || !state.clip) return;
+      const myGeneration = generation;
+      const rotation = state.rotation;
+      setState({ phase: "processing", secondsLeft: null });
+      try {
+        const photo = await process(frame, rotation);
+        if (generation !== myGeneration) return;
+        setState({ phase: "review", photo, clip: null });
+      } catch {
+        if (generation !== myGeneration) return;
+        // 動画は残して、選び直せるようにする
+        setState({ phase: "picking", message: CAPTURE_FAILED_MESSAGE });
+      }
     },
     async retake() {
-      if (state.phase !== "review") return;
+      if (state.phase !== "review" && state.phase !== "picking") return;
       if (camera) {
         // カメラが生きている間は開き直さない
-        setState({ phase: "live", photo: null });
+        setState({ phase: "live", photo: null, clip: null });
         return;
       }
       await openCamera(state.deviceId, true);
@@ -331,7 +422,7 @@ export function createCaptureController(deps: {
       if (state.phase === "off" || state.phase === "unavailable") return;
       stopEverything();
       if (state.phase === "review") return; // 確認中の写真だけ残す
-      setState({ phase: "off", secondsLeft: null, photo: null });
+      setState({ phase: "off", secondsLeft: null, photo: null, clip: null });
     },
     close() {
       stopEverything();

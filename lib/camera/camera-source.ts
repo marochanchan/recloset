@@ -57,6 +57,9 @@ export interface OpenedCamera {
   attach(video: HTMLVideoElement | null): void;
   ready(): Promise<void>; // 最初のフレームが届くと解決。再生できなければ CameraError で reject
   capture(): Promise<Blob>; // 反転も回転もしていない生のフレーム
+  canRecord(): boolean; // 動画を録れるか（MediaRecorder がない環境では false）
+  // seconds 秒の動画を録る。signal が中断されたら録画を止めて reject する
+  record(seconds: number, signal?: AbortSignal): Promise<Blob>;
   onEnded(listener: () => void): () => void;
   stop(): void;
 }
