@@ -181,13 +181,14 @@
   - 判定はサーバー側（RPC、本人ごとのロック）で、アップロード URL を出す前に行う。同じメディアの送り直しは二重に数えない。日付は撮影日（EXIF）ではなく送った日
   - スマホからのまとめ取り込み（発表のあとの予定）を止めない：上限内の分はそのまま進め、超えた分は失敗にせず「明日続きから」にできるよう残す。残りの枚数を画面に出す
   - 仕様書への追記とプランを書いて、Codex のレビューを通してから実装する
+- [ ] 認証メールを日本語に戻す：Supabase を Free に戻した（2026-11-22）ので、テンプレートが英語の初期状態になった。独自の SMTP（例：Resend の無料枠）を設定してから、控え `docs/project/auth-email-templates-ja.md` を貼り直す
 
 ## Supabase の利用量（Egress）（2026-10-27 確認。10月末の予定は変えない）
 
 - 請求期間 10/15〜11/15、Free プラン。10/27 時点：Egress 2.244/5GB、Cached Egress 0.759/5GB、Storage 0.17/1GB、Database 0.028/0.5GB。前の期間の Egress 超過の猶予は 11/11 まで
 - 今のペース（1日約0.19GB）が続くと、11/10 ごろに 5GB を超える見込み。もう一度超えると猶予なしで制限される（API がすべて 402、読み取り専用、停止のどれか）。Pro にすればすぐ解除される
 - [x] 11/3：Egress 3.74/5GB で目安の 3.5GB を超えたため、marochanchan が **一時的に Pro**（月 $25）へ変更。内訳は Storage 99.9%、PostgREST 0.1%（10/31）
-- [ ] **11/17 以降：Supabase を Free に戻す（marochanchan）。** 発表（11/16）のあと。未使用分はクレジットになり、現金の返金はない。Free で動かせるプロジェクトは2つまで。戻す前に、下の「服の写真を Cloudflare Images に移す」を済ませると、Free の枠に収まりやすい
+- [x] **11/17 以降：Supabase を Free に戻す（marochanchan）。** → 2026-11-22 済み（Storage 約0.19GB・Egress 1.53GB で枠内、Spend cap 有効。認証メールのテンプレートは英語に戻ったので、控えを docs/project/auth-email-templates-ja.md に保存）。 発表（11/16）のあと。未使用分はクレジットになり、現金の返金はない。Free で動かせるプロジェクトは2つまで。戻す前に、下の「服の写真を Cloudflare Images に移す」を済ませると、Free の枠に収まりやすい
 - [x] 11/1 と 11/5 に利用量を確かめ、Pro にするか決める（ユーザー。勝手に有料プランへ変えない）。目安：11/3 の時点で Egress が 3.5GB を超えていたら、11/10 の本番での通しの確認より前に決める
 - [x] Egress が増える原因を確かめる（11/3：Usage のサービス別の内訳で Storage が 99.9%。服の写真 `clothing-images` が原因で確定。ログのパス別は未確認）。コードから考えられる原因：服の写真の署名付き URL が少なくとも15分ごとに変わる（サーバーが切り替わるとさらに頻繁）ため、Vercel の画像の最適化とブラウザのキャッシュが効かず、元の写真（長辺1600px）を Supabase から取り直している
 - [ ] **発表のあとの最初の作業：服の写真を Cloudflare Images に移す**（Supabase と Cloudflare の両方に課金し続けないため。2026-11-03 の判断）。仕様とプランを書いて Codex のレビューを通してから実装する
@@ -201,7 +202,7 @@
 - [x] Cloudflare のアカウントを作り、Images & Stream Starter Bundle（月 $5）を契約する（2026-10-25）
 - [x] Cloudflare の API トークンを作り、アカウント ID と一緒に `.env.local` に入れる（読み取り専用で確認済み：Images 上限100,000枚、Stream 上限1,000分）
 - [x] Supabase の secret key を `.env.local` に入れる（有効なことを確認済み）
-- [ ] Cloudflare の API トークンの期限（2026-11-24）より前に、期限を延ばしたトークンを作り直して Vercel と `.env.local` を差し替える
+- [x] Cloudflare の API トークンの期限（2026-11-24）より前に、期限を延ばしたトークンを作り直して Vercel と `.env.local` を差し替える（2026-11-22 済み。新しいトークン `recloset-media-2027-11`、権限は Stream・Images の Read/Edit と Account Analytics Read、**次の期限 2027-11-22**）
 - [x] テスト用の写真（着画1枚・服の平置き3枚）と動画を用意する（`~/Desktop/recloset-test`、動画は MOV から5秒の MP4 に変換、2026-10-27）
 - [x] Cloudflare の予算アラート（Budget Alerts）を $1 と $5 で設定する（自動で作られた $10 もあり。通知だけで、利用は止まらない。2026-10-27）
 - [x] 本番切り替え（Task 12b）のときに、`.env.local` の Cloudflare の値を Vercel に入れる（2026-10-28）
